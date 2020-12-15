@@ -138,8 +138,8 @@ update msg ({ boxUnits, borderUnits } as model) =
                         (\char _ chars ->
                             SimpleChar
                                 { char = char
-                                , width = boxUnits - borderUnits
-                                , height = boxUnits - borderUnits
+                                , width = boxUnits - borderUnits * 2
+                                , height = boxUnits - borderUnits * 2
                                 , x = borderUnits
                                 , y = borderUnits
                                 }
@@ -193,7 +193,7 @@ editor ({ selectedChar, simpleCharSvgs, boxUnits, unitSize, borderUnits } as mod
         [ E.inFront <|
             case selectedChar of
                 Just char ->
-                    E.html <| renderChar unitSize simpleCharSvgs char
+                    E.html <| renderChar unitSize boxUnits simpleCharSvgs char
 
                 Nothing ->
                     E.none
@@ -374,7 +374,7 @@ charCard { thumbnailUnitSize, boxUnits, simpleCharSvgs } myChar =
             ]
           <|
             E.text (String.fromChar <| charFromMyChar myChar)
-        , E.html <| renderChar thumbnailUnitSize simpleCharSvgs myChar
+        , E.html <| renderChar thumbnailUnitSize boxUnits simpleCharSvgs myChar
         ]
 
 
@@ -401,22 +401,26 @@ isMyCharType myCharType myChar =
             False
 
 
-renderChar : Int -> SimpleCharSvgs -> MyChar -> Svg Msg
-renderChar unitSize simpleCharSvgs myChar =
+renderChar : Int -> Int -> SimpleCharSvgs -> MyChar -> Svg Msg
+renderChar unitSize boxUnits simpleCharSvgs myChar =
     case myChar of
         SimpleChar { char, width, height, x, y } ->
             case Dict.get char simpleCharSvgs of
                 Just svg ->
                     Svg.svg
-                        [ SvgAttributes.width <| SvgTypes.px <| toFloat (width * unitSize)
-                        , SvgAttributes.height <| SvgTypes.px <| toFloat (height * unitSize)
+                        [ SvgAttributes.width <| SvgTypes.px <| toFloat (boxUnits * unitSize)
+                        , SvgAttributes.height <| SvgTypes.px <| toFloat (boxUnits * unitSize)
                         ]
-                    <|
                         [ Svg.svg
-                            [ SvgAttributes.x <| SvgTypes.px <| toFloat x
-                            , SvgAttributes.y <| SvgTypes.px <| toFloat y
+                            [ SvgAttributes.x <| SvgTypes.px <| toFloat (x * unitSize)
+                            , SvgAttributes.y <| SvgTypes.px <| toFloat (y * unitSize)
                             ]
-                            [ svg ]
+                            [ Svg.svg
+                                [ SvgAttributes.width <| SvgTypes.px <| toFloat (width * unitSize)
+                                , SvgAttributes.height <| SvgTypes.px <| toFloat (height * unitSize)
+                                ]
+                                [ svg ]
+                            ]
                         ]
 
                 Nothing ->
@@ -425,7 +429,7 @@ renderChar unitSize simpleCharSvgs myChar =
 
         CompoundChar { char, components } ->
             Svg.svg [] <|
-                List.map (renderChar unitSize simpleCharSvgs) components
+                List.map (renderChar unitSize boxUnits simpleCharSvgs) components
 
 
 addButton : Float -> Msg -> E.Element Msg
