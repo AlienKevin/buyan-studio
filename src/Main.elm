@@ -5,6 +5,9 @@ import Dict exposing (Dict)
 import Dict.Extra
 import Element as E
 import Element.Input as Input
+import Element.Background as Background
+import Element.Border as Border
+import Element.Font as Font
 import Html exposing (Html, a)
 import Json.Decode as Decode
 import Json.Encode as Encode
@@ -131,33 +134,62 @@ view model =
 
 
 simpleCharsPanel : Model -> E.Element Msg
-simpleCharsPanel ({ thumbnailGridSize } as model) =
+simpleCharsPanel ({ boxSize, thumbnailGridSize } as model) =
     E.column [ E.width E.fill ]
         [ E.row []
             [ E.text "Simple Characters"
             , addButton AddSimpleChar
             ]
         , E.wrappedRow
-            [ E.width E.fill ] <|
+            [ E.width E.fill
+            , E.spacing 20
+            ]
+          <|
             List.foldl
-            (\{char, width, height} list ->
-                case Dict.get char model.simpleCharSvgs of
-                    Just svg ->
-                        E.column []
-                        [ E.text (String.fromChar char)
-                        , E.html <|
-                            Svg.svg
-                                [ Svg.Attributes.width <| String.fromInt (width * thumbnailGridSize)
-                                , Svg.Attributes.height <| String.fromInt (height * thumbnailGridSize)
-                                ]
-                                [ svg ]
-                        ] :: list
-                    
-                    Nothing -> -- impossible
-                        list
-            )
-            []
-            model.simpleChars
+                (\{ char, width, height } list ->
+                    case Dict.get char model.simpleCharSvgs of
+                        Just svg ->
+                            charCard
+                                { char = char
+                                , svg =
+                                    Svg.svg
+                                        [ Svg.Attributes.width <| String.fromInt (width * thumbnailGridSize)
+                                        , Svg.Attributes.height <| String.fromInt (height * thumbnailGridSize)
+                                        ]
+                                        [ svg ]
+                                , thumbnailGridSize = thumbnailGridSize
+                                , boxSize = boxSize
+                                }
+                                :: list
+
+                        Nothing ->
+                            -- impossible
+                            list
+                )
+                []
+                model.simpleChars
+        ]
+
+
+charCard :
+    { char : Char
+    , svg : Html Msg
+    , thumbnailGridSize : Int
+    , boxSize : Int
+    }
+    -> E.Element Msg
+charCard { char, svg, thumbnailGridSize, boxSize } =
+    E.column
+        [ E.width <| E.px <| boxSize * thumbnailGridSize
+        , Background.color palette.lightBg
+        , Border.rounded 20
+        ]
+        [ E.el
+            [ Font.size 40
+            , Font.bold
+            ] <|
+            E.text (String.fromChar char)
+        , E.html svg
         ]
 
 
@@ -221,3 +253,9 @@ main =
         , update = update
         , subscriptions = subscriptions
         }
+
+
+palette =
+    { lightBg =
+        E.rgb255 246 234 190
+    }
