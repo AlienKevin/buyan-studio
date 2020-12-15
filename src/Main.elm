@@ -28,7 +28,7 @@ port getSimpleChar : (Encode.Value -> msg) -> Sub msg
 
 
 type alias Model =
-    { chars: List MyChar
+    { chars : List MyChar
     , simpleCharSvgs : SimpleCharSvgs
     , boxSize : Int
     , borderSize : Int
@@ -45,7 +45,15 @@ type MyChar
         , x : Int
         , y : Int
         }
-    | CompoundChar (List MyChar)
+    | CompoundChar
+        { char : Char
+        , components : List MyChar
+        }
+
+
+type MyCharType
+    = SimpleCharType
+    | CompoundCharType
 
 
 type alias SimpleCharSvgs =
@@ -70,15 +78,20 @@ init _ =
 
 
 type Msg
-    = AddSimpleChar
+    = AddChar MyCharType
     | GetSimpleChar Encode.Value
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg ({ boxSize, borderSize } as model) =
     case msg of
-        AddSimpleChar ->
-            ( model, addSimpleChar () )
+        AddChar myCharType ->
+            case myCharType of
+                SimpleCharType ->
+                    ( model, addSimpleChar () )
+
+                CompoundCharType ->
+                    ( model, Cmd.none )
 
         GetSimpleChar svgs ->
             case Decode.decodeValue decodeSimpleCharSvgs svgs of
@@ -127,14 +140,15 @@ view model =
     E.layout
         [ E.padding spacing.large ]
     <|
-        E.row []
-            [ simpleCharsPanel model
-            , compoundCharsPanel model
+        E.column
+            [ E.spacing spacing.large ]
+            [ charsPanel SimpleCharType model
+            , charsPanel CompoundCharType model
             ]
 
 
-simpleCharsPanel : Model -> E.Element Msg
-simpleCharsPanel ({ boxSize, thumbnailGridSize } as model) =
+charsPanel : MyCharType -> Model -> E.Element Msg
+charsPanel myCharType model =
     E.column
         [ E.width E.fill
         , E.spacing spacing.medium
@@ -143,53 +157,36 @@ simpleCharsPanel ({ boxSize, thumbnailGridSize } as model) =
             [ E.spacing spacing.small
             , Font.size fontSize.title
             ]
-            [ E.text "Simple Characters"
-            , addButton fontSize.title AddSimpleChar
+            [ E.text <|
+                (case myCharType of
+                    SimpleCharType ->
+                        "Simple"
+
+                    CompoundCharType ->
+                        "Compound"
+                )
+                    ++ " Characters"
+            , addButton fontSize.title <| AddChar myCharType
             ]
         , E.wrappedRow
             [ E.width E.fill
             , E.spacing spacing.medium
             ]
           <|
-            List.foldl
-                (\myChar list ->
-                    case myChar of
-                        SimpleChar { char, width, height } ->
-                            case Dict.get char model.simpleCharSvgs of
-                                Just svg ->
-                                    charCard
-                                        { char = char
-                                        , svg =
-                                            Svg.svg
-                                                [ Svg.Attributes.width <| String.fromInt (width * thumbnailGridSize)
-                                                , Svg.Attributes.height <| String.fromInt (height * thumbnailGridSize)
-                                                ]
-                                                [ svg ]
-                                        , thumbnailGridSize = thumbnailGridSize
-                                        , boxSize = boxSize
-                                        }
-                                        :: list
+            List.filterMap
+                (\myChar ->
+                    if isMyCharType myCharType myChar then
+                        Just <| charCard model myChar
 
-                                Nothing ->
-                                    -- impossible
-                                    list
-                        
-                        _ ->
-                            list
+                    else
+                        Nothing
                 )
-                []
                 model.chars
         ]
 
 
-charCard :
-    { char : Char
-    , svg : Html Msg
-    , thumbnailGridSize : Int
-    , boxSize : Int
-    }
-    -> E.Element Msg
-charCard { char, svg, thumbnailGridSize, boxSize } =
+charCard : Model -> MyChar -> E.Element Msg
+charCard { thumbnailGridSize, boxSize, simpleCharSvgs } myChar =
     E.column
         [ E.width <| E.px <| boxSize * thumbnailGridSize
         , Background.color palette.lightBg
@@ -200,9 +197,59 @@ charCard { char, svg, thumbnailGridSize, boxSize } =
             , Font.bold
             ]
           <|
-            E.text (String.fromChar char)
-        , E.html svg
+            E.text (String.fromChar <| charFromMyChar myChar)
+        , E.html <| renderChar thumbnailGridSize simpleCharSvgs myChar
         ]
+
+
+charFromMyChar : MyChar -> Char
+charFromMyChar myChar =
+    case myChar of
+        SimpleChar { char } ->
+            char
+
+        CompoundChar { char } ->
+            char
+
+
+isMyCharType : MyCharType -> MyChar -> Bool
+isMyCharType myCharType myChar =
+    case ( myCharType, myChar ) of
+        ( SimpleCharType, SimpleChar _ ) ->
+            True
+
+        ( CompoundCharType, CompoundChar _ ) ->
+            True
+
+        _ ->
+            False
+
+
+renderChar : Int -> SimpleCharSvgs -> MyChar -> Svg Msg
+renderChar gridSize simpleCharSvgs myChar =
+    case myChar of
+        SimpleChar { char, width, height, x, y } ->
+            case Dict.get char simpleCharSvgs of
+                Just svg ->
+                    Svg.svg
+                        [ Svg.Attributes.width <| String.fromInt (width * gridSize)
+                        , Svg.Attributes.height <| String.fromInt (height * gridSize)
+                        ]
+                    <|
+                        [ Svg.svg
+                            [ Svg.Attributes.x <| String.fromInt x
+                            , Svg.Attributes.y <| String.fromInt y
+                            ]
+                            [ svg ]
+                        ]
+
+                Nothing ->
+                    -- impossible
+                    Svg.text <| "Error rendering " ++ String.fromChar char
+
+        CompoundChar { char, components } ->
+            Svg.svg [] <|
+                List.map (renderChar gridSize simpleCharSvgs) components
 
 
 addButton : Float -> Msg -> E.Element Msg
