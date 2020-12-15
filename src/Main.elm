@@ -126,7 +126,8 @@ update msg ({ boxSize, borderSize } as model) =
 
 view : Model -> Html Msg
 view model =
-    E.layout [] <|
+    E.layout
+        [ E.padding spacing.large ] <|
         E.row []
             [ simpleCharsPanel model
             , compoundCharsPanel model
@@ -135,14 +136,18 @@ view model =
 
 simpleCharsPanel : Model -> E.Element Msg
 simpleCharsPanel ({ boxSize, thumbnailGridSize } as model) =
-    E.column [ E.width E.fill ]
-        [ E.row []
+    E.column
+        [ E.width E.fill
+        , E.spacing spacing.medium
+        ]
+        [ E.row
+            [ E.spacing spacing.small ]
             [ E.text "Simple Characters"
             , addButton AddSimpleChar
             ]
         , E.wrappedRow
             [ E.width E.fill
-            , E.spacing 20
+            , E.spacing spacing.medium
             ]
           <|
             List.foldl
@@ -182,7 +187,7 @@ charCard { char, svg, thumbnailGridSize, boxSize } =
     E.column
         [ E.width <| E.px <| boxSize * thumbnailGridSize
         , Background.color palette.lightBg
-        , Border.rounded 20
+        , Border.rounded spacing.medium
         ]
         [ E.el
             [ Font.size 40
@@ -258,4 +263,12 @@ main =
 palette =
     { lightBg =
         E.rgb255 246 234 190
+    }
+
+
+spacing =
+    { small =
+        10
+    , medium = 20
+    , large = 30
     }
