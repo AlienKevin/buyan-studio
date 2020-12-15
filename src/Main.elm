@@ -1,7 +1,8 @@
 module Main exposing (..)
 
 import Browser
-import Dict exposing (Dict)
+import Color
+import Dict exposing (Dict, size)
 import Dict.Extra
 import Element as E
 import Element.Background as Background
@@ -14,12 +15,12 @@ import File.Select as Select
 import Html exposing (Html, a)
 import Json.Decode as Decode
 import Json.Encode as Encode
-import TypedSvg as Svg
-import TypedSvg.Core exposing (Svg)
-import TypedSvg.Attributes as SvgAttributes
-import TypedSvg.Types as SvgTypes
 import SvgParser
 import Task
+import TypedSvg as Svg
+import TypedSvg.Attributes as SvgAttributes
+import TypedSvg.Core exposing (Svg)
+import TypedSvg.Types as SvgTypes
 
 
 
@@ -29,10 +30,10 @@ import Task
 type alias Model =
     { chars : List MyChar
     , simpleCharSvgs : SimpleCharSvgs
-    , boxSize : Int
-    , borderSize : Int
-    , gridSize : Int
-    , thumbnailGridSize : Int
+    , boxUnits : Int
+    , borderUnits : Int
+    , unitSize : Int
+    , thumbnailUnitSize : Int
     }
 
 
@@ -63,10 +64,10 @@ init : () -> ( Model, Cmd Msg )
 init _ =
     ( { chars = []
       , simpleCharSvgs = Dict.empty
-      , boxSize = 34
-      , borderSize = 1
-      , gridSize = 20
-      , thumbnailGridSize = 7
+      , boxUnits = 34
+      , borderUnits = 1
+      , unitSize = 20
+      , thumbnailUnitSize = 7
       }
     , Cmd.none
     )
@@ -83,7 +84,7 @@ type Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg ({ boxSize, borderSize } as model) =
+update msg ({ boxUnits, borderUnits } as model) =
     case msg of
         AddChar myCharType ->
             case myCharType of
@@ -133,10 +134,10 @@ update msg ({ boxSize, borderSize } as model) =
                         (\char _ chars ->
                             SimpleChar
                                 { char = char
-                                , width = boxSize - borderSize
-                                , height = boxSize - borderSize
-                                , x = borderSize
-                                , y = borderSize
+                                , width = boxUnits - borderUnits
+                                , height = boxUnits - borderUnits
+                                , x = borderUnits
+                                , y = borderUnits
                                 }
                                 :: chars
                         )
@@ -164,18 +165,119 @@ view model =
     E.layout
         [ E.padding spacing.large ]
     <|
-        E.column
-            [ E.spacing spacing.large ]
-            [ charsPanel SimpleCharType model
-            , charsPanel CompoundCharType model
+        E.row
+            [ E.width E.fill
+            , E.height E.fill
+            , E.spacing spacing.large
+            ]
+            [ charPanels model
+            , editor model
             ]
 
 
-charsPanel : MyCharType -> Model -> E.Element Msg
-charsPanel myCharType model =
+editor : Model -> E.Element Msg
+editor ({ boxUnits, unitSize, borderUnits } as model) =
+    E.html <|
+        gridBackground { boxUnits = boxUnits, unitSize = unitSize, borderUnits = borderUnits }
+
+
+gridBackground :
+    { boxUnits : Int
+    , borderUnits : Int
+    , unitSize : Int
+    }
+    -> Svg Msg
+gridBackground { boxUnits, borderUnits, unitSize } =
+    let
+        boxSize =
+            boxUnits * unitSize
+
+        borderSize =
+            borderUnits * unitSize
+
+        strokeWidth =
+            { normal =
+                2
+            , thick =
+                3
+            }
+    in
+    Svg.svg
+        [ SvgAttributes.width <| SvgTypes.px <| toFloat <| boxSize
+        , SvgAttributes.height <| SvgTypes.px <| toFloat <| boxSize
+        , SvgAttributes.stroke <| SvgTypes.Paint <| Color.lightBlue
+        ]
+    <|
+        [ gridOutline
+            { x = strokeWidth.thick
+            , y = strokeWidth.thick
+            , strokeWidth =
+                strokeWidth.thick
+            , size =
+                boxSize - strokeWidth.thick * 2
+            }
+        , gridOutline
+            { x = borderSize
+            , y = borderSize
+            , strokeWidth =
+                strokeWidth.thick
+            , size =
+                boxSize - borderSize * 2
+            }
+        ]
+            ++ List.map
+                (\units ->
+                    Svg.g
+                        (if units == (round <| toFloat (boxUnits - 4) / 2) then
+                            [ SvgAttributes.strokeWidth <| SvgTypes.px strokeWidth.thick ]
+                        else
+                            []
+                        )
+                        [ Svg.line
+                            [ SvgAttributes.x1 <| SvgTypes.px <| toFloat <| (2 + units) * unitSize
+                            , SvgAttributes.y1 <| SvgTypes.px <| toFloat <| unitSize
+                            , SvgAttributes.x2 <| SvgTypes.px <| toFloat <| (2 + units) * unitSize
+                            , SvgAttributes.y2 <| SvgTypes.px <| toFloat <| (boxUnits - 1) * unitSize
+                            ]
+                            []
+                        , Svg.line
+                            [ SvgAttributes.x1 <| SvgTypes.px <| toFloat <| unitSize
+                            , SvgAttributes.y1 <| SvgTypes.px <| toFloat <| (2 + units) * unitSize
+                            , SvgAttributes.x2 <| SvgTypes.px <| toFloat <| (boxUnits - 1) * unitSize
+                            , SvgAttributes.y2 <| SvgTypes.px <| toFloat <| (2 + units) * unitSize
+                            ]
+                            []
+                        ]
+                )
+                (List.range 0 (boxUnits - 4))
+
+
+gridOutline : { x : Int, y : Int, strokeWidth : Float, size : Int } -> Svg Msg
+gridOutline { x, y, strokeWidth, size } =
+    Svg.rect
+        [ SvgAttributes.width <| SvgTypes.px <| toFloat size
+        , SvgAttributes.height <| SvgTypes.px <| toFloat size
+        , SvgAttributes.x <| SvgTypes.px <| toFloat x
+        , SvgAttributes.y <| SvgTypes.px <| toFloat y
+        , SvgAttributes.fill <| SvgTypes.PaintNone
+        , SvgAttributes.strokeWidth <| SvgTypes.px strokeWidth
+        ]
+        []
+
+
+charPanels : Model -> E.Element Msg
+charPanels model =
     E.column
-        [ E.width E.fill
-        , E.spacing spacing.medium
+        [ E.spacing spacing.large ]
+        [ charPanel SimpleCharType model
+        , charPanel CompoundCharType model
+        ]
+
+
+charPanel : MyCharType -> Model -> E.Element Msg
+charPanel myCharType model =
+    E.column
+        [ E.spacing spacing.medium
         ]
         [ E.row
             [ E.spacing spacing.small
@@ -210,9 +312,9 @@ charsPanel myCharType model =
 
 
 charCard : Model -> MyChar -> E.Element Msg
-charCard { thumbnailGridSize, boxSize, simpleCharSvgs } myChar =
+charCard { thumbnailUnitSize, boxUnits, simpleCharSvgs } myChar =
     E.column
-        [ E.width <| E.px <| boxSize * thumbnailGridSize
+        [ E.width <| E.px <| boxUnits * thumbnailUnitSize
         , Background.color palette.lightBg
         , Border.rounded spacing.medium
         ]
@@ -222,7 +324,7 @@ charCard { thumbnailGridSize, boxSize, simpleCharSvgs } myChar =
             ]
           <|
             E.text (String.fromChar <| charFromMyChar myChar)
-        , E.html <| renderChar thumbnailGridSize simpleCharSvgs myChar
+        , E.html <| renderChar thumbnailUnitSize simpleCharSvgs myChar
         ]
 
 
@@ -250,14 +352,14 @@ isMyCharType myCharType myChar =
 
 
 renderChar : Int -> SimpleCharSvgs -> MyChar -> Svg Msg
-renderChar gridSize simpleCharSvgs myChar =
+renderChar unitSize simpleCharSvgs myChar =
     case myChar of
         SimpleChar { char, width, height, x, y } ->
             case Dict.get char simpleCharSvgs of
                 Just svg ->
                     Svg.svg
-                        [ SvgAttributes.width <| SvgTypes.px <| toFloat (width * gridSize)
-                        , SvgAttributes.height <| SvgTypes.px <| toFloat (height * gridSize)
+                        [ SvgAttributes.width <| SvgTypes.px <| toFloat (width * unitSize)
+                        , SvgAttributes.height <| SvgTypes.px <| toFloat (height * unitSize)
                         ]
                     <|
                         [ Svg.svg
@@ -273,7 +375,7 @@ renderChar gridSize simpleCharSvgs myChar =
 
         CompoundChar { char, components } ->
             Svg.svg [] <|
-                List.map (renderChar gridSize simpleCharSvgs) components
+                List.map (renderChar unitSize simpleCharSvgs) components
 
 
 addButton : Float -> Msg -> E.Element Msg
