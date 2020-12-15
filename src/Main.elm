@@ -14,8 +14,10 @@ import File.Select as Select
 import Html exposing (Html, a)
 import Json.Decode as Decode
 import Json.Encode as Encode
-import Svg exposing (Svg)
-import Svg.Attributes
+import TypedSvg as Svg
+import TypedSvg.Core exposing (Svg)
+import TypedSvg.Attributes as SvgAttributes
+import TypedSvg.Types as SvgTypes
 import SvgParser
 import Task
 
@@ -254,20 +256,20 @@ renderChar gridSize simpleCharSvgs myChar =
             case Dict.get char simpleCharSvgs of
                 Just svg ->
                     Svg.svg
-                        [ Svg.Attributes.width <| String.fromInt (width * gridSize)
-                        , Svg.Attributes.height <| String.fromInt (height * gridSize)
+                        [ SvgAttributes.width <| SvgTypes.px <| toFloat (width * gridSize)
+                        , SvgAttributes.height <| SvgTypes.px <| toFloat (height * gridSize)
                         ]
                     <|
                         [ Svg.svg
-                            [ Svg.Attributes.x <| String.fromInt x
-                            , Svg.Attributes.y <| String.fromInt y
+                            [ SvgAttributes.x <| SvgTypes.px <| toFloat x
+                            , SvgAttributes.y <| SvgTypes.px <| toFloat y
                             ]
                             [ svg ]
                         ]
 
                 Nothing ->
                     -- impossible
-                    Svg.text <| "Error rendering " ++ String.fromChar char
+                    TypedSvg.Core.text <| "Error rendering " ++ String.fromChar char
 
         CompoundChar { char, components } ->
             Svg.svg [] <|
