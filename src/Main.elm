@@ -28,8 +28,7 @@ port getSimpleChar : (Encode.Value -> msg) -> Sub msg
 
 
 type alias Model =
-    { simpleChars : List SimpleChar
-    , compoundChars : List CompoundChar
+    { chars: List MyChar
     , simpleCharSvgs : SimpleCharSvgs
     , boxSize : Int
     , borderSize : Int
@@ -38,17 +37,15 @@ type alias Model =
     }
 
 
-type alias SimpleChar =
-    { char : Char
-    , width : Int
-    , height : Int
-    , x : Int
-    , y : Int
-    }
-
-
-type alias CompoundChar =
-    List SimpleChar
+type MyChar
+    = SimpleChar
+        { char : Char
+        , width : Int
+        , height : Int
+        , x : Int
+        , y : Int
+        }
+    | CompoundChar (List MyChar)
 
 
 type alias SimpleCharSvgs =
@@ -57,8 +54,7 @@ type alias SimpleCharSvgs =
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { simpleChars = []
-      , compoundChars = []
+    ( { chars = []
       , simpleCharSvgs = Dict.empty
       , boxSize = 34
       , borderSize = 1
@@ -88,18 +84,19 @@ update msg ({ boxSize, borderSize } as model) =
             case Decode.decodeValue decodeSimpleCharSvgs svgs of
                 Ok newSimpleCharSvgs ->
                     ( { model
-                        | simpleChars =
+                        | chars =
                             Dict.foldl
                                 (\char _ chars ->
-                                    { char = char
-                                    , width = boxSize - borderSize
-                                    , height = boxSize - borderSize
-                                    , x = borderSize
-                                    , y = borderSize
-                                    }
+                                    SimpleChar
+                                        { char = char
+                                        , width = boxSize - borderSize
+                                        , height = boxSize - borderSize
+                                        , x = borderSize
+                                        , y = borderSize
+                                        }
                                         :: chars
                                 )
-                                model.simpleChars
+                                model.chars
                                 newSimpleCharSvgs
                         , simpleCharSvgs =
                             Dict.merge
@@ -155,28 +152,33 @@ simpleCharsPanel ({ boxSize, thumbnailGridSize } as model) =
             ]
           <|
             List.foldl
-                (\{ char, width, height } list ->
-                    case Dict.get char model.simpleCharSvgs of
-                        Just svg ->
-                            charCard
-                                { char = char
-                                , svg =
-                                    Svg.svg
-                                        [ Svg.Attributes.width <| String.fromInt (width * thumbnailGridSize)
-                                        , Svg.Attributes.height <| String.fromInt (height * thumbnailGridSize)
-                                        ]
-                                        [ svg ]
-                                , thumbnailGridSize = thumbnailGridSize
-                                , boxSize = boxSize
-                                }
-                                :: list
+                (\myChar list ->
+                    case myChar of
+                        SimpleChar { char, width, height } ->
+                            case Dict.get char model.simpleCharSvgs of
+                                Just svg ->
+                                    charCard
+                                        { char = char
+                                        , svg =
+                                            Svg.svg
+                                                [ Svg.Attributes.width <| String.fromInt (width * thumbnailGridSize)
+                                                , Svg.Attributes.height <| String.fromInt (height * thumbnailGridSize)
+                                                ]
+                                                [ svg ]
+                                        , thumbnailGridSize = thumbnailGridSize
+                                        , boxSize = boxSize
+                                        }
+                                        :: list
 
-                        Nothing ->
-                            -- impossible
+                                Nothing ->
+                                    -- impossible
+                                    list
+                        
+                        _ ->
                             list
                 )
                 []
-                model.simpleChars
+                model.chars
         ]
 
 
