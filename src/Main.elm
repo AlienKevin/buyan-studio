@@ -7,6 +7,7 @@ import Dict.Extra
 import Element as E
 import Element.Background as Background
 import Element.Border as Border
+import Element.Events as Events
 import Element.Font as Font
 import Element.Input as Input
 import FeatherIcons
@@ -29,6 +30,7 @@ import TypedSvg.Types as SvgTypes
 
 type alias Model =
     { chars : List MyChar
+    , selectedChar : Maybe MyChar
     , simpleCharSvgs : SimpleCharSvgs
     , boxUnits : Int
     , borderUnits : Int
@@ -63,6 +65,7 @@ type alias SimpleCharSvgs =
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { chars = []
+      , selectedChar = Nothing
       , simpleCharSvgs = Dict.empty
       , boxUnits = 34
       , borderUnits = 1
@@ -81,6 +84,7 @@ type Msg
     = AddChar MyCharType
     | SvgsSelected File (List File)
     | SvgsLoaded SimpleCharSvgs
+    | EditChar MyChar
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -155,6 +159,14 @@ update msg ({ boxUnits, borderUnits } as model) =
             , Cmd.none
             )
 
+        EditChar myChar ->
+            ( { model
+                | selectedChar =
+                    Just myChar
+              }
+            , Cmd.none
+            )
+
 
 
 ---- VIEW ----
@@ -176,9 +188,19 @@ view model =
 
 
 editor : Model -> E.Element Msg
-editor ({ boxUnits, unitSize, borderUnits } as model) =
-    E.html <|
-        gridBackground { boxUnits = boxUnits, unitSize = unitSize, borderUnits = borderUnits }
+editor ({ selectedChar, simpleCharSvgs, boxUnits, unitSize, borderUnits } as model) =
+    E.el
+        [ E.inFront <|
+            case selectedChar of
+                Just char ->
+                    E.html <| renderChar unitSize simpleCharSvgs char
+
+                Nothing ->
+                    E.none
+        ]
+    <|
+        E.html <|
+            gridBackground { boxUnits = boxUnits, unitSize = unitSize, borderUnits = borderUnits }
 
 
 gridBackground :
@@ -297,7 +319,8 @@ charPanel myCharType model =
         , E.height
             (if List.length cards <= 3 then
                 E.shrink
-            else
+
+             else
                 E.fill
             )
         , E.centerY
@@ -343,6 +366,7 @@ charCard { thumbnailUnitSize, boxUnits, simpleCharSvgs } myChar =
         [ E.width <| E.px <| boxUnits * thumbnailUnitSize
         , Background.color palette.lightBg
         , Border.rounded spacing.medium
+        , Events.onClick <| EditChar myChar
         ]
         [ E.el
             [ Font.size fontSize.large
