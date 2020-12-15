@@ -14,6 +14,7 @@ import FeatherIcons
 import File exposing (File)
 import File.Select as Select
 import Html exposing (Html, a)
+import Html.Attributes
 import Json.Decode as Decode
 import Json.Encode as Encode
 import SvgParser
@@ -301,7 +302,7 @@ charPanels model =
 
 
 charPanel : MyCharType -> Model -> E.Element Msg
-charPanel myCharType model =
+charPanel myCharType ({boxUnits, thumbnailUnitSize} as model) =
     let
         cards =
             List.filterMap
@@ -349,10 +350,10 @@ charPanel myCharType model =
 
                  else
                     E.fill
-                        |> E.minimum 500
-                        |> E.maximum 1000
+                        |> E.minimum (boxUnits * thumbnailUnitSize + fontSize.medium + spacing.medium)
                 )
-            , E.scrollbarY
+            , E.htmlAttribute <| Html.Attributes.style "overflow-y" "auto"
+            , E.htmlAttribute <| Html.Attributes.style "overflow-x" "hidden"
             , E.spacing spacing.medium
             ]
           <|
