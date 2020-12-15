@@ -367,6 +367,7 @@ charCard { thumbnailUnitSize, boxUnits, simpleCharSvgs } myChar =
         , Background.color palette.lightBg
         , Border.rounded spacing.medium
         , Events.onClick <| EditChar myChar
+        , E.pointer 
         ]
         [ E.el
             [ Font.size fontSize.large
