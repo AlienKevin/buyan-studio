@@ -230,7 +230,8 @@ gridBackground { boxUnits, borderUnits, unitSize } =
                     Svg.g
                         (if units == (round <| toFloat (boxUnits - 4) / 2) then
                             [ SvgAttributes.strokeWidth <| SvgTypes.px strokeWidth.thick ]
-                        else
+
+                         else
                             []
                         )
                         [ Svg.line
@@ -268,7 +269,10 @@ gridOutline { x, y, strokeWidth, size } =
 charPanels : Model -> E.Element Msg
 charPanels model =
     E.column
-        [ E.spacing spacing.large ]
+        [ E.width E.fill
+        , E.height E.fill
+        , E.spacing spacing.large
+        ]
         [ charPanel SimpleCharType model
         , charPanel CompoundCharType model
         ]
@@ -276,8 +280,27 @@ charPanels model =
 
 charPanel : MyCharType -> Model -> E.Element Msg
 charPanel myCharType model =
+    let
+        cards =
+            List.filterMap
+                (\myChar ->
+                    if isMyCharType myCharType myChar then
+                        Just <| charCard model myChar
+
+                    else
+                        Nothing
+                )
+                model.chars
+    in
     E.column
         [ E.spacing spacing.medium
+        , E.height
+            (if List.length cards <= 3 then
+                E.shrink
+            else
+                E.fill
+            )
+        , E.centerY
         ]
         [ E.row
             [ E.spacing spacing.small
@@ -296,18 +319,21 @@ charPanel myCharType model =
             ]
         , E.wrappedRow
             [ E.width E.fill
+            , E.height E.fill
+            , E.height
+                (if List.length cards == 0 then
+                    E.shrink
+
+                 else
+                    E.fill
+                        |> E.minimum 500
+                        |> E.maximum 1000
+                )
+            , E.scrollbarY
             , E.spacing spacing.medium
             ]
           <|
-            List.filterMap
-                (\myChar ->
-                    if isMyCharType myCharType myChar then
-                        Just <| charCard model myChar
-
-                    else
-                        Nothing
-                )
-                model.chars
+            cards
         ]
 
 
