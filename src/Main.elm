@@ -141,7 +141,9 @@ simpleCharsPanel ({ boxSize, thumbnailGridSize } as model) =
         , E.spacing spacing.medium
         ]
         [ E.row
-            [ E.spacing spacing.small ]
+            [ E.spacing spacing.small
+            , Font.size fontSize.title
+            ]
             [ E.text "Simple Characters"
             , addButton AddSimpleChar
             ]
@@ -190,7 +192,7 @@ charCard { char, svg, thumbnailGridSize, boxSize } =
         , Border.rounded spacing.medium
         ]
         [ E.el
-            [ Font.size 40
+            [ Font.size fontSize.large
             , Font.bold
             ] <|
             E.text (String.fromChar char)
@@ -271,4 +273,16 @@ spacing =
         10
     , medium = 20
     , large = 30
+    }
+
+
+fontSize =
+    { small =
+        16
+    , medium =
+        20
+    , large =
+        30
+    , title =
+        40
     }
