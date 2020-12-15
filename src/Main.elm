@@ -4,10 +4,11 @@ import Browser
 import Dict exposing (Dict)
 import Dict.Extra
 import Element as E
-import Element.Input as Input
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
+import Element.Input as Input
+import FeatherIcons
 import Html exposing (Html, a)
 import Json.Decode as Decode
 import Json.Encode as Encode
@@ -127,7 +128,8 @@ update msg ({ boxSize, borderSize } as model) =
 view : Model -> Html Msg
 view model =
     E.layout
-        [ E.padding spacing.large ] <|
+        [ E.padding spacing.large ]
+    <|
         E.row []
             [ simpleCharsPanel model
             , compoundCharsPanel model
@@ -145,7 +147,7 @@ simpleCharsPanel ({ boxSize, thumbnailGridSize } as model) =
             , Font.size fontSize.title
             ]
             [ E.text "Simple Characters"
-            , addButton AddSimpleChar
+            , addButton fontSize.title AddSimpleChar
             ]
         , E.wrappedRow
             [ E.width E.fill
@@ -194,17 +196,23 @@ charCard { char, svg, thumbnailGridSize, boxSize } =
         [ E.el
             [ Font.size fontSize.large
             , Font.bold
-            ] <|
+            ]
+          <|
             E.text (String.fromChar char)
         , E.html svg
         ]
 
 
-addButton : Msg -> E.Element Msg
-addButton msg =
-    Input.button []
+addButton : Float -> Msg -> E.Element Msg
+addButton iconSize msg =
+    Input.button
+        []
         { label =
-            E.text "Add"
+            E.html
+                (FeatherIcons.plusCircle
+                    |> FeatherIcons.withSize iconSize
+                    |> FeatherIcons.toHtml []
+                )
         , onPress =
             Just msg
         }
