@@ -1,4 +1,4 @@
-port module Main exposing (..)
+module Main exposing (..)
 
 import Browser
 import Dict exposing (Dict)
@@ -9,18 +9,15 @@ import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
 import FeatherIcons
+import File exposing (File)
+import File.Select as Select
 import Html exposing (Html, a)
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Svg exposing (Svg)
 import Svg.Attributes
 import SvgParser
-
-
-port addSimpleChar : () -> Cmd msg
-
-
-port getSimpleChar : (Encode.Value -> msg) -> Sub msg
+import Task
 
 
 
@@ -79,7 +76,8 @@ init _ =
 
 type Msg
     = AddChar MyCharType
-    | GetSimpleChar Encode.Value
+    | SvgsSelected File (List File)
+    | SvgsLoaded SimpleCharSvgs
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -88,47 +86,71 @@ update msg ({ boxSize, borderSize } as model) =
         AddChar myCharType ->
             case myCharType of
                 SimpleCharType ->
-                    ( model, addSimpleChar () )
+                    ( model, Select.files [ "image/svg+xml" ] SvgsSelected )
 
                 CompoundCharType ->
                     ( model, Cmd.none )
 
-        GetSimpleChar svgs ->
-            case Decode.decodeValue decodeSimpleCharSvgs svgs of
-                Ok newSimpleCharSvgs ->
-                    ( { model
-                        | chars =
-                            Dict.foldl
-                                (\char _ chars ->
-                                    SimpleChar
-                                        { char = char
-                                        , width = boxSize - borderSize
-                                        , height = boxSize - borderSize
-                                        , x = borderSize
-                                        , y = borderSize
-                                        }
-                                        :: chars
-                                )
-                                model.chars
-                                newSimpleCharSvgs
-                        , simpleCharSvgs =
-                            Dict.merge
-                                (\key a -> Dict.insert key a)
-                                (\key a b -> Dict.insert key a)
-                                (\key b -> Dict.insert key b)
-                                newSimpleCharSvgs
-                                model.simpleCharSvgs
-                                Dict.empty
-                      }
-                    , Cmd.none
-                    )
+        SvgsSelected first rest ->
+            ( model
+            , Task.perform SvgsLoaded <|
+                Task.map Dict.fromList <|
+                    Task.sequence <|
+                        List.map
+                            (\file ->
+                                Task.map
+                                    (\svgString ->
+                                        ( case String.uncons <| File.name file of
+                                            Just ( char, _ ) ->
+                                                char
 
-                Err err ->
-                    let
-                        _ =
-                            Debug.log "err" err
-                    in
-                    ( model, Cmd.none )
+                                            Nothing ->
+                                                '?'
+                                        , case SvgParser.parse svgString of
+                                            Ok svg ->
+                                                svg
+
+                                            Err err ->
+                                                let
+                                                    _ =
+                                                        Debug.log "Error parsing svg" err
+                                                in
+                                                Svg.g [] []
+                                        )
+                                    )
+                                <|
+                                    File.toString file
+                            )
+                            (first :: rest)
+            )
+
+        SvgsLoaded svgs ->
+            ( { model
+                | chars =
+                    Dict.foldl
+                        (\char _ chars ->
+                            SimpleChar
+                                { char = char
+                                , width = boxSize - borderSize
+                                , height = boxSize - borderSize
+                                , x = borderSize
+                                , y = borderSize
+                                }
+                                :: chars
+                        )
+                        model.chars
+                        svgs
+                , simpleCharSvgs =
+                    Dict.merge
+                        (\key a -> Dict.insert key a)
+                        (\key a b -> Dict.insert key a)
+                        (\key b -> Dict.insert key b)
+                        svgs
+                        model.simpleCharSvgs
+                        Dict.empty
+              }
+            , Cmd.none
+            )
 
 
 
@@ -278,7 +300,7 @@ compoundCharsPanel model =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    getSimpleChar GetSimpleChar
+    Sub.none
 
 
 decodeSimpleCharSvgs : Decode.Decoder SimpleCharSvgs
