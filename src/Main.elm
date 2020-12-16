@@ -101,6 +101,7 @@ type Msg
     | AddNewCompoundChar
     | ShowInputError
     | HideInputError
+    | ClosePopUp
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -241,6 +242,13 @@ update msg ({ boxUnits, borderUnits } as model) =
             , Cmd.none
             )
 
+        ClosePopUp ->
+            ( { model
+                | popUp = NoPopUp
+              }
+            , Cmd.none
+            )
+
 
 
 ---- VIEW ----
@@ -275,6 +283,18 @@ popUp ({ boxUnits, thumbnailUnitSize, newCompoundChar, showInputError } as model
                  , E.height <| E.px <| boxUnits * thumbnailUnitSize
                  , E.spacing spacing.small
                  , Font.size fontSize.medium
+                 , E.inFront <|
+                    E.el
+                        [ E.padding spacing.tiny ]
+                    <|
+                        iconButton
+                            { icon =
+                                FeatherIcons.x
+                            , size =
+                                fontSize.medium
+                            , onPress =
+                                Just ClosePopUp
+                            }
                  ]
                     ++ highlightBorder 6 Border.dashed
                 )
@@ -703,8 +723,8 @@ palette =
 
 
 spacing =
-    { small =
-        10
+    { tiny = 5
+    , small = 10
     , medium = 20
     , large = 30
     }
