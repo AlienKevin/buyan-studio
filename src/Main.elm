@@ -15,6 +15,7 @@ import File exposing (File)
 import File.Select as Select
 import Html exposing (Html, a)
 import Html.Attributes
+import Html5.DragDrop as DragDrop
 import Json.Decode as Decode
 import Json.Encode as Encode
 import SvgParser
@@ -30,8 +31,8 @@ import TypedSvg.Types as SvgTypes
 
 
 type alias Model =
-    { chars : List MyChar
-    , selectedChar : Maybe MyChar
+    { chars : Dict Char MyChar
+    , selectedChar : Maybe Char
     , simpleCharSvgs : SimpleCharSvgs
     , boxUnits : Int
     , borderUnits : Int
@@ -40,6 +41,8 @@ type alias Model =
     , popUp : PopUp
     , newCompoundChar : String
     , showInputError : Bool
+    , dragDropChar : DragDrop.Model Char ()
+    , dragDropCharData : { char : Char }
     }
 
 
@@ -54,6 +57,16 @@ type MyChar
     | CompoundChar
         { char : Char
         , components : List MyChar
+        }
+
+
+emptyMyChar =
+    SimpleChar
+        { char = '?'
+        , width = 0
+        , height = 0
+        , x = 0
+        , y = 0
         }
 
 
@@ -73,7 +86,7 @@ type PopUp
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { chars = []
+    ( { chars = Dict.empty
       , selectedChar = Nothing
       , simpleCharSvgs = Dict.empty
       , boxUnits = 34
@@ -83,6 +96,8 @@ init _ =
       , popUp = NoPopUp
       , newCompoundChar = ""
       , showInputError = False
+      , dragDropChar = DragDrop.init
+      , dragDropCharData = { char = '?' }
       }
     , Cmd.none
     )
@@ -102,6 +117,7 @@ type Msg
     | ShowInputError
     | HideInputError
     | ClosePopUp
+    | DragDropChar (DragDrop.Msg Char ())
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -157,15 +173,17 @@ update msg ({ boxUnits, borderUnits } as model) =
             ( { model
                 | chars =
                     Dict.foldl
-                        (\char _ chars ->
-                            SimpleChar
-                                { char = char
-                                , width = boxUnits - borderUnits * 2
-                                , height = boxUnits - borderUnits * 2
-                                , x = borderUnits
-                                , y = borderUnits
-                                }
-                                :: chars
+                        (\char _ ->
+                            Dict.insert
+                                char
+                                (SimpleChar
+                                    { char = char
+                                    , width = boxUnits - borderUnits * 2
+                                    , height = boxUnits - borderUnits * 2
+                                    , x = borderUnits
+                                    , y = borderUnits
+                                    }
+                                )
                         )
                         model.chars
                         svgs
@@ -184,7 +202,7 @@ update msg ({ boxUnits, borderUnits } as model) =
         EditChar myChar ->
             ( { model
                 | selectedChar =
-                    Just myChar
+                    Just <| charFromMyChar myChar
               }
             , Cmd.none
             )
@@ -215,9 +233,9 @@ update msg ({ boxUnits, borderUnits } as model) =
             in
             ( { model
                 | chars =
-                    newCompoundChar :: model.chars
+                    Dict.insert newChar newCompoundChar model.chars
                 , selectedChar =
-                    Just newCompoundChar
+                    Just <| charFromMyChar newCompoundChar
                 , popUp =
                     NoPopUp
               }
@@ -246,6 +264,67 @@ update msg ({ boxUnits, borderUnits } as model) =
             ( { model
                 | popUp = NoPopUp
               }
+            , Cmd.none
+            )
+
+        DragDropChar msg_ ->
+            let
+                ( model_, result ) =
+                    DragDrop.update msg_ model.dragDropChar
+            in
+            ( case result of
+                Nothing ->
+                    { model
+                        | dragDropChar =
+                            model_
+                        , dragDropCharData =
+                            model.dragDropCharData
+                        , chars =
+                            model.chars
+                    }
+
+                Just ( componentChar, _, _ ) ->
+                    { model
+                        | dragDropChar =
+                            DragDrop.init
+                        , dragDropCharData =
+                            { char = componentChar }
+                        , chars =
+                            case model.selectedChar of
+                                Just selectedChar ->
+                                    Dict.update
+                                        selectedChar
+                                        (Maybe.map
+                                            (\myChar ->
+                                                case myChar of
+                                                    SimpleChar _ ->
+                                                        myChar
+
+                                                    CompoundChar ({ components } as compoundChar) ->
+                                                        CompoundChar
+                                                            { compoundChar
+                                                                | components =
+                                                                    SimpleChar
+                                                                        { char =
+                                                                            componentChar
+                                                                        , width =
+                                                                            round <| toFloat boxUnits / 2
+                                                                        , height =
+                                                                            round <| toFloat boxUnits / 2
+                                                                        , x =
+                                                                            round <| toFloat boxUnits / 4
+                                                                        , y =
+                                                                            round <| toFloat boxUnits / 4
+                                                                        }
+                                                                        :: components
+                                                            }
+                                            )
+                                        )
+                                        model.chars
+
+                                Nothing ->
+                                    model.chars
+                    }
             , Cmd.none
             )
 
@@ -367,16 +446,46 @@ popUp ({ boxUnits, thumbnailUnitSize, newCompoundChar, showInputError } as model
 
 
 editor : Model -> E.Element Msg
-editor ({ selectedChar, simpleCharSvgs, boxUnits, unitSize, borderUnits } as model) =
+editor ({ selectedChar, chars, simpleCharSvgs, boxUnits, unitSize, borderUnits } as model) =
+    let
+        dropId =
+            DragDrop.getDropId model.dragDropChar
+
+        droppablePosition =
+            DragDrop.getDroppablePosition model.dragDropChar
+
+        highlight =
+            case dropId of
+                Just _ ->
+                    case droppablePosition of
+                        Nothing ->
+                            []
+
+                        Just _ ->
+                            [ Background.color palette.lightBg ]
+
+                Nothing ->
+                    []
+    in
     E.el
-        [ E.inFront <|
+        ([ E.inFront <|
             case selectedChar of
                 Just char ->
-                    E.html <| renderChar unitSize boxUnits simpleCharSvgs char
+                    E.html <|
+                        renderChar unitSize
+                            boxUnits
+                            simpleCharSvgs
+                            (Maybe.withDefault emptyMyChar <|
+                                -- impossible
+                                Dict.get char chars
+                            )
 
                 Nothing ->
                     E.none
-        ]
+         ]
+            ++ highlight
+            ++ (List.map E.htmlAttribute <| DragDrop.droppable DragDropChar ())
+        )
     <|
         E.html <|
             gridBackground { boxUnits = boxUnits, unitSize = unitSize, borderUnits = borderUnits }
@@ -491,7 +600,7 @@ charPanel myCharType ({ boxUnits, thumbnailUnitSize } as model) =
                     else
                         Nothing
                 )
-                model.chars
+                (Dict.values model.chars)
     in
     E.column
         [ E.spacing spacing.medium
@@ -553,15 +662,19 @@ charCard { thumbnailUnitSize, boxUnits, simpleCharSvgs, selectedChar } myChar =
             charFromMyChar myChar
     in
     E.column
-        ([ E.width <| E.px <| boxUnits * thumbnailUnitSize
-         , Background.color palette.lightBg
-         , Border.rounded spacing.medium
-         , Events.onClick <| EditChar myChar
-         , E.pointer
-         ]
+        (([ E.width <| E.px <| boxUnits * thumbnailUnitSize
+          , Background.color palette.lightBg
+          , Border.rounded spacing.medium
+          , Events.onClick <| EditChar myChar
+          , E.pointer
+          ]
+            ++ (List.map E.htmlAttribute <|
+                    DragDrop.draggable DragDropChar char
+               )
+         )
             ++ (case selectedChar of
                     Just selected ->
-                        if charFromMyChar selected == char then
+                        if selected == char then
                             highlightBorder 0 Border.solid
 
                         else
@@ -633,7 +746,11 @@ renderChar unitSize boxUnits simpleCharSvgs myChar =
                     TypedSvg.Core.text <| "Error rendering " ++ String.fromChar char
 
         CompoundChar { char, components } ->
-            Svg.svg [] <|
+            Svg.svg
+                [ SvgAttributes.width <| SvgTypes.px <| toFloat (boxUnits * unitSize)
+                , SvgAttributes.height <| SvgTypes.px <| toFloat (boxUnits * unitSize)
+                ]
+            <|
                 List.map (renderChar unitSize boxUnits simpleCharSvgs) components
 
 

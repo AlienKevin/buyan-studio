@@ -17,7 +17,8 @@
             "elm-community/dict-extra": "2.4.0",
             "elm-community/typed-svg": "6.0.0",
             "feathericons/elm-feather": "1.5.0",
-            "mdgriffith/elm-ui": "1.1.8"
+            "mdgriffith/elm-ui": "1.1.8",
+            "norpan/elm-html5-drag-drop": "3.1.4"
         },
         "indirect": {
             "andre-dietrich/parser-combinators": "3.2.0",
