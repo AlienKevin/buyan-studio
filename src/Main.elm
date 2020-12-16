@@ -268,19 +268,16 @@ popUp ({ boxUnits, thumbnailUnitSize, newCompoundChar, showInputError } as model
     case model.popUp of
         AddCompoundCharPopUp ->
             E.column
-                [ E.centerX
-                , E.centerY
-                , Background.color palette.lightBg
-                , E.width <| E.px <| boxUnits * thumbnailUnitSize
-                , E.height <| E.px <| boxUnits * thumbnailUnitSize
-                , E.spacing spacing.small
-                , Border.rounded spacing.medium
-                , Border.color palette.lightFg
-                , Border.width 6
-                , Border.dashed
-                , Border.glow palette.lightFg 10
-                , Font.size fontSize.medium
-                ]
+                ([ E.centerX
+                 , E.centerY
+                 , Background.color palette.lightBg
+                 , E.width <| E.px <| boxUnits * thumbnailUnitSize
+                 , E.height <| E.px <| boxUnits * thumbnailUnitSize
+                 , E.spacing spacing.small
+                 , Font.size fontSize.medium
+                 ]
+                    ++ highlightBorder 6 Border.dashed
+                )
                 [ Input.text
                     [ E.width <| E.px <| fontSize.medium * 5
                     , E.centerX
@@ -530,20 +527,38 @@ charPanel myCharType ({ boxUnits, thumbnailUnitSize } as model) =
 
 
 charCard : Model -> MyChar -> E.Element Msg
-charCard { thumbnailUnitSize, boxUnits, simpleCharSvgs } myChar =
+charCard { thumbnailUnitSize, boxUnits, simpleCharSvgs, selectedChar } myChar =
+    let
+        char =
+            charFromMyChar myChar
+    in
     E.column
-        [ E.width <| E.px <| boxUnits * thumbnailUnitSize
-        , Background.color palette.lightBg
-        , Border.rounded spacing.medium
-        , Events.onClick <| EditChar myChar
-        , E.pointer
-        ]
+        ([ E.width <| E.px <| boxUnits * thumbnailUnitSize
+         , Background.color palette.lightBg
+         , Border.rounded spacing.medium
+         , Events.onClick <| EditChar myChar
+         , E.pointer
+         ]
+            ++ (case selectedChar of
+                    Just selected ->
+                        if charFromMyChar selected == char then
+                            highlightBorder 0 Border.solid
+
+                        else
+                            []
+
+                    Nothing ->
+                        []
+               )
+        )
         [ E.el
             [ Font.size fontSize.large
             , Font.bold
             ]
           <|
-            E.text (String.fromChar <| charFromMyChar myChar)
+            E.text <|
+                String.fromChar <|
+                    char
         , E.html <| renderChar thumbnailUnitSize boxUnits simpleCharSvgs myChar
         ]
 
@@ -615,6 +630,16 @@ iconButton { icon, size, onPress } =
         , onPress =
             onPress
         }
+
+
+highlightBorder : Int -> E.Attribute Msg -> List (E.Attribute Msg)
+highlightBorder borderWidth borderStyle =
+    [ Border.rounded spacing.medium
+    , Border.color palette.lightFg
+    , Border.width borderWidth
+    , borderStyle
+    , Border.glow palette.lightFg 10
+    ]
 
 
 compoundCharsPanel : Model -> E.Element Msg
@@ -700,7 +725,7 @@ fontSize =
 toElmUiColor : Color.Color -> E.Color
 toElmUiColor color =
     let
-        {red, green, blue, alpha } =
+        { red, green, blue, alpha } =
             Color.toRgba color
     in
     E.rgba red green blue alpha
