@@ -37,6 +37,9 @@ type alias Model =
     , borderUnits : Int
     , unitSize : Int
     , thumbnailUnitSize : Int
+    , popUp : PopUp
+    , newCompoundChar : String
+    , showInputError : Bool
     }
 
 
@@ -63,6 +66,11 @@ type alias SimpleCharSvgs =
     Dict Char (Svg Msg)
 
 
+type PopUp
+    = AddCompoundCharPopUp
+    | NoPopUp
+
+
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { chars = []
@@ -72,6 +80,9 @@ init _ =
       , borderUnits = 1
       , unitSize = 20
       , thumbnailUnitSize = 7
+      , popUp = NoPopUp
+      , newCompoundChar = ""
+      , showInputError = False
       }
     , Cmd.none
     )
@@ -86,6 +97,10 @@ type Msg
     | SvgsSelected File (List File)
     | SvgsLoaded SimpleCharSvgs
     | EditChar MyChar
+    | UpdateNewCompoundChar String
+    | AddNewCompoundChar
+    | ShowInputError
+    | HideInputError
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -97,7 +112,12 @@ update msg ({ boxUnits, borderUnits } as model) =
                     ( model, Select.files [ "image/svg+xml" ] SvgsSelected )
 
                 CompoundCharType ->
-                    ( model, Cmd.none )
+                    ( { model
+                        | popUp =
+                            AddCompoundCharPopUp
+                      }
+                    , Cmd.none
+                    )
 
         SvgsSelected first rest ->
             ( model
@@ -168,6 +188,59 @@ update msg ({ boxUnits, borderUnits } as model) =
             , Cmd.none
             )
 
+        UpdateNewCompoundChar string ->
+            ( { model
+                | newCompoundChar =
+                    string
+              }
+            , Cmd.none
+            )
+
+        AddNewCompoundChar ->
+            let
+                newChar =
+                    case String.uncons model.newCompoundChar of
+                        Just ( char, _ ) ->
+                            char
+
+                        Nothing ->
+                            '?'
+
+                newCompoundChar =
+                    CompoundChar
+                        { char = newChar
+                        , components = []
+                        }
+            in
+            ( { model
+                | chars =
+                    newCompoundChar :: model.chars
+                , selectedChar =
+                    Just newCompoundChar
+                , popUp =
+                    NoPopUp
+              }
+            , Cmd.none
+            )
+
+        ShowInputError ->
+            let
+                _ =
+                    Debug.log "showInputError" ""
+            in
+            ( { model
+                | showInputError = True
+              }
+            , Cmd.none
+            )
+
+        HideInputError ->
+            ( { model
+                | showInputError = False
+              }
+            , Cmd.none
+            )
+
 
 
 ---- VIEW ----
@@ -176,7 +249,9 @@ update msg ({ boxUnits, borderUnits } as model) =
 view : Model -> Html Msg
 view model =
     E.layout
-        [ E.padding spacing.large ]
+        [ E.padding spacing.large
+        , E.inFront <| popUp model
+        ]
     <|
         E.row
             [ E.width E.fill
@@ -186,6 +261,92 @@ view model =
             [ charPanels model
             , editor model
             ]
+
+
+popUp : Model -> E.Element Msg
+popUp ({ boxUnits, thumbnailUnitSize, newCompoundChar, showInputError } as model) =
+    case model.popUp of
+        AddCompoundCharPopUp ->
+            E.column
+                [ E.centerX
+                , E.centerY
+                , Background.color palette.lightBg
+                , E.width <| E.px <| boxUnits * thumbnailUnitSize
+                , E.height <| E.px <| boxUnits * thumbnailUnitSize
+                , E.spacing spacing.small
+                , Border.rounded spacing.medium
+                , Border.color palette.lightFg
+                , Border.width 6
+                , Border.dashed
+                , Border.glow palette.lightFg 10
+                , Font.size fontSize.medium
+                ]
+                [ Input.text
+                    [ E.width <| E.px <| fontSize.medium * 5
+                    , E.centerX
+                    , E.centerY
+                    , E.onRight <|
+                        let
+                            inputLength =
+                                String.length newCompoundChar
+
+                            isValidNewChar =
+                                inputLength == 1
+                        in
+                        E.el
+                            ([ E.paddingXY spacing.small 0 ]
+                                ++ (if isValidNewChar then
+                                        []
+
+                                    else
+                                        [ Events.onMouseEnter ShowInputError
+                                        , Events.onMouseLeave HideInputError
+                                        ]
+                                   )
+                            )
+                        <|
+                            iconButton
+                                { icon =
+                                    if isValidNewChar then
+                                        FeatherIcons.checkCircle
+
+                                    else
+                                        FeatherIcons.alertTriangle
+                                , size =
+                                    fontSize.title
+                                , onPress =
+                                    if isValidNewChar then
+                                        Just AddNewCompoundChar
+
+                                    else
+                                        Nothing
+                                }
+                    , E.below <|
+                        if showInputError then
+                            E.el
+                                [ E.centerX
+                                , E.padding spacing.small
+                                ]
+                            <|
+                                E.text "Accept only 1 character"
+
+                        else
+                            E.none
+                    ]
+                    { onChange =
+                        UpdateNewCompoundChar
+                    , text =
+                        newCompoundChar
+                    , placeholder =
+                        Nothing
+                    , label =
+                        Input.labelAbove []
+                            (E.text "Character")
+                    }
+                ]
+
+        NoPopUp ->
+            E.none
 
 
 editor : Model -> E.Element Msg
@@ -302,7 +463,7 @@ charPanels model =
 
 
 charPanel : MyCharType -> Model -> E.Element Msg
-charPanel myCharType ({boxUnits, thumbnailUnitSize} as model) =
+charPanel myCharType ({ boxUnits, thumbnailUnitSize } as model) =
     let
         cards =
             List.filterMap
@@ -339,7 +500,14 @@ charPanel myCharType ({boxUnits, thumbnailUnitSize} as model) =
                         "Compound"
                 )
                     ++ " Characters"
-            , addButton fontSize.title <| AddChar myCharType
+            , iconButton
+                { icon =
+                    FeatherIcons.plusCircle
+                , size =
+                    fontSize.title
+                , onPress =
+                    Just <| AddChar myCharType
+                }
             ]
         , E.wrappedRow
             [ E.width E.fill
@@ -368,7 +536,7 @@ charCard { thumbnailUnitSize, boxUnits, simpleCharSvgs } myChar =
         , Background.color palette.lightBg
         , Border.rounded spacing.medium
         , Events.onClick <| EditChar myChar
-        , E.pointer 
+        , E.pointer
         ]
         [ E.el
             [ Font.size fontSize.large
@@ -434,18 +602,18 @@ renderChar unitSize boxUnits simpleCharSvgs myChar =
                 List.map (renderChar unitSize boxUnits simpleCharSvgs) components
 
 
-addButton : Float -> Msg -> E.Element Msg
-addButton iconSize msg =
+iconButton : { icon : FeatherIcons.Icon, size : Float, onPress : Maybe Msg } -> E.Element Msg
+iconButton { icon, size, onPress } =
     Input.button
         []
         { label =
             E.html
-                (FeatherIcons.plusCircle
-                    |> FeatherIcons.withSize iconSize
+                (icon
+                    |> FeatherIcons.withSize size
                     |> FeatherIcons.toHtml []
                 )
         , onPress =
-            Just msg
+            onPress
         }
 
 
@@ -504,6 +672,8 @@ main =
 palette =
     { lightBg =
         E.rgb255 246 234 190
+    , lightFg =
+        toElmUiColor Color.lightBlue
     }
 
 
@@ -525,3 +695,12 @@ fontSize =
     , title =
         40
     }
+
+
+toElmUiColor : Color.Color -> E.Color
+toElmUiColor color =
+    let
+        {red, green, blue, alpha } =
+            Color.toRgba color
+    in
+    E.rgba red green blue alpha
