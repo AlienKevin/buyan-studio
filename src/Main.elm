@@ -38,6 +38,7 @@ type alias Model =
     , borderUnits : Int
     , unitSize : Int
     , thumbnailUnitSize : Int
+    , strokeWidth : Float
     , popUp : PopUp
     , newCompoundChar : String
     , showInputError : Bool
@@ -49,13 +50,17 @@ type alias Model =
 type MyChar
     = SimpleChar
         { char : Char
-        , width : Int
-        , height : Int
-        , x : Int
-        , y : Int
+        , width : Float
+        , height : Float
+        , x : Float
+        , y : Float
         }
     | CompoundChar
         { char : Char
+        , width : Float
+        , height : Float
+        , x : Float
+        , y : Float
         , components : List MyChar
         }
 
@@ -93,6 +98,7 @@ init _ =
       , borderUnits = 1
       , unitSize = 20
       , thumbnailUnitSize = 7
+      , strokeWidth = 20
       , popUp = NoPopUp
       , newCompoundChar = ""
       , showInputError = False
@@ -178,10 +184,10 @@ update msg ({ boxUnits, borderUnits } as model) =
                                 char
                                 (SimpleChar
                                     { char = char
-                                    , width = boxUnits - borderUnits * 2
-                                    , height = boxUnits - borderUnits * 2
-                                    , x = borderUnits
-                                    , y = borderUnits
+                                    , width = 100
+                                    , height = 100
+                                    , x = 0
+                                    , y = 0
                                     }
                                 )
                         )
@@ -228,6 +234,10 @@ update msg ({ boxUnits, borderUnits } as model) =
                 newCompoundChar =
                     CompoundChar
                         { char = newChar
+                        , width = 100
+                        , height = 100
+                        , x = 0
+                        , y = 0
                         , components = []
                         }
             in
@@ -301,21 +311,54 @@ update msg ({ boxUnits, borderUnits } as model) =
                                                         myChar
 
                                                     CompoundChar ({ components } as compoundChar) ->
+                                                        let
+                                                            width =
+                                                                50
+
+                                                            height =
+                                                                50
+
+                                                            x =
+                                                                25
+
+                                                            y =
+                                                                25
+                                                        in
                                                         CompoundChar
                                                             { compoundChar
                                                                 | components =
-                                                                    SimpleChar
-                                                                        { char =
-                                                                            componentChar
-                                                                        , width =
-                                                                            round <| toFloat boxUnits / 2
-                                                                        , height =
-                                                                            round <| toFloat boxUnits / 2
-                                                                        , x =
-                                                                            round <| toFloat boxUnits / 4
-                                                                        , y =
-                                                                            round <| toFloat boxUnits / 4
-                                                                        }
+                                                                    (case Dict.get componentChar model.chars of
+                                                                        Just c ->
+                                                                            case c of
+                                                                                SimpleChar _ ->
+                                                                                    SimpleChar
+                                                                                        { char = componentChar
+                                                                                        , width = width
+                                                                                        , height = height
+                                                                                        , x = x
+                                                                                        , y = y
+                                                                                        }
+
+                                                                                CompoundChar compound ->
+                                                                                    CompoundChar
+                                                                                        { char = componentChar
+                                                                                        , width = width
+                                                                                        , height = height
+                                                                                        , x = x
+                                                                                        , y = y
+                                                                                        , components = compound.components
+                                                                                        }
+
+                                                                        Nothing ->
+                                                                            -- impossible
+                                                                            SimpleChar
+                                                                                { char = componentChar
+                                                                                , width = width
+                                                                                , height = height
+                                                                                , x = x
+                                                                                , y = y
+                                                                                }
+                                                                    )
                                                                         :: components
                                                             }
                                             )
@@ -327,6 +370,26 @@ update msg ({ boxUnits, borderUnits } as model) =
                     }
             , Cmd.none
             )
+
+
+
+-- Requires: char to be in chars
+
+
+getCharType : Dict Char MyChar -> Char -> MyCharType
+getCharType chars char =
+    case Dict.get char chars of
+        Just myChar ->
+            case myChar of
+                SimpleChar _ ->
+                    SimpleCharType
+
+                CompoundChar _ ->
+                    CompoundCharType
+
+        Nothing ->
+            -- impossible
+            SimpleCharType
 
 
 
@@ -446,7 +509,7 @@ popUp ({ boxUnits, thumbnailUnitSize, newCompoundChar, showInputError } as model
 
 
 editor : Model -> E.Element Msg
-editor ({ selectedChar, chars, simpleCharSvgs, boxUnits, unitSize, borderUnits } as model) =
+editor ({ selectedChar, chars, simpleCharSvgs, boxUnits, unitSize, borderUnits, strokeWidth } as model) =
     let
         dropId =
             DragDrop.getDropId model.dragDropChar
@@ -472,13 +535,17 @@ editor ({ selectedChar, chars, simpleCharSvgs, boxUnits, unitSize, borderUnits }
             case selectedChar of
                 Just char ->
                     E.html <|
-                        renderChar unitSize
-                            boxUnits
-                            simpleCharSvgs
-                            (Maybe.withDefault emptyMyChar <|
-                                -- impossible
-                                Dict.get char chars
-                            )
+                        renderChar
+                            { unitSize = unitSize
+                            , boxUnits = boxUnits
+                            , borderUnits = borderUnits
+                            , strokeWidth = strokeWidth
+                            , simpleCharSvgs = simpleCharSvgs
+                            , myChar =
+                                Maybe.withDefault emptyMyChar <|
+                                    -- impossible
+                                    Dict.get char chars
+                            }
 
                 Nothing ->
                     E.none
@@ -656,7 +723,7 @@ charPanel myCharType ({ boxUnits, thumbnailUnitSize } as model) =
 
 
 charCard : Model -> MyChar -> E.Element Msg
-charCard { thumbnailUnitSize, boxUnits, simpleCharSvgs, selectedChar } myChar =
+charCard { unitSize, thumbnailUnitSize, boxUnits, borderUnits, strokeWidth, simpleCharSvgs, selectedChar } myChar =
     let
         char =
             charFromMyChar myChar
@@ -692,7 +759,15 @@ charCard { thumbnailUnitSize, boxUnits, simpleCharSvgs, selectedChar } myChar =
             E.text <|
                 String.fromChar <|
                     char
-        , E.html <| renderChar thumbnailUnitSize boxUnits simpleCharSvgs myChar
+        , E.html <|
+            renderChar
+                { unitSize = thumbnailUnitSize
+                , boxUnits = boxUnits
+                , borderUnits = borderUnits
+                , strokeWidth = strokeWidth * toFloat thumbnailUnitSize / toFloat unitSize
+                , simpleCharSvgs = simpleCharSvgs
+                , myChar = myChar
+                }
         ]
 
 
@@ -719,39 +794,84 @@ isMyCharType myCharType myChar =
             False
 
 
-renderChar : Int -> Int -> SimpleCharSvgs -> MyChar -> Svg Msg
-renderChar unitSize boxUnits simpleCharSvgs myChar =
+renderChar :
+    { unitSize : Int
+    , boxUnits : Int
+    , borderUnits : Int
+    , strokeWidth : Float
+    , simpleCharSvgs : SimpleCharSvgs
+    , myChar : MyChar
+    }
+    -> Svg Msg
+renderChar { unitSize, boxUnits, borderUnits, strokeWidth, simpleCharSvgs, myChar } =
+    let
+        size =
+            toFloat ((boxUnits - 2 * borderUnits) * unitSize) - strokeWidth
+        offset =
+            toFloat (borderUnits * unitSize) + strokeWidth / 2
+        charClassName =
+            "char-with-size-" ++ (String.fromInt <| round strokeWidth)
+    in
+    Svg.svg
+        [ SvgAttributes.width <| SvgTypes.px <| toFloat (boxUnits * unitSize)
+        , SvgAttributes.height <| SvgTypes.px <| toFloat (boxUnits * unitSize)
+        , SvgAttributes.class [ charClassName ]
+        ]
+        [ Svg.defs []
+            [ Svg.style []
+                [ TypedSvg.Core.text <|
+                    "." ++ charClassName
+                    ++ """ * {
+                        fill: none;
+                        stroke: #000;
+                        stroke-linecap: round;
+                        stroke-miterlimit: 10;
+                        stroke-width: """
+                        ++ String.fromFloat strokeWidth
+                        ++ """ !important;
+                        vector-effect: non-scaling-stroke;
+                    }
+                    svg {
+                        overflow: visible
+                    }
+                    """
+                ]
+            ]
+        , Svg.svg
+            [ SvgAttributes.width <| SvgTypes.px size
+            , SvgAttributes.height <| SvgTypes.px size
+            , SvgAttributes.x <| SvgTypes.px offset
+            , SvgAttributes.y <| SvgTypes.px offset
+            ]
+            [ renderCharHelper unitSize boxUnits simpleCharSvgs myChar ]
+        ]
+
+
+renderCharHelper : Int -> Int -> SimpleCharSvgs -> MyChar -> Svg Msg
+renderCharHelper unitSize boxUnits simpleCharSvgs myChar =
+    let
+        constraint width height x y contents =
+            Svg.svg
+                [ SvgAttributes.x <| SvgTypes.Percent x
+                , SvgAttributes.y <| SvgTypes.Percent y
+                , SvgAttributes.width <| SvgTypes.Percent width
+                , SvgAttributes.height <| SvgTypes.Percent height
+                ]
+                contents
+    in
     case myChar of
         SimpleChar { char, width, height, x, y } ->
             case Dict.get char simpleCharSvgs of
                 Just svg ->
-                    Svg.svg
-                        [ SvgAttributes.width <| SvgTypes.px <| toFloat (boxUnits * unitSize)
-                        , SvgAttributes.height <| SvgTypes.px <| toFloat (boxUnits * unitSize)
-                        ]
-                        [ Svg.svg
-                            [ SvgAttributes.x <| SvgTypes.px <| toFloat (x * unitSize)
-                            , SvgAttributes.y <| SvgTypes.px <| toFloat (y * unitSize)
-                            ]
-                            [ Svg.svg
-                                [ SvgAttributes.width <| SvgTypes.px <| toFloat (width * unitSize)
-                                , SvgAttributes.height <| SvgTypes.px <| toFloat (height * unitSize)
-                                ]
-                                [ svg ]
-                            ]
-                        ]
+                    constraint width height x y [ svg ]
 
                 Nothing ->
                     -- impossible
                     TypedSvg.Core.text <| "Error rendering " ++ String.fromChar char
 
-        CompoundChar { char, components } ->
-            Svg.svg
-                [ SvgAttributes.width <| SvgTypes.px <| toFloat (boxUnits * unitSize)
-                , SvgAttributes.height <| SvgTypes.px <| toFloat (boxUnits * unitSize)
-                ]
-            <|
-                List.map (renderChar unitSize boxUnits simpleCharSvgs) components
+        CompoundChar { char, width, height, x, y, components } ->
+            constraint width height x y <|
+                List.map (renderCharHelper unitSize boxUnits simpleCharSvgs) components
 
 
 iconButton : { icon : FeatherIcons.Icon, size : Float, onPress : Maybe Msg } -> E.Element Msg
