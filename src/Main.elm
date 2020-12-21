@@ -98,7 +98,7 @@ init _ =
       , borderUnits = 1
       , unitSize = 20
       , thumbnailUnitSize = 7
-      , strokeWidth = 20
+      , strokeWidth = 70
       , popUp = NoPopUp
       , newCompoundChar = ""
       , showInputError = False
@@ -829,6 +829,7 @@ renderChar { unitSize, boxUnits, borderUnits, strokeWidth, simpleCharSvgs, myCha
                         stroke-width: """
                         ++ String.fromFloat strokeWidth
                         ++ """ !important;
+                        stroke-linejoin: round;
                         vector-effect: non-scaling-stroke;
                     }
                     svg {
