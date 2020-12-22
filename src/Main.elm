@@ -17,6 +17,7 @@ import File exposing (File)
 import File.Select as Select
 import Html exposing (Html, a)
 import Html.Attributes
+import Html.Events
 import Html5.DragDrop as DragDrop
 import Json.Decode as Decode
 import Json.Encode as Encode
@@ -609,6 +610,13 @@ popUp : Model -> E.Element Msg
 popUp ({ activeComponentId, boxUnits, thumbnailUnitSize, newCompoundChar, isInputErrorShown } as model) =
     case model.popUp of
         AddCompoundCharPopUp ->
+            let
+                inputLength =
+                    String.length newCompoundChar
+
+                isValidNewChar =
+                    inputLength == 1
+            in
             E.column
                 ([ E.centerX
                  , E.centerY
@@ -636,14 +644,13 @@ popUp ({ activeComponentId, boxUnits, thumbnailUnitSize, newCompoundChar, isInpu
                     [ E.width <| E.px <| fontSize.medium * 5
                     , E.centerX
                     , E.centerY
-                    , E.onRight <|
-                        let
-                            inputLength =
-                                String.length newCompoundChar
+                    , onEnter <|
+                        if isValidNewChar then
+                            Just AddPendingCompoundChar
 
-                            isValidNewChar =
-                                inputLength == 1
-                        in
+                        else
+                            Nothing
+                    , E.onRight <|
                         E.el
                             ([ E.paddingXY spacing.small 0 ]
                                 ++ (if isValidNewChar then
@@ -698,6 +705,28 @@ popUp ({ activeComponentId, boxUnits, thumbnailUnitSize, newCompoundChar, isInpu
 
         NoPopUp ->
             E.none
+
+
+onEnter : Maybe Msg -> E.Attribute Msg
+onEnter =
+    -- only used a dummy default attribute
+    Maybe.withDefault (E.htmlAttribute (Html.Attributes.selected True))
+        << Maybe.map
+            (\msg ->
+                E.htmlAttribute
+                    (Html.Events.on "keyup"
+                        (Decode.field "key" Decode.string
+                            |> Decode.andThen
+                                (\key ->
+                                    if key == "Enter" then
+                                        Decode.succeed msg
+
+                                    else
+                                        Decode.fail "Not the enter key"
+                                )
+                        )
+                    )
+            )
 
 
 editor : Model -> E.Element Msg
