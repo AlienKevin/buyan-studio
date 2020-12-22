@@ -15,7 +15,7 @@ import Element.Input as Input
 import FeatherIcons
 import File exposing (File)
 import File.Select as Select
-import Html exposing (Html, a)
+import Html exposing (Html)
 import Html.Attributes
 import Html.Events
 import Html5.DragDrop as DragDrop
