@@ -59,21 +59,17 @@ type alias Id =
 
 
 type MyChar
-    = SimpleChar
-        { char : Char
-        , id : Id
-        , width : Float
-        , height : Float
-        , position : Vec2
-        }
-    | CompoundChar
-        { char : Char
-        , id : Id
-        , width : Float
-        , height : Float
-        , position : Vec2
-        , components : List MyChar
-        }
+    = SimpleChar MyCharRef
+    | CompoundChar MyCharRef (List MyCharRef)
+
+
+type alias MyCharRef =
+    { char : Char
+    , id : Id
+    , width : Float
+    , height : Float
+    , position : Vec2
+    }
 
 
 emptyMyChar : MyChar
@@ -315,7 +311,7 @@ addComponentToMyChar chars componentChar myChar =
         SimpleChar _ ->
             myChar
 
-        CompoundChar ({ components } as compoundChar) ->
+        CompoundChar compoundChar components ->
             let
                 width =
                     50
@@ -330,43 +326,16 @@ addComponentToMyChar chars componentChar myChar =
                     List.length components
 
                 newComponent =
-                    case Dict.get componentChar chars of
-                        Just c ->
-                            case c of
-                                SimpleChar _ ->
-                                    SimpleChar
-                                        { char = componentChar
-                                        , id = id
-                                        , width = width
-                                        , height = height
-                                        , position = position
-                                        }
-
-                                CompoundChar compound ->
-                                    CompoundChar
-                                        { char = componentChar
-                                        , id = id
-                                        , width = width
-                                        , height = height
-                                        , position = position
-                                        , components = compound.components
-                                        }
-
-                        Nothing ->
-                            -- impossible
-                            SimpleChar
-                                { char = componentChar
-                                , id = id
-                                , width = width
-                                , height = height
-                                , position = position
-                                }
+                    { char = componentChar
+                    , id = id
+                    , width = width
+                    , height = height
+                    , position = position
+                    }
             in
             CompoundChar
-                { compoundChar
-                    | components =
-                        components ++ [ newComponent ]
-                }
+                compoundChar
+                (components ++ [ newComponent ])
 
 
 closePopUp : Model -> ( Model, Cmd Msg )
@@ -414,8 +383,8 @@ addPendingCompoundChar model =
                 , width = 100
                 , height = 100
                 , position = Vector2.vec2 0 0
-                , components = []
                 }
+                []
     in
     ( { model
         | chars =
@@ -533,36 +502,22 @@ addChar myCharType model =
             )
 
 
-updateComponent : (List MyChar -> List MyChar) -> MyChar -> MyChar
+updateComponent : (List MyCharRef -> List MyCharRef) -> MyChar -> MyChar
 updateComponent func myChar =
     case myChar of
         SimpleChar _ ->
             myChar
 
-        CompoundChar c ->
-            CompoundChar
-                { c
-                    | components =
-                        func c.components
-                }
+        CompoundChar c components ->
+            CompoundChar c (func components)
 
 
-updatePosition : (Vec2 -> Vec2) -> MyChar -> MyChar
-updatePosition func myChar =
-    case myChar of
-        SimpleChar c ->
-            SimpleChar
-                { c
-                    | position =
-                        func c.position
-                }
-
-        CompoundChar c ->
-            CompoundChar
-                { c
-                    | position =
-                        func c.position
-                }
+updatePosition : (Vec2 -> Vec2) -> MyCharRef -> MyCharRef
+updatePosition func myCharRef =
+    { myCharRef
+        | position =
+            func myCharRef.position
+    }
 
 
 
@@ -577,7 +532,7 @@ getCharType chars char =
                 SimpleChar _ ->
                     SimpleCharType
 
-                CompoundChar _ ->
+                CompoundChar _ _ ->
                     CompoundCharType
 
         Nothing ->
@@ -1013,7 +968,7 @@ charFromMyChar myChar =
         SimpleChar { char } ->
             char
 
-        CompoundChar { char } ->
+        CompoundChar { char } _ ->
             char
 
 
@@ -1023,7 +978,7 @@ isMyCharType myCharType myChar =
         ( SimpleCharType, SimpleChar _ ) ->
             True
 
-        ( CompoundCharType, CompoundChar _ ) ->
+        ( CompoundCharType, CompoundChar _ _ ) ->
             True
 
         _ ->
@@ -1164,7 +1119,7 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
                     -- impossible
                     TypedSvg.Core.text <| "Error rendering " ++ String.fromChar char
 
-        CompoundChar { char, width, height, position, components } ->
+        CompoundChar { char, width, height, position } components ->
             constraint width height position <|
                 List.map
                     (renderCharHelper
@@ -1176,21 +1131,33 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
                         , isThumbnail = isThumbnail
                         }
                         (level + 1)
+                        << myCharFromMyCharRef chars
                     )
-                <|
-                    -- impossible
-                    Maybe.withDefault components
-                    <|
-                        Maybe.andThen
-                            (\compoundChar ->
-                                case compoundChar of
-                                    SimpleChar _ ->
-                                        Nothing
+                    components
 
-                                    CompoundChar c ->
-                                        Just c.components
-                            )
-                            (Dict.get char chars)
+
+myCharFromMyCharRef : Dict Char MyChar -> MyCharRef -> MyChar
+myCharFromMyCharRef chars ref =
+    let
+        myChar =
+            -- impossible
+            Maybe.withDefault emptyMyChar <|
+                Dict.get ref.char chars
+
+        updateAttributes r =
+            { r
+                | id = ref.id
+                , width = ref.width
+                , height = ref.height
+                , position = ref.position
+            }
+    in
+    case myChar of
+        SimpleChar r ->
+            SimpleChar (updateAttributes r)
+
+        CompoundChar r components ->
+            CompoundChar (updateAttributes r) components
 
 
 getId : MyChar -> Id
@@ -1199,7 +1166,7 @@ getId myChar =
         SimpleChar { id } ->
             id
 
-        CompoundChar { id } ->
+        CompoundChar { id } _ ->
             id
 
 
