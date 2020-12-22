@@ -45,7 +45,7 @@ type alias Model =
     , strokeWidth : Float
     , popUp : PopUp
     , newCompoundChar : String
-    , showInputError : Bool
+    , isInputErrorShown : Bool
     , dragDropChar : DragDrop.Model Char ()
     , dragDropCharData : { char : Char }
     , drag : Draggable.State Id
@@ -75,6 +75,7 @@ type MyChar
         }
 
 
+emptyMyChar : MyChar
 emptyMyChar =
     SimpleChar
         { char = '?'
@@ -111,7 +112,7 @@ init _ =
       , strokeWidth = 70
       , popUp = NoPopUp
       , newCompoundChar = ""
-      , showInputError = False
+      , isInputErrorShown = False
       , dragDropChar = DragDrop.init
       , dragDropCharData = { char = '?' }
       , drag = Draggable.init
@@ -129,9 +130,9 @@ type Msg
     = AddChar MyCharType
     | SvgsSelected File (List File)
     | SvgsLoaded SimpleCharSvgs
-    | EditChar MyChar
-    | UpdateNewCompoundChar String
-    | AddNewCompoundChar
+    | SelectChar MyChar
+    | UpdatePendingCompoundChar String
+    | AddPendingCompoundChar
     | ShowInputError
     | HideInputError
     | ClosePopUp
@@ -156,310 +157,379 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as model) =
     case msg of
         AddChar myCharType ->
-            case myCharType of
-                SimpleCharType ->
-                    ( model, Select.files [ "image/svg+xml" ] SvgsSelected )
-
-                CompoundCharType ->
-                    ( { model
-                        | popUp =
-                            AddCompoundCharPopUp
-                      }
-                    , Cmd.none
-                    )
+            addChar myCharType model
 
         SvgsSelected first rest ->
-            ( model
-            , Task.perform SvgsLoaded <|
-                Task.map Dict.fromList <|
-                    Task.sequence <|
-                        List.map
-                            (\file ->
-                                Task.map
-                                    (\svgString ->
-                                        ( case String.uncons <| File.name file of
-                                            Just ( char, _ ) ->
-                                                char
-
-                                            Nothing ->
-                                                '?'
-                                        , case SvgParser.parse svgString of
-                                            Ok svg ->
-                                                svg
-
-                                            Err err ->
-                                                let
-                                                    _ =
-                                                        Debug.log "Error parsing svg" err
-                                                in
-                                                Svg.g [] []
-                                        )
-                                    )
-                                <|
-                                    File.toString file
-                            )
-                            (first :: rest)
-            )
+            svgsSelected first rest model
 
         SvgsLoaded svgs ->
-            ( { model
-                | chars =
-                    Dict.foldl
-                        (\char _ ->
-                            Dict.insert
-                                char
-                                (SimpleChar
-                                    { char = char
-                                    , id = -1
-                                    , width = 100
-                                    , height = 100
-                                    , position = Vector2.vec2 0 0
-                                    }
-                                )
-                        )
-                        model.chars
-                        svgs
-                , simpleCharSvgs =
-                    Dict.merge
-                        (\key a -> Dict.insert key a)
-                        (\key a b -> Dict.insert key a)
-                        (\key b -> Dict.insert key b)
-                        svgs
-                        model.simpleCharSvgs
-                        Dict.empty
-              }
-            , Cmd.none
-            )
+            svgsLoaded svgs model
 
-        EditChar myChar ->
-            ( { model
-                | selectedChar =
-                    Just <| charFromMyChar myChar
-                , activeComponentId =
-                    Nothing
-              }
-            , Cmd.none
-            )
+        SelectChar myChar ->
+            selectChar myChar model
 
-        UpdateNewCompoundChar string ->
-            ( { model
-                | newCompoundChar =
-                    string
-              }
-            , Cmd.none
-            )
+        UpdatePendingCompoundChar charInput ->
+            updatePendingCompoundChar charInput model
 
-        AddNewCompoundChar ->
-            let
-                newChar =
-                    case String.uncons model.newCompoundChar of
-                        Just ( char, _ ) ->
-                            char
-
-                        Nothing ->
-                            '?'
-
-                newCompoundChar =
-                    CompoundChar
-                        { char = newChar
-                        , id = -1
-                        , width = 100
-                        , height = 100
-                        , position = Vector2.vec2 0 0
-                        , components = []
-                        }
-            in
-            ( { model
-                | chars =
-                    Dict.insert newChar newCompoundChar model.chars
-                , selectedChar =
-                    Just <| charFromMyChar newCompoundChar
-                , popUp =
-                    NoPopUp
-              }
-            , Cmd.none
-            )
+        AddPendingCompoundChar ->
+            addPendingCompoundChar model
 
         ShowInputError ->
-            let
-                _ =
-                    Debug.log "showInputError" ""
-            in
-            ( { model
-                | showInputError = True
-              }
-            , Cmd.none
-            )
+            showInputError model
 
         HideInputError ->
-            ( { model
-                | showInputError = False
-              }
-            , Cmd.none
-            )
+            hideInputError model
 
         ClosePopUp ->
-            ( { model
-                | popUp = NoPopUp
-              }
-            , Cmd.none
-            )
+            closePopUp model
 
         DragDropChar msg_ ->
-            let
-                ( model_, result ) =
-                    DragDrop.update msg_ model.dragDropChar
-            in
-            ( case result of
-                Nothing ->
-                    { model
-                        | dragDropChar =
-                            model_
-                        , dragDropCharData =
-                            model.dragDropCharData
-                        , chars =
-                            model.chars
-                    }
-
-                Just ( componentChar, _, _ ) ->
-                    { model
-                        | dragDropChar =
-                            DragDrop.init
-                        , dragDropCharData =
-                            { char = componentChar }
-                        , chars =
-                            case model.selectedChar of
-                                Just selectedChar ->
-                                    Dict.update
-                                        selectedChar
-                                        (Maybe.map
-                                            (\myChar ->
-                                                case myChar of
-                                                    SimpleChar _ ->
-                                                        myChar
-
-                                                    CompoundChar ({ components } as compoundChar) ->
-                                                        let
-                                                            width =
-                                                                50
-
-                                                            height =
-                                                                50
-
-                                                            position =
-                                                                Vector2.vec2 25 25
-
-                                                            id =
-                                                                List.length components
-
-                                                            _ =
-                                                                Debug.log "id" id
-                                                        in
-                                                        CompoundChar
-                                                            { compoundChar
-                                                                | components =
-                                                                    components
-                                                                        ++ [ case Dict.get componentChar model.chars of
-                                                                                Just c ->
-                                                                                    case c of
-                                                                                        SimpleChar _ ->
-                                                                                            SimpleChar
-                                                                                                { char = componentChar
-                                                                                                , id = id
-                                                                                                , width = width
-                                                                                                , height = height
-                                                                                                , position = position
-                                                                                                }
-
-                                                                                        CompoundChar compound ->
-                                                                                            CompoundChar
-                                                                                                { char = componentChar
-                                                                                                , id = id
-                                                                                                , width = width
-                                                                                                , height = height
-                                                                                                , position = position
-                                                                                                , components = compound.components
-                                                                                                }
-
-                                                                                Nothing ->
-                                                                                    -- impossible
-                                                                                    SimpleChar
-                                                                                        { char = componentChar
-                                                                                        , id = id
-                                                                                        , width = width
-                                                                                        , height = height
-                                                                                        , position = position
-                                                                                        }
-                                                                           ]
-                                                            }
-                                            )
-                                        )
-                                        model.chars
-
-                                Nothing ->
-                                    model.chars
-                    }
-            , Cmd.none
-            )
+            dragDropChar msg_ model
 
         OnDragBy delta ->
-            ( { model
-                | chars =
-                    case model.selectedChar of
-                        Just selectedChar ->
-                            let
-                                _ =
-                                    Debug.log "activeComponentId" activeComponentId
-                            in
-                            Dict.update
-                                selectedChar
-                                (Maybe.map
-                                    (updateComponent <|
-                                        List.Extra.updateAt
-                                            -- impossible
-                                            (Maybe.withDefault -1 activeComponentId)
-                                            (updatePosition
-                                                (Vector2.add <|
-                                                    Vector2.scale (100 / toFloat (boxUnits * unitSize))
-                                                        delta
-                                                )
-                                            )
-                                    )
-                                )
-                                chars
-
-                        Nothing ->
-                            chars
-              }
-            , Cmd.none
-            )
+            onDragBy delta model
 
         StartDragging id ->
-            ( { model
-                | activeComponentId =
-                    Just id
-              }
-            , Cmd.none
-            )
+            startDragging id model
 
         StopDragging ->
-            ( { model
-                | activeComponentId =
-                    Nothing
-              }
-            , Cmd.none
-            )
+            stopDragging model
 
         SetActiveComponentId id ->
+            setActiveComponentId id model
+
+        DragMsg msg_ ->
+            dragMsg msg_ model
+
+
+dragMsg : Draggable.Msg Id -> Model -> ( Model, Cmd Msg )
+dragMsg msg model =
+    Draggable.update dragConfig msg model
+
+
+setActiveComponentId : Id -> Model -> ( Model, Cmd Msg )
+setActiveComponentId id model =
+    ( { model
+        | activeComponentId =
+            Just id
+      }
+    , Cmd.none
+    )
+
+
+stopDragging : Model -> ( Model, Cmd Msg )
+stopDragging model =
+    ( { model
+        | activeComponentId =
+            Nothing
+      }
+    , Cmd.none
+    )
+
+
+startDragging : Id -> Model -> ( Model, Cmd Msg )
+startDragging id model =
+    ( { model
+        | activeComponentId =
+            Just id
+      }
+    , Cmd.none
+    )
+
+
+onDragBy : Vec2 -> Model -> ( Model, Cmd Msg )
+onDragBy delta ({ activeComponentId, boxUnits, unitSize, chars } as model) =
+    ( { model
+        | chars =
+            case model.selectedChar of
+                Just selectedChar ->
+                    Dict.update
+                        selectedChar
+                        (Maybe.map
+                            (updateComponent <|
+                                let
+                                    factor =
+                                        100 / toFloat (boxUnits * unitSize)
+                                in
+                                List.Extra.updateAt
+                                    -- impossible
+                                    (Maybe.withDefault -1 activeComponentId)
+                                    (updatePosition
+                                        (Vector2.add <| Vector2.scale factor delta)
+                                    )
+                            )
+                        )
+                        chars
+
+                Nothing ->
+                    chars
+      }
+    , Cmd.none
+    )
+
+
+dragDropChar : DragDrop.Msg Char () -> Model -> ( Model, Cmd Msg )
+dragDropChar msg_ model =
+    let
+        ( model_, result ) =
+            DragDrop.update msg_ model.dragDropChar
+    in
+    ( case result of
+        Nothing ->
+            { model
+                | dragDropChar =
+                    model_
+                , dragDropCharData =
+                    model.dragDropCharData
+                , chars =
+                    model.chars
+            }
+
+        Just ( componentChar, _, _ ) ->
+            { model
+                | dragDropChar =
+                    DragDrop.init
+                , dragDropCharData =
+                    { char = componentChar }
+                , chars =
+                    Maybe.map
+                        (\selectedChar ->
+                            Dict.update
+                                selectedChar
+                                (Maybe.map <|
+                                    addComponentToMyChar model.chars componentChar
+                                )
+                                model.chars
+                        )
+                        model.selectedChar
+                        |> Maybe.withDefault model.chars
+            }
+    , Cmd.none
+    )
+
+
+addComponentToMyChar : Dict Char MyChar -> Char -> MyChar -> MyChar
+addComponentToMyChar chars componentChar myChar =
+    case myChar of
+        SimpleChar _ ->
+            myChar
+
+        CompoundChar ({ components } as compoundChar) ->
+            let
+                width =
+                    50
+
+                height =
+                    50
+
+                position =
+                    Vector2.vec2 25 25
+
+                id =
+                    List.length components
+
+                newComponent =
+                    case Dict.get componentChar chars of
+                        Just c ->
+                            case c of
+                                SimpleChar _ ->
+                                    SimpleChar
+                                        { char = componentChar
+                                        , id = id
+                                        , width = width
+                                        , height = height
+                                        , position = position
+                                        }
+
+                                CompoundChar compound ->
+                                    CompoundChar
+                                        { char = componentChar
+                                        , id = id
+                                        , width = width
+                                        , height = height
+                                        , position = position
+                                        , components = compound.components
+                                        }
+
+                        Nothing ->
+                            -- impossible
+                            SimpleChar
+                                { char = componentChar
+                                , id = id
+                                , width = width
+                                , height = height
+                                , position = position
+                                }
+            in
+            CompoundChar
+                { compoundChar
+                    | components =
+                        components ++ [ newComponent ]
+                }
+
+
+closePopUp : Model -> ( Model, Cmd Msg )
+closePopUp model =
+    ( { model
+        | popUp = NoPopUp
+      }
+    , Cmd.none
+    )
+
+
+hideInputError : Model -> ( Model, Cmd Msg )
+hideInputError model =
+    ( { model
+        | isInputErrorShown = False
+      }
+    , Cmd.none
+    )
+
+
+showInputError : Model -> ( Model, Cmd Msg )
+showInputError model =
+    ( { model
+        | isInputErrorShown = True
+      }
+    , Cmd.none
+    )
+
+
+addPendingCompoundChar : Model -> ( Model, Cmd Msg )
+addPendingCompoundChar model =
+    let
+        newChar =
+            case String.uncons model.newCompoundChar of
+                Just ( char, _ ) ->
+                    char
+
+                Nothing ->
+                    '?'
+
+        newCompoundChar =
+            CompoundChar
+                { char = newChar
+                , id = -1
+                , width = 100
+                , height = 100
+                , position = Vector2.vec2 0 0
+                , components = []
+                }
+    in
+    ( { model
+        | chars =
+            Dict.insert newChar newCompoundChar model.chars
+        , selectedChar =
+            Just <| charFromMyChar newCompoundChar
+        , popUp =
+            NoPopUp
+      }
+    , Cmd.none
+    )
+
+
+updatePendingCompoundChar : String -> Model -> ( Model, Cmd Msg )
+updatePendingCompoundChar charInput model =
+    ( { model
+        | newCompoundChar =
+            charInput
+      }
+    , Cmd.none
+    )
+
+
+selectChar : MyChar -> Model -> ( Model, Cmd Msg )
+selectChar myChar model =
+    ( { model
+        | selectedChar =
+            Just <| charFromMyChar myChar
+        , activeComponentId =
+            Nothing
+      }
+    , Cmd.none
+    )
+
+
+svgsLoaded : SimpleCharSvgs -> Model -> ( Model, Cmd Msg )
+svgsLoaded svgs model =
+    ( { model
+        | chars =
+            Dict.foldl
+                (\char _ ->
+                    Dict.insert
+                        char
+                        (SimpleChar
+                            { char = char
+                            , id = -1
+                            , width = 100
+                            , height = 100
+                            , position = Vector2.vec2 0 0
+                            }
+                        )
+                )
+                model.chars
+                svgs
+        , simpleCharSvgs =
+            Dict.merge
+                (\key a -> Dict.insert key a)
+                (\key a b -> Dict.insert key a)
+                (\key b -> Dict.insert key b)
+                svgs
+                model.simpleCharSvgs
+                Dict.empty
+      }
+    , Cmd.none
+    )
+
+
+svgsSelected : File -> List File -> Model -> ( Model, Cmd Msg )
+svgsSelected first rest model =
+    ( model
+    , Task.perform SvgsLoaded <|
+        Task.map Dict.fromList <|
+            Task.sequence <|
+                List.map
+                    (\file ->
+                        Task.map
+                            (\svgString ->
+                                ( case String.uncons <| File.name file of
+                                    Just ( char, _ ) ->
+                                        char
+
+                                    Nothing ->
+                                        '?'
+                                , case SvgParser.parse svgString of
+                                    Ok svg ->
+                                        svg
+
+                                    Err err ->
+                                        let
+                                            _ =
+                                                Debug.log "Error parsing svg" err
+                                        in
+                                        Svg.g [] []
+                                )
+                            )
+                        <|
+                            File.toString file
+                    )
+                    (first :: rest)
+    )
+
+
+addChar : MyCharType -> Model -> ( Model, Cmd Msg )
+addChar myCharType model =
+    case myCharType of
+        SimpleCharType ->
+            ( model, Select.files [ "image/svg+xml" ] SvgsSelected )
+
+        CompoundCharType ->
             ( { model
-                | activeComponentId =
-                    Just id
+                | popUp =
+                    AddCompoundCharPopUp
               }
             , Cmd.none
             )
-
-        DragMsg dragMsg ->
-            Draggable.update dragConfig dragMsg model
 
 
 updateComponent : (List MyChar -> List MyChar) -> MyChar -> MyChar
@@ -536,7 +606,7 @@ view model =
 
 
 popUp : Model -> E.Element Msg
-popUp ({ activeComponentId, boxUnits, thumbnailUnitSize, newCompoundChar, showInputError } as model) =
+popUp ({ activeComponentId, boxUnits, thumbnailUnitSize, newCompoundChar, isInputErrorShown } as model) =
     case model.popUp of
         AddCompoundCharPopUp ->
             E.column
@@ -597,13 +667,13 @@ popUp ({ activeComponentId, boxUnits, thumbnailUnitSize, newCompoundChar, showIn
                                     fontSize.title
                                 , onPress =
                                     if isValidNewChar then
-                                        Just AddNewCompoundChar
+                                        Just AddPendingCompoundChar
 
                                     else
                                         Nothing
                                 }
                     , E.below <|
-                        if showInputError then
+                        if isInputErrorShown then
                             E.el
                                 [ E.centerX
                                 , E.padding spacing.small
@@ -615,7 +685,7 @@ popUp ({ activeComponentId, boxUnits, thumbnailUnitSize, newCompoundChar, showIn
                             E.none
                     ]
                     { onChange =
-                        UpdateNewCompoundChar
+                        UpdatePendingCompoundChar
                     , text =
                         newCompoundChar
                     , placeholder =
@@ -857,7 +927,7 @@ charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, bord
         (([ E.width <| E.px <| boxUnits * thumbnailUnitSize
           , Background.color palette.lightBg
           , Border.rounded spacing.medium
-          , Events.onClick <| EditChar myChar
+          , Events.onClick <| SelectChar myChar
           , E.pointer
           ]
             ++ (List.map E.htmlAttribute <|
@@ -979,7 +1049,7 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, chars, s
                         stroke-width: 2px !important;
                         stroke: """
                         ++ (Color.toCssString <| toColor palette.darkFg)
-                    ++ """;
+                        ++ """;
                     }
                     svg {
                         overflow: visible
@@ -1077,18 +1147,21 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
                         , isThumbnail = isThumbnail
                         }
                         (level + 1)
-                    ) <|
+                    )
+                <|
                     -- impossible
-                    Maybe.withDefault components <|
-                    Maybe.andThen
-                        (\compoundChar ->
-                            case compoundChar of
-                                SimpleChar _ ->
-                                    Nothing
-                                CompoundChar c ->
-                                    Just c.components
-                        )
-                        (Dict.get char chars)
+                    Maybe.withDefault components
+                    <|
+                        Maybe.andThen
+                            (\compoundChar ->
+                                case compoundChar of
+                                    SimpleChar _ ->
+                                        Nothing
+
+                                    CompoundChar c ->
+                                        Just c.components
+                            )
+                            (Dict.get char chars)
 
 
 getId : MyChar -> Id
