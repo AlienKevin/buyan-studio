@@ -661,6 +661,7 @@ editor ({ activeComponentId, selectedChar, chars, simpleCharSvgs, boxUnits, unit
                             { unitSize = unitSize
                             , boxUnits = boxUnits
                             , borderUnits = borderUnits
+                            , chars = chars
                             , simpleCharSvgs = simpleCharSvgs
                             , activeComponentId = activeComponentId
                             , strokeWidth = strokeWidth
@@ -847,7 +848,7 @@ charPanel myCharType ({ boxUnits, thumbnailUnitSize } as model) =
 
 
 charCard : Model -> MyChar -> E.Element Msg
-charCard { activeComponentId, unitSize, thumbnailUnitSize, boxUnits, borderUnits, strokeWidth, simpleCharSvgs, selectedChar } myChar =
+charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, borderUnits, strokeWidth, simpleCharSvgs, selectedChar } myChar =
     let
         char =
             charFromMyChar myChar
@@ -889,6 +890,7 @@ charCard { activeComponentId, unitSize, thumbnailUnitSize, boxUnits, borderUnits
                 , boxUnits = boxUnits
                 , borderUnits = borderUnits
                 , strokeWidth = strokeWidth * toFloat thumbnailUnitSize / toFloat unitSize
+                , chars = chars
                 , simpleCharSvgs = simpleCharSvgs
                 , activeComponentId =
                     Maybe.andThen
@@ -935,12 +937,13 @@ renderChar :
     , boxUnits : Int
     , borderUnits : Int
     , strokeWidth : Float
+    , chars : Dict Char MyChar
     , simpleCharSvgs : SimpleCharSvgs
     , activeComponentId : Maybe Id
     }
     -> MyChar
     -> Svg Msg
-renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, simpleCharSvgs, activeComponentId } myChar =
+renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, chars, simpleCharSvgs, activeComponentId } myChar =
     let
         size =
             toFloat ((boxUnits - 2 * borderUnits) * unitSize) - strokeWidth
@@ -993,6 +996,7 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, simpleCh
             [ renderCharHelper
                 { unitSize = unitSize
                 , boxUnits = boxUnits
+                , chars = chars
                 , simpleCharSvgs = simpleCharSvgs
                 , activeComponentId = activeComponentId
                 , isThumbnail = isThumbnail
@@ -1006,6 +1010,7 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, simpleCh
 renderCharHelper :
     { unitSize : Int
     , boxUnits : Int
+    , chars : Dict Char MyChar
     , simpleCharSvgs : SimpleCharSvgs
     , activeComponentId : Maybe Id
     , isThumbnail : Bool
@@ -1013,7 +1018,7 @@ renderCharHelper :
     -> Int
     -> MyChar
     -> Svg Msg
-renderCharHelper { unitSize, boxUnits, simpleCharSvgs, activeComponentId, isThumbnail } level myChar =
+renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId, isThumbnail } level myChar =
     let
         id =
             getId myChar
@@ -1066,13 +1071,24 @@ renderCharHelper { unitSize, boxUnits, simpleCharSvgs, activeComponentId, isThum
                     (renderCharHelper
                         { unitSize = unitSize
                         , boxUnits = boxUnits
+                        , chars = chars
                         , simpleCharSvgs = simpleCharSvgs
                         , activeComponentId = activeComponentId
                         , isThumbnail = isThumbnail
                         }
                         (level + 1)
-                    )
-                    components
+                    ) <|
+                    -- impossible
+                    Maybe.withDefault components <|
+                    Maybe.andThen
+                        (\compoundChar ->
+                            case compoundChar of
+                                SimpleChar _ ->
+                                    Nothing
+                                CompoundChar c ->
+                                    Just c.components
+                        )
+                        (Dict.get char chars)
 
 
 getId : MyChar -> Id
