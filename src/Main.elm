@@ -235,6 +235,8 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as mod
             ( { model
                 | selectedChar =
                     Just <| charFromMyChar myChar
+                , activeComponentId =
+                    Nothing
               }
             , Cmd.none
             )
@@ -995,6 +997,7 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, simpleCh
                 , activeComponentId = activeComponentId
                 , isThumbnail = isThumbnail
                 }
+                0
                 myChar
             ]
         ]
@@ -1007,12 +1010,16 @@ renderCharHelper :
     , activeComponentId : Maybe Id
     , isThumbnail : Bool
     }
+    -> Int
     -> MyChar
     -> Svg Msg
-renderCharHelper { unitSize, boxUnits, simpleCharSvgs, activeComponentId, isThumbnail } myChar =
+renderCharHelper { unitSize, boxUnits, simpleCharSvgs, activeComponentId, isThumbnail } level myChar =
     let
         id =
             getId myChar
+
+        levelwiseId =
+            id + (level - 1) * 10
 
         constraint width height position contents =
             Svg.svg
@@ -1021,15 +1028,15 @@ renderCharHelper { unitSize, boxUnits, simpleCharSvgs, activeComponentId, isThum
                  , SvgAttributes.width <| SvgTypes.Percent width
                  , SvgAttributes.height <| SvgTypes.Percent height
                  ]
-                    ++ (if isThumbnail then
+                    ++ (if isThumbnail || level > 1 then
                             []
 
                         else
-                            [ Draggable.mouseTrigger id DragMsg ]
+                            [ Draggable.mouseTrigger levelwiseId DragMsg ]
                        )
                 )
             <|
-                if Just id == activeComponentId then
+                if Just levelwiseId == activeComponentId then
                     Svg.rect
                         [ SvgAttributes.id "active-component-border"
                         , SvgAttributes.width <| SvgTypes.Percent 100
@@ -1063,6 +1070,7 @@ renderCharHelper { unitSize, boxUnits, simpleCharSvgs, activeComponentId, isThum
                         , activeComponentId = activeComponentId
                         , isThumbnail = isThumbnail
                         }
+                        (level + 1)
                     )
                     components
 
