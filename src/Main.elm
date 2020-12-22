@@ -4,6 +4,8 @@ import Browser
 import Color
 import Dict exposing (Dict, size)
 import Dict.Extra
+import Draggable
+import Draggable.Events
 import Element as E
 import Element.Background as Background
 import Element.Border as Border
@@ -18,6 +20,8 @@ import Html.Attributes
 import Html5.DragDrop as DragDrop
 import Json.Decode as Decode
 import Json.Encode as Encode
+import List.Extra
+import Math.Vector2 as Vector2 exposing (Vec2)
 import SvgParser
 import Task
 import TypedSvg as Svg
@@ -44,23 +48,29 @@ type alias Model =
     , showInputError : Bool
     , dragDropChar : DragDrop.Model Char ()
     , dragDropCharData : { char : Char }
+    , drag : Draggable.State Id
+    , activeComponentId : Maybe Id
     }
+
+
+type alias Id =
+    Int
 
 
 type MyChar
     = SimpleChar
         { char : Char
+        , id : Id
         , width : Float
         , height : Float
-        , x : Float
-        , y : Float
+        , position : Vec2
         }
     | CompoundChar
         { char : Char
+        , id : Id
         , width : Float
         , height : Float
-        , x : Float
-        , y : Float
+        , position : Vec2
         , components : List MyChar
         }
 
@@ -68,10 +78,10 @@ type MyChar
 emptyMyChar =
     SimpleChar
         { char = '?'
+        , id = -1
         , width = 0
         , height = 0
-        , x = 0
-        , y = 0
+        , position = Vector2.vec2 0 0
         }
 
 
@@ -104,6 +114,8 @@ init _ =
       , showInputError = False
       , dragDropChar = DragDrop.init
       , dragDropCharData = { char = '?' }
+      , drag = Draggable.init
+      , activeComponentId = Nothing
       }
     , Cmd.none
     )
@@ -124,10 +136,24 @@ type Msg
     | HideInputError
     | ClosePopUp
     | DragDropChar (DragDrop.Msg Char ())
+    | OnDragBy Vec2
+    | StartDragging Id
+    | StopDragging
+    | DragMsg (Draggable.Msg Id)
+    | SetActiveComponentId Id
+
+
+dragConfig : Draggable.Config Id Msg
+dragConfig =
+    Draggable.customConfig
+        [ Draggable.Events.onDragBy (\( dx, dy ) -> Vector2.vec2 dx dy |> OnDragBy)
+        , Draggable.Events.onDragStart StartDragging
+        , Draggable.Events.onClick SetActiveComponentId
+        ]
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg ({ boxUnits, borderUnits } as model) =
+update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as model) =
     case msg of
         AddChar myCharType ->
             case myCharType of
@@ -184,10 +210,10 @@ update msg ({ boxUnits, borderUnits } as model) =
                                 char
                                 (SimpleChar
                                     { char = char
+                                    , id = -1
                                     , width = 100
                                     , height = 100
-                                    , x = 0
-                                    , y = 0
+                                    , position = Vector2.vec2 0 0
                                     }
                                 )
                         )
@@ -234,10 +260,10 @@ update msg ({ boxUnits, borderUnits } as model) =
                 newCompoundChar =
                     CompoundChar
                         { char = newChar
+                        , id = -1
                         , width = 100
                         , height = 100
-                        , x = 0
-                        , y = 0
+                        , position = Vector2.vec2 0 0
                         , components = []
                         }
             in
@@ -318,48 +344,51 @@ update msg ({ boxUnits, borderUnits } as model) =
                                                             height =
                                                                 50
 
-                                                            x =
-                                                                25
+                                                            position =
+                                                                Vector2.vec2 25 25
 
-                                                            y =
-                                                                25
+                                                            id =
+                                                                List.length components
+
+                                                            _ =
+                                                                Debug.log "id" id
                                                         in
                                                         CompoundChar
                                                             { compoundChar
                                                                 | components =
-                                                                    (case Dict.get componentChar model.chars of
-                                                                        Just c ->
-                                                                            case c of
-                                                                                SimpleChar _ ->
+                                                                    components
+                                                                        ++ [ case Dict.get componentChar model.chars of
+                                                                                Just c ->
+                                                                                    case c of
+                                                                                        SimpleChar _ ->
+                                                                                            SimpleChar
+                                                                                                { char = componentChar
+                                                                                                , id = id
+                                                                                                , width = width
+                                                                                                , height = height
+                                                                                                , position = position
+                                                                                                }
+
+                                                                                        CompoundChar compound ->
+                                                                                            CompoundChar
+                                                                                                { char = componentChar
+                                                                                                , id = id
+                                                                                                , width = width
+                                                                                                , height = height
+                                                                                                , position = position
+                                                                                                , components = compound.components
+                                                                                                }
+
+                                                                                Nothing ->
+                                                                                    -- impossible
                                                                                     SimpleChar
                                                                                         { char = componentChar
+                                                                                        , id = id
                                                                                         , width = width
                                                                                         , height = height
-                                                                                        , x = x
-                                                                                        , y = y
+                                                                                        , position = position
                                                                                         }
-
-                                                                                CompoundChar compound ->
-                                                                                    CompoundChar
-                                                                                        { char = componentChar
-                                                                                        , width = width
-                                                                                        , height = height
-                                                                                        , x = x
-                                                                                        , y = y
-                                                                                        , components = compound.components
-                                                                                        }
-
-                                                                        Nothing ->
-                                                                            -- impossible
-                                                                            SimpleChar
-                                                                                { char = componentChar
-                                                                                , width = width
-                                                                                , height = height
-                                                                                , x = x
-                                                                                , y = y
-                                                                                }
-                                                                    )
-                                                                        :: components
+                                                                           ]
                                                             }
                                             )
                                         )
@@ -370,6 +399,97 @@ update msg ({ boxUnits, borderUnits } as model) =
                     }
             , Cmd.none
             )
+
+        OnDragBy delta ->
+            ( { model
+                | chars =
+                    case model.selectedChar of
+                        Just selectedChar ->
+                            let
+                                _ =
+                                    Debug.log "activeComponentId" activeComponentId
+                            in
+                            Dict.update
+                                selectedChar
+                                (Maybe.map
+                                    (updateComponent <|
+                                        List.Extra.updateAt
+                                            -- impossible
+                                            (Maybe.withDefault -1 activeComponentId)
+                                            (updatePosition
+                                                (Vector2.add <|
+                                                    Vector2.scale (100 / toFloat (boxUnits * unitSize))
+                                                        delta
+                                                )
+                                            )
+                                    )
+                                )
+                                chars
+
+                        Nothing ->
+                            chars
+              }
+            , Cmd.none
+            )
+
+        StartDragging id ->
+            ( { model
+                | activeComponentId =
+                    Just id
+              }
+            , Cmd.none
+            )
+
+        StopDragging ->
+            ( { model
+                | activeComponentId =
+                    Nothing
+              }
+            , Cmd.none
+            )
+
+        SetActiveComponentId id ->
+            ( { model
+                | activeComponentId =
+                    Just id
+              }
+            , Cmd.none
+            )
+
+        DragMsg dragMsg ->
+            Draggable.update dragConfig dragMsg model
+
+
+updateComponent : (List MyChar -> List MyChar) -> MyChar -> MyChar
+updateComponent func myChar =
+    case myChar of
+        SimpleChar _ ->
+            myChar
+
+        CompoundChar c ->
+            CompoundChar
+                { c
+                    | components =
+                        func c.components
+                }
+
+
+updatePosition : (Vec2 -> Vec2) -> MyChar -> MyChar
+updatePosition func myChar =
+    case myChar of
+        SimpleChar c ->
+            SimpleChar
+                { c
+                    | position =
+                        func c.position
+                }
+
+        CompoundChar c ->
+            CompoundChar
+                { c
+                    | position =
+                        func c.position
+                }
 
 
 
@@ -414,7 +534,7 @@ view model =
 
 
 popUp : Model -> E.Element Msg
-popUp ({ boxUnits, thumbnailUnitSize, newCompoundChar, showInputError } as model) =
+popUp ({ activeComponentId, boxUnits, thumbnailUnitSize, newCompoundChar, showInputError } as model) =
     case model.popUp of
         AddCompoundCharPopUp ->
             E.column
@@ -509,7 +629,7 @@ popUp ({ boxUnits, thumbnailUnitSize, newCompoundChar, showInputError } as model
 
 
 editor : Model -> E.Element Msg
-editor ({ selectedChar, chars, simpleCharSvgs, boxUnits, unitSize, borderUnits, strokeWidth } as model) =
+editor ({ activeComponentId, selectedChar, chars, simpleCharSvgs, boxUnits, unitSize, borderUnits, strokeWidth } as model) =
     let
         dropId =
             DragDrop.getDropId model.dragDropChar
@@ -539,13 +659,15 @@ editor ({ selectedChar, chars, simpleCharSvgs, boxUnits, unitSize, borderUnits, 
                             { unitSize = unitSize
                             , boxUnits = boxUnits
                             , borderUnits = borderUnits
-                            , strokeWidth = strokeWidth
                             , simpleCharSvgs = simpleCharSvgs
-                            , myChar =
-                                Maybe.withDefault emptyMyChar <|
-                                    -- impossible
-                                    Dict.get char chars
+                            , activeComponentId = activeComponentId
+                            , strokeWidth = strokeWidth
+                            , isThumbnail = False
                             }
+                            (Maybe.withDefault emptyMyChar <|
+                                -- impossible
+                                Dict.get char chars
+                            )
 
                 Nothing ->
                     E.none
@@ -723,7 +845,7 @@ charPanel myCharType ({ boxUnits, thumbnailUnitSize } as model) =
 
 
 charCard : Model -> MyChar -> E.Element Msg
-charCard { unitSize, thumbnailUnitSize, boxUnits, borderUnits, strokeWidth, simpleCharSvgs, selectedChar } myChar =
+charCard { activeComponentId, unitSize, thumbnailUnitSize, boxUnits, borderUnits, strokeWidth, simpleCharSvgs, selectedChar } myChar =
     let
         char =
             charFromMyChar myChar
@@ -766,8 +888,19 @@ charCard { unitSize, thumbnailUnitSize, boxUnits, borderUnits, strokeWidth, simp
                 , borderUnits = borderUnits
                 , strokeWidth = strokeWidth * toFloat thumbnailUnitSize / toFloat unitSize
                 , simpleCharSvgs = simpleCharSvgs
-                , myChar = myChar
+                , activeComponentId =
+                    Maybe.andThen
+                        (\selected ->
+                            if selected == char then
+                                activeComponentId
+
+                            else
+                                Nothing
+                        )
+                        selectedChar
+                , isThumbnail = True
                 }
+                myChar
         ]
 
 
@@ -795,20 +928,24 @@ isMyCharType myCharType myChar =
 
 
 renderChar :
-    { unitSize : Int
+    { isThumbnail : Bool
+    , unitSize : Int
     , boxUnits : Int
     , borderUnits : Int
     , strokeWidth : Float
     , simpleCharSvgs : SimpleCharSvgs
-    , myChar : MyChar
+    , activeComponentId : Maybe Id
     }
+    -> MyChar
     -> Svg Msg
-renderChar { unitSize, boxUnits, borderUnits, strokeWidth, simpleCharSvgs, myChar } =
+renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, simpleCharSvgs, activeComponentId } myChar =
     let
         size =
             toFloat ((boxUnits - 2 * borderUnits) * unitSize) - strokeWidth
+
         offset =
             toFloat (borderUnits * unitSize) + strokeWidth / 2
+
         charClassName =
             "char-with-size-" ++ (String.fromInt <| round strokeWidth)
     in
@@ -820,8 +957,9 @@ renderChar { unitSize, boxUnits, borderUnits, strokeWidth, simpleCharSvgs, myCha
         [ Svg.defs []
             [ Svg.style []
                 [ TypedSvg.Core.text <|
-                    "." ++ charClassName
-                    ++ """ * {
+                    "."
+                        ++ charClassName
+                        ++ """ * {
                         fill: none;
                         stroke: #000;
                         stroke-linecap: round;
@@ -831,6 +969,12 @@ renderChar { unitSize, boxUnits, borderUnits, strokeWidth, simpleCharSvgs, myCha
                         ++ """ !important;
                         stroke-linejoin: round;
                         vector-effect: non-scaling-stroke;
+                    }
+                    #active-component-border {
+                        stroke-width: 2px !important;
+                        stroke: """
+                        ++ (Color.toCssString <| toColor palette.darkFg)
+                    ++ """;
                     }
                     svg {
                         overflow: visible
@@ -844,35 +988,93 @@ renderChar { unitSize, boxUnits, borderUnits, strokeWidth, simpleCharSvgs, myCha
             , SvgAttributes.x <| SvgTypes.px offset
             , SvgAttributes.y <| SvgTypes.px offset
             ]
-            [ renderCharHelper unitSize boxUnits simpleCharSvgs myChar ]
+            [ renderCharHelper
+                { unitSize = unitSize
+                , boxUnits = boxUnits
+                , simpleCharSvgs = simpleCharSvgs
+                , activeComponentId = activeComponentId
+                , isThumbnail = isThumbnail
+                }
+                myChar
+            ]
         ]
 
 
-renderCharHelper : Int -> Int -> SimpleCharSvgs -> MyChar -> Svg Msg
-renderCharHelper unitSize boxUnits simpleCharSvgs myChar =
+renderCharHelper :
+    { unitSize : Int
+    , boxUnits : Int
+    , simpleCharSvgs : SimpleCharSvgs
+    , activeComponentId : Maybe Id
+    , isThumbnail : Bool
+    }
+    -> MyChar
+    -> Svg Msg
+renderCharHelper { unitSize, boxUnits, simpleCharSvgs, activeComponentId, isThumbnail } myChar =
     let
-        constraint width height x y contents =
+        id =
+            getId myChar
+
+        constraint width height position contents =
             Svg.svg
-                [ SvgAttributes.x <| SvgTypes.Percent x
-                , SvgAttributes.y <| SvgTypes.Percent y
-                , SvgAttributes.width <| SvgTypes.Percent width
-                , SvgAttributes.height <| SvgTypes.Percent height
-                ]
-                contents
+                ([ SvgAttributes.x <| SvgTypes.Percent <| Vector2.getX position
+                 , SvgAttributes.y <| SvgTypes.Percent <| Vector2.getY position
+                 , SvgAttributes.width <| SvgTypes.Percent width
+                 , SvgAttributes.height <| SvgTypes.Percent height
+                 ]
+                    ++ (if isThumbnail then
+                            []
+
+                        else
+                            [ Draggable.mouseTrigger id DragMsg ]
+                       )
+                )
+            <|
+                if Just id == activeComponentId then
+                    Svg.rect
+                        [ SvgAttributes.id "active-component-border"
+                        , SvgAttributes.width <| SvgTypes.Percent 100
+                        , SvgAttributes.height <| SvgTypes.Percent 100
+                        , SvgAttributes.fill <| SvgTypes.PaintNone
+                        , SvgAttributes.stroke <| SvgTypes.Paint <| toColor palette.lightFg
+                        ]
+                        []
+                        :: contents
+
+                else
+                    contents
     in
     case myChar of
-        SimpleChar { char, width, height, x, y } ->
+        SimpleChar { char, width, height, position } ->
             case Dict.get char simpleCharSvgs of
                 Just svg ->
-                    constraint width height x y [ svg ]
+                    constraint width height position [ svg ]
 
                 Nothing ->
                     -- impossible
                     TypedSvg.Core.text <| "Error rendering " ++ String.fromChar char
 
-        CompoundChar { char, width, height, x, y, components } ->
-            constraint width height x y <|
-                List.map (renderCharHelper unitSize boxUnits simpleCharSvgs) components
+        CompoundChar { char, width, height, position, components } ->
+            constraint width height position <|
+                List.map
+                    (renderCharHelper
+                        { unitSize = unitSize
+                        , boxUnits = boxUnits
+                        , simpleCharSvgs = simpleCharSvgs
+                        , activeComponentId = activeComponentId
+                        , isThumbnail = isThumbnail
+                        }
+                    )
+                    components
+
+
+getId : MyChar -> Id
+getId myChar =
+    case myChar of
+        SimpleChar { id } ->
+            id
+
+        CompoundChar { id } ->
+            id
 
 
 iconButton : { icon : FeatherIcons.Icon, size : Float, onPress : Maybe Msg } -> E.Element Msg
@@ -910,8 +1112,8 @@ compoundCharsPanel model =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions model =
-    Sub.none
+subscriptions ({ drag } as model) =
+    Draggable.subscriptions DragMsg drag
 
 
 decodeSimpleCharSvgs : Decode.Decoder SimpleCharSvgs
@@ -957,6 +1159,8 @@ palette =
         E.rgb255 246 234 190
     , lightFg =
         toElmUiColor Color.lightBlue
+    , darkFg =
+        toElmUiColor Color.lightPurple
     }
 
 
@@ -982,8 +1186,14 @@ fontSize =
 
 toElmUiColor : Color.Color -> E.Color
 toElmUiColor color =
-    let
-        { red, green, blue, alpha } =
-            Color.toRgba color
-    in
-    E.rgba red green blue alpha
+    E.fromRgb <| Color.toRgba color
+
+
+toColor : E.Color -> Color.Color
+toColor color =
+    Color.fromRgba <| E.toRgb color
+
+
+toCssString : E.Color -> String
+toCssString color =
+    Color.toCssString <| Color.fromRgba <| E.toRgb color
