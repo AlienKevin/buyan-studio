@@ -127,7 +127,7 @@ init _ =
       , borderUnits = 1
       , unitSize = 20
       , thumbnailUnitSize = 7
-      , strokeWidth = 70
+      , strokeWidth = 5
       , popUp = NoPopUp
       , newCompoundChar = ""
       , isInputErrorShown = False
@@ -161,6 +161,7 @@ type Msg
     | SetActiveComponentId Id
     | GotModel Value
     | SaveModel ()
+    | UpdateStrokeWidth Float
 
 
 dragConfig : Draggable.Config Id Msg
@@ -222,6 +223,19 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as mod
 
         SaveModel _ ->
             saveModel model
+
+        UpdateStrokeWidth newStrokeWidth ->
+            updateStrokeWidth newStrokeWidth model
+
+
+updateStrokeWidth : Float -> Model -> ( Model, Cmd Msg )
+updateStrokeWidth newStrokeWidth model =
+    ( { model
+        | strokeWidth =
+            newStrokeWidth
+      }
+    , Cmd.none
+    )
 
 
 saveModel : Model -> ( Model, Cmd Msg )
@@ -714,7 +728,11 @@ view model =
             , E.spacing spacing.large
             ]
             [ charPanels model
-            , editor model
+            , E.column
+                [ E.spacing spacing.medium ]
+                [ editor model
+                , preferences model
+                ]
             ]
 
 
@@ -839,6 +857,39 @@ onEnter =
                         )
                     )
             )
+
+
+preferences : Model -> E.Element Msg
+preferences model =
+    E.column
+        [ E.spacing spacing.small ]
+        [ E.el [ Font.size fontSize.title ] <|
+            E.text "Preferences"
+        , Input.slider
+            [ E.height (E.px fontSize.small)
+            , E.width (E.px <| fontSize.small * 7)
+            , E.behindContent
+                (E.el
+                    [ E.width E.fill
+                    , E.height (E.px <| fontSize.small // 3)
+                    , E.centerY
+                    , Background.color palette.darkFg
+                    , Border.rounded (fontSize.small // 3)
+                    ]
+                    E.none
+                )
+            ]
+            { onChange = UpdateStrokeWidth
+            , label =
+                Input.labelLeft []
+                    (E.text <| "Stroke width is " ++ String.fromInt (round model.strokeWidth))
+            , min = 10
+            , max = 70
+            , step = Just 1
+            , value = model.strokeWidth
+            , thumb = Input.defaultThumb
+            }
+        ]
 
 
 editor : Model -> E.Element Msg
