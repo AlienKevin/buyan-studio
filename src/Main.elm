@@ -1090,6 +1090,7 @@ charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, bord
         [ E.el
             [ Font.size fontSize.large
             , Font.bold
+            , E.paddingXY spacing.small spacing.small
             ]
           <|
             E.text <|
