@@ -31,6 +31,12 @@ import TypedSvg.Core exposing (Svg)
 import TypedSvg.Types as SvgTypes
 
 
+port addSimpleCharsPort : () -> Cmd msg
+
+
+port getSimpleCharsPort : (Encode.Value -> msg) -> Sub msg
+
+
 port saveModelPort : Value -> Cmd msg
 
 
@@ -140,8 +146,7 @@ init _ =
 
 type Msg
     = AddChar MyCharType
-    | SvgsSelected File (List File)
-    | SvgsLoaded SimpleCharSvgs
+    | GetSimpleChars Value
     | SelectChar MyChar
     | UpdatePendingCompoundChar String
     | AddPendingCompoundChar
@@ -173,11 +178,8 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as mod
         AddChar myCharType ->
             addChar myCharType model
 
-        SvgsSelected first rest ->
-            svgsSelected first rest model
-
-        SvgsLoaded svgs ->
-            svgsLoaded svgs model
+        GetSimpleChars svgsJson ->
+            getSimpleChars svgsJson model
 
         SelectChar myChar ->
             selectChar myChar model
@@ -300,7 +302,8 @@ gotModel savedModelJson model =
 
         Err err ->
             let
-                _ = Debug.log "err" err
+                _ =
+                    Debug.log "err" err
             in
             model
     , Cmd.none
@@ -600,65 +603,44 @@ selectChar myChar model =
     )
 
 
-svgsLoaded : SimpleCharSvgs -> Model -> ( Model, Cmd Msg )
-svgsLoaded svgs model =
-    ( { model
-        | chars =
-            Dict.foldl
-                (\char _ ->
-                    Dict.insert
-                        char
-                        (SimpleChar
-                            { char = char
-                            , id = -1
-                            , width = 100
-                            , height = 100
-                            , position = Vector2.vec2 0 0
-                            }
-                        )
-                )
-                model.chars
-                svgs
-        , simpleCharSvgs =
-            Dict.merge
-                (\key a -> Dict.insert key a)
-                (\key a b -> Dict.insert key a)
-                (\key b -> Dict.insert key b)
-                svgs
-                model.simpleCharSvgs
-                Dict.empty
-      }
-    , Cmd.none
-    )
-
-
-svgsSelected : File -> List File -> Model -> ( Model, Cmd Msg )
-svgsSelected first rest model =
-    ( model
-    , Task.perform SvgsLoaded <|
-        Task.map Dict.fromList <|
-            Task.sequence <|
-                List.map
-                    (\file ->
-                        Task.map
-                            (\svgString ->
-                                ( charFromString (File.name file)
-                                , case SvgParser.parse svgString of
-                                    Ok svg ->
-                                        svg
-
-                                    Err err ->
-                                        let
-                                            _ =
-                                                Debug.log "Error parsing svg" err
-                                        in
-                                        Svg.g [] []
+getSimpleChars : Value -> Model -> ( Model, Cmd Msg )
+getSimpleChars svgsJson model =
+    ( case Decode.decodeValue decodeSimpleCharSvgs svgsJson of
+        Ok svgs ->
+            { model
+                | chars =
+                    Dict.foldl
+                        (\char _ ->
+                            Dict.insert
+                                char
+                                (SimpleChar
+                                    { char = char
+                                    , id = -1
+                                    , width = 100
+                                    , height = 100
+                                    , position = Vector2.vec2 0 0
+                                    }
                                 )
-                            )
-                        <|
-                            File.toString file
-                    )
-                    (first :: rest)
+                        )
+                        model.chars
+                        svgs
+                , simpleCharSvgs =
+                    Dict.merge
+                        (\key a -> Dict.insert key a)
+                        (\key a b -> Dict.insert key a)
+                        (\key b -> Dict.insert key b)
+                        svgs
+                        model.simpleCharSvgs
+                        Dict.empty
+            }
+
+        Err err ->
+            let
+                _ =
+                    Debug.log "err" err
+            in
+            model
+    , Cmd.none
     )
 
 
@@ -666,7 +648,7 @@ addChar : MyCharType -> Model -> ( Model, Cmd Msg )
 addChar myCharType model =
     case myCharType of
         SimpleCharType ->
-            ( model, Select.files [ "image/svg+xml" ] SvgsSelected )
+            ( model, addSimpleCharsPort () )
 
         CompoundCharType ->
             ( { model
@@ -1385,6 +1367,7 @@ subscriptions ({ drag } as model) =
         [ Draggable.subscriptions DragMsg drag
         , getModelPort GotModel
         , pageUnloadingPort SaveModel
+        , getSimpleCharsPort GetSimpleChars
         ]
 
 
