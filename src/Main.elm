@@ -1,4 +1,4 @@
-module Main exposing (..)
+port module Main exposing (..)
 
 import Browser
 import Color
@@ -19,8 +19,8 @@ import Html exposing (Html)
 import Html.Attributes
 import Html.Events
 import Html5.DragDrop as DragDrop
-import Json.Decode as Decode
-import Json.Encode as Encode
+import Json.Decode as Decode exposing (Decoder)
+import Json.Encode as Encode exposing (Value)
 import List.Extra
 import Math.Vector2 as Vector2 exposing (Vec2)
 import SvgParser
@@ -29,6 +29,15 @@ import TypedSvg as Svg
 import TypedSvg.Attributes as SvgAttributes
 import TypedSvg.Core exposing (Svg)
 import TypedSvg.Types as SvgTypes
+
+
+port saveModelPort : Value -> Cmd msg
+
+
+port getModelPort : (Value -> msg) -> Sub msg
+
+
+port pageUnloadingPort : (() -> msg) -> Sub msg
 
 
 
@@ -51,6 +60,12 @@ type alias Model =
     , dragDropCharData : { char : Char }
     , drag : Draggable.State Id
     , activeComponentId : Maybe Id
+    }
+
+
+type alias SavedModel =
+    { chars : Dict Char MyChar
+    , strokeWidth : Float
     }
 
 
@@ -139,6 +154,8 @@ type Msg
     | StopDragging
     | DragMsg (Draggable.Msg Id)
     | SetActiveComponentId Id
+    | GotModel Value
+    | SaveModel ()
 
 
 dragConfig : Draggable.Config Id Msg
@@ -197,6 +214,174 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as mod
 
         DragMsg msg_ ->
             dragMsg msg_ model
+
+        GotModel savedModelJson ->
+            gotModel savedModelJson model
+
+        SaveModel _ ->
+            saveModel model
+
+
+saveModel : Model -> ( Model, Cmd Msg )
+saveModel model =
+    ( model, saveModelPort <| encodeModel model )
+
+
+encodeModel : Model -> Value
+encodeModel { chars, simpleCharSvgs, strokeWidth } =
+    Encode.object
+        [ ( "chars", Encode.dict String.fromChar encodeMyChar chars )
+        , ( "strokeWidth", Encode.float strokeWidth )
+        ]
+
+
+encodeChar : Char -> Value
+encodeChar =
+    Encode.string << String.fromChar
+
+
+encodeMyChar : MyChar -> Value
+encodeMyChar myChar =
+    case myChar of
+        SimpleChar ref ->
+            Encode.object
+                [ ( "type", Encode.string "SimpleChar" )
+                , ( "reference", encodeMyCharRef ref )
+                ]
+
+        CompoundChar ref components ->
+            Encode.object
+                [ ( "type", Encode.string "CompoundChar" )
+                , ( "reference", encodeMyCharRef ref )
+                , ( "components", Encode.list encodeMyCharRef components )
+                ]
+
+
+encodeMyCharRef : MyCharRef -> Value
+encodeMyCharRef { char, id, width, height, position } =
+    -- { char : Char
+    -- , id : Id
+    -- , width : Float
+    -- , height : Float
+    -- , position : Vec2
+    -- }
+    Encode.object
+        [ ( "char", encodeChar char )
+        , ( "id", encodeId id )
+        , ( "width", Encode.float width )
+        , ( "height", Encode.float height )
+        , ( "position", encodeVec2 position )
+        ]
+
+
+encodeVec2 : Vec2 -> Value
+encodeVec2 vec =
+    Encode.object
+        [ ( "x", Encode.float <| Vector2.getX vec )
+        , ( "y", Encode.float <| Vector2.getY vec )
+        ]
+
+
+encodeId : Id -> Value
+encodeId =
+    Encode.int
+
+
+gotModel : Value -> Model -> ( Model, Cmd Msg )
+gotModel savedModelJson model =
+    ( case Decode.decodeValue decodeSavedModel savedModelJson of
+        Ok { chars, strokeWidth } ->
+            { model
+                | chars =
+                    chars
+                , strokeWidth =
+                    strokeWidth
+            }
+
+        Err err ->
+            let
+                _ = Debug.log "err" err
+            in
+            model
+    , Cmd.none
+    )
+
+
+decodeSavedModel : Decoder SavedModel
+decodeSavedModel =
+    Decode.map2 SavedModel
+        (Decode.field "chars"
+            (Decode.map (Dict.Extra.mapKeys charFromString) <|
+                Decode.dict decodeMyChar
+            )
+        )
+        (Decode.field "strokeWidth" Decode.float)
+
+
+decodeChar : Decoder Char
+decodeChar =
+    Decode.map charFromString Decode.string
+
+
+charFromString : String -> Char
+charFromString string =
+    case String.uncons string of
+        Just ( firstChar, _ ) ->
+            firstChar
+
+        Nothing ->
+            '?'
+
+
+decodeMyChar : Decoder MyChar
+decodeMyChar =
+    Decode.field "type" Decode.string
+        |> Decode.andThen
+            (\myCharType ->
+                case myCharType of
+                    "SimpleChar" ->
+                        Decode.map SimpleChar
+                            (Decode.field "reference" decodeMyCharRef)
+
+                    "CompoundChar" ->
+                        Decode.map2 CompoundChar
+                            (Decode.field "reference" decodeMyCharRef)
+                            (Decode.field "components" (Decode.list decodeMyCharRef))
+
+                    _ ->
+                        Decode.fail <|
+                            "Trying to decode MyChar, but "
+                                ++ myCharType
+                                ++ " is not supported."
+            )
+
+
+decodeMyCharRef : Decoder MyCharRef
+decodeMyCharRef =
+    -- { char : Char
+    -- , id : Id
+    -- , width : Float
+    -- , height : Float
+    -- , position : Vec2
+    -- }
+    Decode.map5 MyCharRef
+        (Decode.field "char" decodeChar)
+        (Decode.field "id" decodeId)
+        (Decode.field "width" Decode.float)
+        (Decode.field "height" Decode.float)
+        (Decode.field "position" decodeVec2)
+
+
+decodeVec2 : Decoder Vec2
+decodeVec2 =
+    Decode.map2 Vector2.vec2
+        (Decode.field "x" Decode.float)
+        (Decode.field "y" Decode.float)
+
+
+decodeId : Decoder Id
+decodeId =
+    Decode.int
 
 
 dragMsg : Draggable.Msg Id -> Model -> ( Model, Cmd Msg )
@@ -369,12 +554,7 @@ addPendingCompoundChar : Model -> ( Model, Cmd Msg )
 addPendingCompoundChar model =
     let
         newChar =
-            case String.uncons model.newCompoundChar of
-                Just ( char, _ ) ->
-                    char
-
-                Nothing ->
-                    '?'
+            charFromString model.newCompoundChar
 
         newCompoundChar =
             CompoundChar
@@ -462,12 +642,7 @@ svgsSelected first rest model =
                     (\file ->
                         Task.map
                             (\svgString ->
-                                ( case String.uncons <| File.name file of
-                                    Just ( char, _ ) ->
-                                        char
-
-                                    Nothing ->
-                                        '?'
+                                ( charFromString (File.name file)
                                 , case SvgParser.parse svgString of
                                     Ok svg ->
                                         svg
@@ -1206,22 +1381,17 @@ compoundCharsPanel model =
 
 subscriptions : Model -> Sub Msg
 subscriptions ({ drag } as model) =
-    Draggable.subscriptions DragMsg drag
+    Sub.batch
+        [ Draggable.subscriptions DragMsg drag
+        , getModelPort GotModel
+        , pageUnloadingPort SaveModel
+        ]
 
 
 decodeSimpleCharSvgs : Decode.Decoder SimpleCharSvgs
 decodeSimpleCharSvgs =
     Decode.map
-        (Dict.Extra.mapKeys
-            (\name ->
-                case String.uncons name of
-                    Just ( char, _ ) ->
-                        char
-
-                    Nothing ->
-                        '?'
-            )
-        )
+        (Dict.Extra.mapKeys charFromString)
     <|
         Decode.dict decodeSimpleCharSvg
 

@@ -1,0 +1,28 @@
+{
+  "name": "buyan-studio",
+  "version": "1.0.0",
+  "description": "This project is bootstrapped with [Create Elm App](https://github.com/halfzebra/create-elm-app).",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "dependencies": {
+    "babel-runtime": "^6.26.0",
+    "localforage": "^1.9.0",
+    "regenerator-runtime": "^0.13.7"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AlienKevin/buyan-studio.git"
+  },
+  "author": "Kevin Li",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/AlienKevin/buyan-studio/issues"
+  },
+  "homepage": "https://github.com/AlienKevin/buyan-studio#readme"
+}
