@@ -28,6 +28,7 @@ import Task
 import TypedSvg as Svg
 import TypedSvg.Attributes as SvgAttributes
 import TypedSvg.Core exposing (Svg)
+import TypedSvg.Events
 import TypedSvg.Types as SvgTypes
 
 
@@ -67,6 +68,7 @@ type alias Model =
     , drag : Draggable.State ( Id, Scale )
     , activeComponentId : Maybe Id
     , activeScale : Scale
+    , isAspectRatioLocked : Bool
     }
 
 
@@ -143,6 +145,7 @@ init _ =
       , drag = Draggable.init
       , activeComponentId = Nothing
       , activeScale = NoScale
+      , isAspectRatioLocked = True
       }
     , Cmd.none
     )
@@ -170,6 +173,7 @@ type Msg
     | GotModel Value
     | SaveModel ()
     | UpdateStrokeWidth Float
+    | ToggleIsAspectRatioLocked
 
 
 dragConfig : Draggable.Config ( Id, Scale ) Msg
@@ -234,6 +238,19 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as mod
 
         UpdateStrokeWidth newStrokeWidth ->
             updateStrokeWidth newStrokeWidth model
+
+        ToggleIsAspectRatioLocked ->
+            toggleIsAspectRatioLocked model
+
+
+toggleIsAspectRatioLocked : Model -> ( Model, Cmd Msg )
+toggleIsAspectRatioLocked model =
+    ( { model
+        | isAspectRatioLocked =
+            not model.isAspectRatioLocked
+      }
+    , Cmd.none
+    )
 
 
 updateStrokeWidth : Float -> Model -> ( Model, Cmd Msg )
@@ -432,8 +449,13 @@ startDragging ( id, scale ) model =
     )
 
 
+type OffsetType
+    = DimensionOffset
+    | PositionOffset
+
+
 onDragBy : Vec2 -> Model -> ( Model, Cmd Msg )
-onDragBy delta ({ activeComponentId, activeScale, boxUnits, unitSize, chars } as model) =
+onDragBy delta ({ activeComponentId, activeScale, boxUnits, unitSize, chars, isAspectRatioLocked } as model) =
     ( { model
         | chars =
             case model.selectedChar of
@@ -448,22 +470,54 @@ onDragBy delta ({ activeComponentId, activeScale, boxUnits, unitSize, chars } as
 
                                     deltaX =
                                         Vector2.getX delta
-                                    
+
                                     deltaY =
                                         Vector2.getY delta
 
-                                    averagedDelta =
-                                        (abs deltaX + abs deltaY) / 2
-                                    
-                                    averagedDeltaX =
-                                        (sign deltaX) * averagedDelta
-                                    
-                                    averagedDeltaY =
-                                        (sign deltaY) * averagedDelta
-                                    
-                                    offset xDir yDir =
+                                    offsetDimension xDir yDir =
+                                        offset DimensionOffset xDir yDir
+
+                                    offsetPosition xDir yDir =
+                                        offset PositionOffset xDir yDir
+
+                                    offset offsetType xDir yDir =
                                         Vector2.scale factor <|
-                                            Vector2.vec2 (xDir * averagedDeltaX) (yDir * averagedDeltaY)
+                                            if isAspectRatioLocked then
+                                                let
+                                                    averagedDelta =
+                                                        (abs deltaX + abs deltaY) / 2
+
+                                                    averagedDeltaX =
+                                                        sign deltaX * averagedDelta
+
+                                                    averagedDeltaY =
+                                                        sign
+                                                            (case offsetType of
+                                                                DimensionOffset ->
+                                                                    deltaX
+
+                                                                PositionOffset ->
+                                                                    deltaY
+                                                            )
+                                                            * averagedDelta
+                                                in
+                                                Vector2.vec2 (xDir * averagedDeltaX)
+                                                    ((case offsetType of
+                                                        DimensionOffset ->
+                                                            xDir
+
+                                                        PositionOffset ->
+                                                            yDir
+                                                     )
+                                                        * averagedDeltaY
+                                                    )
+
+                                            else
+                                                -- let
+                                                --     _ = Debug.log "deltaX" <| xDir * deltaX * factor
+                                                --     _ = Debug.log "deltaY" <| yDir * deltaY * factor
+                                                -- in
+                                                Vector2.vec2 (xDir * deltaX) (yDir * deltaY)
                                 in
                                 List.Extra.updateAt
                                     -- impossible
@@ -474,20 +528,20 @@ onDragBy delta ({ activeComponentId, activeScale, boxUnits, unitSize, chars } as
                                                 (Vector2.add <| Vector2.scale factor delta)
 
                                         ScaleTopLeft ->
-                                            updateDimension (Vector2.add (offset -1 -1)) <<
-                                            updatePosition (Vector2.add (offset 1 1))
+                                            updateDimension (Vector2.add (offsetDimension -1 -1))
+                                                << updatePosition (Vector2.add (offsetPosition 1 1))
 
                                         ScaleTopRight ->
-                                            updateDimension (Vector2.add (offset 1 -1)) <<
-                                            updatePosition (Vector2.add (offset 0 1))
+                                            updateDimension (Vector2.add (offsetDimension 1 -1))
+                                                << updatePosition (Vector2.add (offsetPosition 0 1))
 
                                         ScaleBottomLeft ->
-                                            updateDimension (Vector2.add (offset -1 1)) <<
-                                            updatePosition (Vector2.add (offset 1 0))
+                                            updateDimension (Vector2.add (offsetDimension -1 1))
+                                                << updatePosition (Vector2.add (offsetPosition 1 0))
 
                                         ScaleBottomRight ->
-                                            updateDimension (Vector2.add (offset 1 1)) <<
-                                            updatePosition (Vector2.add (offset 0 0))
+                                            updateDimension (Vector2.add (offsetDimension 1 1))
+                                                << updatePosition (Vector2.add (offsetPosition 0 0))
                                     )
                             )
                         )
@@ -504,10 +558,9 @@ sign : number -> number
 sign n =
     if n < 0 then
         -1
-    else if n > 0 then
-        1
+
     else
-        0
+        1
 
 
 dragDropChar : DragDrop.Msg Char () -> Model -> ( Model, Cmd Msg )
@@ -938,7 +991,7 @@ preferences model =
 
 
 editor : Model -> E.Element Msg
-editor ({ activeComponentId, selectedChar, chars, simpleCharSvgs, boxUnits, unitSize, borderUnits, strokeWidth } as model) =
+editor ({ activeComponentId, selectedChar, chars, simpleCharSvgs, boxUnits, unitSize, borderUnits, strokeWidth, isAspectRatioLocked } as model) =
     let
         dropId =
             DragDrop.getDropId model.dragDropChar
@@ -973,6 +1026,7 @@ editor ({ activeComponentId, selectedChar, chars, simpleCharSvgs, boxUnits, unit
                             , activeComponentId = activeComponentId
                             , strokeWidth = strokeWidth
                             , isThumbnail = False
+                            , isAspectRatioLocked = isAspectRatioLocked
                             }
                             (Maybe.withDefault emptyMyChar <|
                                 -- impossible
@@ -1155,7 +1209,7 @@ charPanel myCharType ({ boxUnits, thumbnailUnitSize } as model) =
 
 
 charCard : Model -> MyChar -> E.Element Msg
-charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, borderUnits, strokeWidth, simpleCharSvgs, selectedChar } myChar =
+charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, borderUnits, strokeWidth, simpleCharSvgs, selectedChar, isAspectRatioLocked } myChar =
     let
         char =
             charFromMyChar myChar
@@ -1211,6 +1265,7 @@ charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, bord
                         )
                         selectedChar
                 , isThumbnail = True
+                , isAspectRatioLocked = isAspectRatioLocked
                 }
                 myChar
         ]
@@ -1248,10 +1303,11 @@ renderChar :
     , chars : Dict Char MyChar
     , simpleCharSvgs : SimpleCharSvgs
     , activeComponentId : Maybe Id
+    , isAspectRatioLocked : Bool
     }
     -> MyChar
     -> Svg Msg
-renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, chars, simpleCharSvgs, activeComponentId } myChar =
+renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, chars, simpleCharSvgs, activeComponentId, isAspectRatioLocked } myChar =
     let
         size =
             toFloat ((boxUnits - 2 * borderUnits) * unitSize) - strokeWidth
@@ -1289,7 +1345,13 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, chars, s
                         ++ (Color.toCssString <| toColor palette.darkFg)
                         ++ """;
                     }
-                    .scaling-handle {
+                    #aspect-ratio-lock * {
+                        stroke-width: 2px !important;
+                        stroke: """
+                        ++ (Color.toCssString <| Color.white)
+                        ++ """;
+                    }
+                    .scale-handle, #aspect-ratio-lock-bg {
                         fill: """
                         ++ (Color.toCssString <| toColor palette.darkFg)
                         ++ """;
@@ -1314,6 +1376,7 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, chars, s
                 , simpleCharSvgs = simpleCharSvgs
                 , activeComponentId = activeComponentId
                 , isThumbnail = isThumbnail
+                , isAspectRatioLocked = isAspectRatioLocked
                 }
                 0
                 myChar
@@ -1328,11 +1391,12 @@ renderCharHelper :
     , simpleCharSvgs : SimpleCharSvgs
     , activeComponentId : Maybe Id
     , isThumbnail : Bool
+    , isAspectRatioLocked : Bool
     }
     -> Int
     -> MyChar
     -> Svg Msg
-renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId, isThumbnail } level myChar =
+renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId, isThumbnail, isAspectRatioLocked } level myChar =
     let
         id =
             getId myChar
@@ -1348,7 +1412,7 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
                 ([ SvgAttributes.x <| SvgTypes.Percent <| Vector2.getX position
                  , SvgAttributes.y <| SvgTypes.Percent <| Vector2.getY position
                  , SvgAttributes.width <| SvgTypes.Percent <| Vector2.getX dimension
-                 , SvgAttributes.height <| SvgTypes.Percent <| Vector2.getX dimension
+                 , SvgAttributes.height <| SvgTypes.Percent <| Vector2.getY dimension
                  ]
                     ++ (if isDraggable then
                             []
@@ -1367,6 +1431,7 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
                         , SvgAttributes.stroke <| SvgTypes.Paint <| toColor palette.lightFg
                         ]
                         []
+                    , scaleAspectRatioLock isAspectRatioLocked
                     , scaleHandle ( levelwiseId, ScaleTopLeft ) 0 0 unitSize isDraggable
                     , scaleHandle ( levelwiseId, ScaleTopRight ) 100 0 unitSize isDraggable
                     , scaleHandle ( levelwiseId, ScaleBottomLeft ) 0 100 unitSize isDraggable
@@ -1397,11 +1462,42 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
                         , simpleCharSvgs = simpleCharSvgs
                         , activeComponentId = activeComponentId
                         , isThumbnail = isThumbnail
+                        , isAspectRatioLocked = isAspectRatioLocked
                         }
                         (level + 1)
                         << myCharFromMyCharRef chars
                     )
                     components
+
+
+scaleAspectRatioLock : Bool -> Svg Msg
+scaleAspectRatioLock isAspectRatioLocked =
+    Svg.svg
+        [ SvgAttributes.id "aspect-ratio-lock"
+        , SvgAttributes.x <| SvgTypes.px -35
+        , SvgAttributes.y <| SvgTypes.percent 50
+        , SvgAttributes.width <| SvgTypes.px fontSize.large
+        , SvgAttributes.height <| SvgTypes.px fontSize.large
+        ]
+        [ Svg.rect
+            [ SvgAttributes.width <| SvgTypes.percent 100
+            , SvgAttributes.height <| SvgTypes.percent 100
+            , SvgAttributes.rx <| SvgTypes.percent 20
+            , SvgAttributes.ry <| SvgTypes.percent 20
+            , SvgAttributes.id "aspect-ratio-lock-bg"
+            , TypedSvg.Events.onClick ToggleIsAspectRatioLocked
+            ]
+            []
+        , (if isAspectRatioLocked then
+            FeatherIcons.lock
+
+           else
+            FeatherIcons.unlock
+          )
+            |> FeatherIcons.withSize 100
+            |> FeatherIcons.withSizeUnit "%"
+            |> FeatherIcons.toHtml []
+        ]
 
 
 scaleHandle : ( Id, Scale ) -> Float -> Float -> Int -> Bool -> Svg Msg
@@ -1410,7 +1506,7 @@ scaleHandle ( id, scale ) x y size isDraggable =
         ([ SvgAttributes.cx (SvgTypes.percent x)
          , SvgAttributes.cy (SvgTypes.percent y)
          , SvgAttributes.r (SvgTypes.px <| toFloat size / 2)
-         , SvgAttributes.class [ "scaling-handle" ]
+         , SvgAttributes.class [ "scale-handle" ]
          ]
             ++ (if isDraggable then
                     []
