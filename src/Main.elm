@@ -1,5 +1,6 @@
 port module Main exposing (..)
 
+import Array
 import Browser
 import Color
 import Dict exposing (Dict, size)
@@ -119,7 +120,11 @@ type MyCharType
 
 
 type alias SimpleCharSvgs =
-    Dict Char (Svg Msg)
+    Dict Char SimpleCharSvg
+
+
+type alias SimpleCharSvg =
+    ( Svg Msg, Maybe Vec2 )
 
 
 type PopUp
@@ -715,14 +720,46 @@ getSimpleChars svgsJson model =
             { model
                 | chars =
                     Dict.foldl
-                        (\char _ ->
+                        (\char ( _, maybeDimension ) ->
+                            let
+                                fullDimension =
+                                    Vector2.vec2 100 100
+
+                                dimension =
+                                    case maybeDimension of
+                                        Just d ->
+                                            let
+                                                width =
+                                                    Vector2.getX d
+
+                                                height =
+                                                    Vector2.getY d
+
+                                                _ =
+                                                    Debug.log "width" width
+
+                                                _ =
+                                                    Debug.log "height" height
+
+                                                f =
+                                                    lerp 0 (max width height) 0 100
+                                            in
+                                            Vector2.vec2 (f width) (f height)
+
+                                        Nothing ->
+                                            fullDimension
+
+                                position =
+                                    Vector2.scale 0.5 <|
+                                        Vector2.sub fullDimension dimension
+                            in
                             Dict.insert
                                 char
                                 (SimpleChar
                                     { char = char
                                     , id = -1
-                                    , dimension = Vector2.vec2 100 100
-                                    , position = Vector2.vec2 0 0
+                                    , dimension = dimension
+                                    , position = position
                                     }
                                 )
                         )
@@ -746,6 +783,11 @@ getSimpleChars svgsJson model =
             model
     , Cmd.none
     )
+
+
+lerp : Float -> Float -> Float -> Float -> Float -> Float
+lerp inMin inMax outMin outMax n =
+    (n - inMin) / (inMax - inMin) * (outMax - outMin) + outMin
 
 
 addChar : MyCharType -> Model -> ( Model, Cmd Msg )
@@ -1358,7 +1400,7 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, chars, s
                         stroke: none;
                     }
                     svg {
-                        overflow: visible
+                        overflow: visible;
                     }
                     """
                 ]
@@ -1445,7 +1487,7 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
     case myChar of
         SimpleChar { char, dimension, position } ->
             case Dict.get char simpleCharSvgs of
-                Just svg ->
+                Just ( svg, _ ) ->
                     constraint dimension position [ svg ]
 
                 Nothing ->
@@ -1603,10 +1645,50 @@ decodeSimpleCharSvgs =
         Decode.dict decodeSimpleCharSvg
 
 
-decodeSimpleCharSvg : Decode.Decoder (Svg Msg)
+decodeSimpleCharSvg : Decode.Decoder SimpleCharSvg
 decodeSimpleCharSvg =
     Decode.map
-        (SvgParser.parse >> Result.withDefault (Svg.g [] []))
+        (SvgParser.parseToNode
+            >> Result.withDefault
+                (SvgParser.SvgElement
+                    { name = "g"
+                    , attributes = []
+                    , children = []
+                    }
+                )
+            >> (\node ->
+                    case node of
+                        SvgParser.SvgElement element ->
+                            let
+                                attributes =
+                                    Dict.fromList element.attributes
+                            in
+                            ( SvgParser.SvgElement
+                                { element
+                                    | attributes =
+                                        element.attributes
+                                            ++ [ ( "preserveAspectRatio", "none" ) ]
+                                }
+                            , Maybe.map
+                                (\( width, height ) -> Vector2.vec2 width height)
+                                (Maybe.andThen
+                                    (String.words
+                                        >> Array.fromList
+                                        >> (\arr ->
+                                                Maybe.map2 Tuple.pair
+                                                    (Maybe.andThen String.toFloat <| Array.get 2 arr)
+                                                    (Maybe.andThen String.toFloat <| Array.get 3 arr)
+                                           )
+                                    )
+                                    (Dict.get "viewBox" attributes)
+                                )
+                            )
+
+                        _ ->
+                            ( node, Nothing )
+               )
+            >> Tuple.mapFirst SvgParser.nodeToSvg
+        )
         Decode.string
 
 
