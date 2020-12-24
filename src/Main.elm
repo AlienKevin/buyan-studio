@@ -64,8 +64,9 @@ type alias Model =
     , isInputErrorShown : Bool
     , dragDropChar : DragDrop.Model Char ()
     , dragDropCharData : { char : Char }
-    , drag : Draggable.State Id
+    , drag : Draggable.State ( Id, Scale )
     , activeComponentId : Maybe Id
+    , activeScale : Scale
     }
 
 
@@ -79,6 +80,14 @@ type alias Id =
     Int
 
 
+type Scale
+    = ScaleTopLeft
+    | ScaleTopRight
+    | ScaleBottomLeft
+    | ScaleBottomRight
+    | NoScale
+
+
 type MyChar
     = SimpleChar MyCharRef
     | CompoundChar MyCharRef (List MyCharRef)
@@ -87,8 +96,7 @@ type MyChar
 type alias MyCharRef =
     { char : Char
     , id : Id
-    , width : Float
-    , height : Float
+    , dimension : Vec2
     , position : Vec2
     }
 
@@ -98,8 +106,7 @@ emptyMyChar =
     SimpleChar
         { char = '?'
         , id = -1
-        , width = 0
-        , height = 0
+        , dimension = Vector2.vec2 0 0
         , position = Vector2.vec2 0 0
         }
 
@@ -135,6 +142,7 @@ init _ =
       , dragDropCharData = { char = '?' }
       , drag = Draggable.init
       , activeComponentId = Nothing
+      , activeScale = NoScale
       }
     , Cmd.none
     )
@@ -155,21 +163,21 @@ type Msg
     | ClosePopUp
     | DragDropChar (DragDrop.Msg Char ())
     | OnDragBy Vec2
-    | StartDragging Id
+    | StartDragging ( Id, Scale )
     | StopDragging
-    | DragMsg (Draggable.Msg Id)
+    | DragMsg (Draggable.Msg ( Id, Scale ))
     | SetActiveComponentId Id
     | GotModel Value
     | SaveModel ()
     | UpdateStrokeWidth Float
 
 
-dragConfig : Draggable.Config Id Msg
+dragConfig : Draggable.Config ( Id, Scale ) Msg
 dragConfig =
     Draggable.customConfig
         [ Draggable.Events.onDragBy (\( dx, dy ) -> Vector2.vec2 dx dy |> OnDragBy)
         , Draggable.Events.onDragStart StartDragging
-        , Draggable.Events.onClick SetActiveComponentId
+        , Draggable.Events.onClick (\( id, _ ) -> SetActiveComponentId id)
         ]
 
 
@@ -206,8 +214,8 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as mod
         OnDragBy delta ->
             onDragBy delta model
 
-        StartDragging id ->
-            startDragging id model
+        StartDragging target ->
+            startDragging target model
 
         StopDragging ->
             stopDragging model
@@ -274,18 +282,11 @@ encodeMyChar myChar =
 
 
 encodeMyCharRef : MyCharRef -> Value
-encodeMyCharRef { char, id, width, height, position } =
-    -- { char : Char
-    -- , id : Id
-    -- , width : Float
-    -- , height : Float
-    -- , position : Vec2
-    -- }
+encodeMyCharRef { char, id, dimension, position } =
     Encode.object
         [ ( "char", encodeChar char )
         , ( "id", encodeId id )
-        , ( "width", Encode.float width )
-        , ( "height", Encode.float height )
+        , ( "dimension", encodeVec2 dimension )
         , ( "position", encodeVec2 position )
         ]
 
@@ -375,17 +376,10 @@ decodeMyChar =
 
 decodeMyCharRef : Decoder MyCharRef
 decodeMyCharRef =
-    -- { char : Char
-    -- , id : Id
-    -- , width : Float
-    -- , height : Float
-    -- , position : Vec2
-    -- }
-    Decode.map5 MyCharRef
+    Decode.map4 MyCharRef
         (Decode.field "char" decodeChar)
         (Decode.field "id" decodeId)
-        (Decode.field "width" Decode.float)
-        (Decode.field "height" Decode.float)
+        (Decode.field "dimension" decodeVec2)
         (Decode.field "position" decodeVec2)
 
 
@@ -401,7 +395,7 @@ decodeId =
     Decode.int
 
 
-dragMsg : Draggable.Msg Id -> Model -> ( Model, Cmd Msg )
+dragMsg : Draggable.Msg ( Id, Scale ) -> Model -> ( Model, Cmd Msg )
 dragMsg msg model =
     Draggable.update dragConfig msg model
 
@@ -426,18 +420,20 @@ stopDragging model =
     )
 
 
-startDragging : Id -> Model -> ( Model, Cmd Msg )
-startDragging id model =
+startDragging : ( Id, Scale ) -> Model -> ( Model, Cmd Msg )
+startDragging ( id, scale ) model =
     ( { model
         | activeComponentId =
             Just id
+        , activeScale =
+            scale
       }
     , Cmd.none
     )
 
 
 onDragBy : Vec2 -> Model -> ( Model, Cmd Msg )
-onDragBy delta ({ activeComponentId, boxUnits, unitSize, chars } as model) =
+onDragBy delta ({ activeComponentId, activeScale, boxUnits, unitSize, chars } as model) =
     ( { model
         | chars =
             case model.selectedChar of
@@ -449,12 +445,49 @@ onDragBy delta ({ activeComponentId, boxUnits, unitSize, chars } as model) =
                                 let
                                     factor =
                                         100 / toFloat (boxUnits * unitSize)
+
+                                    deltaX =
+                                        Vector2.getX delta
+                                    
+                                    deltaY =
+                                        Vector2.getY delta
+
+                                    averagedDelta =
+                                        (abs deltaX + abs deltaY) / 2
+                                    
+                                    averagedDeltaX =
+                                        (sign deltaX) * averagedDelta
+                                    
+                                    averagedDeltaY =
+                                        (sign deltaY) * averagedDelta
+                                    
+                                    offset xDir yDir =
+                                        Vector2.scale factor <|
+                                            Vector2.vec2 (xDir * averagedDeltaX) (yDir * averagedDeltaY)
                                 in
                                 List.Extra.updateAt
                                     -- impossible
                                     (Maybe.withDefault -1 activeComponentId)
-                                    (updatePosition
-                                        (Vector2.add <| Vector2.scale factor delta)
+                                    (case activeScale of
+                                        NoScale ->
+                                            updatePosition
+                                                (Vector2.add <| Vector2.scale factor delta)
+
+                                        ScaleTopLeft ->
+                                            updateDimension (Vector2.add (offset -1 -1)) <<
+                                            updatePosition (Vector2.add (offset 1 1))
+
+                                        ScaleTopRight ->
+                                            updateDimension (Vector2.add (offset 1 -1)) <<
+                                            updatePosition (Vector2.add (offset 0 1))
+
+                                        ScaleBottomLeft ->
+                                            updateDimension (Vector2.add (offset -1 1)) <<
+                                            updatePosition (Vector2.add (offset 1 0))
+
+                                        ScaleBottomRight ->
+                                            updateDimension (Vector2.add (offset 1 1)) <<
+                                            updatePosition (Vector2.add (offset 0 0))
                                     )
                             )
                         )
@@ -465,6 +498,16 @@ onDragBy delta ({ activeComponentId, boxUnits, unitSize, chars } as model) =
       }
     , Cmd.none
     )
+
+
+sign : number -> number
+sign n =
+    if n < 0 then
+        -1
+    else if n > 0 then
+        1
+    else
+        0
 
 
 dragDropChar : DragDrop.Msg Char () -> Model -> ( Model, Cmd Msg )
@@ -515,11 +558,8 @@ addComponentToMyChar chars componentChar myChar =
 
         CompoundChar compoundChar components ->
             let
-                width =
-                    50
-
-                height =
-                    50
+                dimension =
+                    Vector2.vec2 50 50
 
                 position =
                     Vector2.vec2 25 25
@@ -530,8 +570,7 @@ addComponentToMyChar chars componentChar myChar =
                 newComponent =
                     { char = componentChar
                     , id = id
-                    , width = width
-                    , height = height
+                    , dimension = dimension
                     , position = position
                     }
             in
@@ -577,8 +616,7 @@ addPendingCompoundChar model =
             CompoundChar
                 { char = newChar
                 , id = -1
-                , width = 100
-                , height = 100
+                , dimension = Vector2.vec2 100 100
                 , position = Vector2.vec2 0 0
                 }
                 []
@@ -630,8 +668,7 @@ getSimpleChars svgsJson model =
                                 (SimpleChar
                                     { char = char
                                     , id = -1
-                                    , width = 100
-                                    , height = 100
+                                    , dimension = Vector2.vec2 100 100
                                     , position = Vector2.vec2 0 0
                                     }
                                 )
@@ -688,6 +725,14 @@ updatePosition func myCharRef =
     { myCharRef
         | position =
             func myCharRef.position
+    }
+
+
+updateDimension : (Vec2 -> Vec2) -> MyCharRef -> MyCharRef
+updateDimension func myCharRef =
+    { myCharRef
+        | dimension =
+            func myCharRef.dimension
     }
 
 
@@ -1244,6 +1289,12 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, chars, s
                         ++ (Color.toCssString <| toColor palette.darkFg)
                         ++ """;
                     }
+                    .scaling-handle {
+                        fill: """
+                        ++ (Color.toCssString <| toColor palette.darkFg)
+                        ++ """;
+                        stroke: none;
+                    }
                     svg {
                         overflow: visible
                     }
@@ -1289,23 +1340,26 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
         levelwiseId =
             id + (level - 1) * 10
 
-        constraint width height position contents =
+        isDraggable =
+            isThumbnail || level > 1
+
+        constraint dimension position contents =
             Svg.svg
                 ([ SvgAttributes.x <| SvgTypes.Percent <| Vector2.getX position
                  , SvgAttributes.y <| SvgTypes.Percent <| Vector2.getY position
-                 , SvgAttributes.width <| SvgTypes.Percent width
-                 , SvgAttributes.height <| SvgTypes.Percent height
+                 , SvgAttributes.width <| SvgTypes.Percent <| Vector2.getX dimension
+                 , SvgAttributes.height <| SvgTypes.Percent <| Vector2.getX dimension
                  ]
-                    ++ (if isThumbnail || level > 1 then
+                    ++ (if isDraggable then
                             []
 
                         else
-                            [ Draggable.mouseTrigger levelwiseId DragMsg ]
+                            [ Draggable.mouseTrigger ( levelwiseId, NoScale ) DragMsg ]
                        )
                 )
             <|
                 if Just levelwiseId == activeComponentId then
-                    Svg.rect
+                    [ Svg.rect
                         [ SvgAttributes.id "active-component-border"
                         , SvgAttributes.width <| SvgTypes.Percent 100
                         , SvgAttributes.height <| SvgTypes.Percent 100
@@ -1313,23 +1367,28 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
                         , SvgAttributes.stroke <| SvgTypes.Paint <| toColor palette.lightFg
                         ]
                         []
-                        :: contents
+                    , scaleHandle ( levelwiseId, ScaleTopLeft ) 0 0 unitSize isDraggable
+                    , scaleHandle ( levelwiseId, ScaleTopRight ) 100 0 unitSize isDraggable
+                    , scaleHandle ( levelwiseId, ScaleBottomLeft ) 0 100 unitSize isDraggable
+                    , scaleHandle ( levelwiseId, ScaleBottomRight ) 100 100 unitSize isDraggable
+                    ]
+                        ++ contents
 
                 else
                     contents
     in
     case myChar of
-        SimpleChar { char, width, height, position } ->
+        SimpleChar { char, dimension, position } ->
             case Dict.get char simpleCharSvgs of
                 Just svg ->
-                    constraint width height position [ svg ]
+                    constraint dimension position [ svg ]
 
                 Nothing ->
                     -- impossible
                     TypedSvg.Core.text <| "Error rendering " ++ String.fromChar char
 
-        CompoundChar { char, width, height, position } components ->
-            constraint width height position <|
+        CompoundChar { char, dimension, position } components ->
+            constraint dimension position <|
                 List.map
                     (renderCharHelper
                         { unitSize = unitSize
@@ -1345,6 +1404,24 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
                     components
 
 
+scaleHandle : ( Id, Scale ) -> Float -> Float -> Int -> Bool -> Svg Msg
+scaleHandle ( id, scale ) x y size isDraggable =
+    Svg.circle
+        ([ SvgAttributes.cx (SvgTypes.percent x)
+         , SvgAttributes.cy (SvgTypes.percent y)
+         , SvgAttributes.r (SvgTypes.px <| toFloat size / 2)
+         , SvgAttributes.class [ "scaling-handle" ]
+         ]
+            ++ (if isDraggable then
+                    []
+
+                else
+                    [ Draggable.mouseTrigger ( id, scale ) DragMsg ]
+               )
+        )
+        []
+
+
 myCharFromMyCharRef : Dict Char MyChar -> MyCharRef -> MyChar
 myCharFromMyCharRef chars ref =
     let
@@ -1356,8 +1433,7 @@ myCharFromMyCharRef chars ref =
         updateAttributes r =
             { r
                 | id = ref.id
-                , width = ref.width
-                , height = ref.height
+                , dimension = ref.dimension
                 , position = ref.position
             }
     in
