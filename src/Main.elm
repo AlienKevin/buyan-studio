@@ -1038,107 +1038,112 @@ view model =
 
 
 popUp : Model -> E.Element Msg
-popUp ({ activeComponentId, boxUnits, thumbnailUnitSize, newCompoundChar, isInputErrorShown } as model) =
+popUp model =
     case model.popUp of
         AddCompoundCharPopUp ->
-            let
-                inputLength =
-                    String.length newCompoundChar
-
-                isValidNewChar =
-                    inputLength == 1
-
-                borderWidth =
-                    6
-            in
-            E.column
-                ([ E.centerX
-                 , E.centerY
-                 , Background.color palette.lightBg
-                 , E.width <| E.px <| boxUnits * thumbnailUnitSize + 2 * borderWidth
-                 , E.height <| E.px <| boxUnits * thumbnailUnitSize + fontSize.title + 2 * borderWidth
-                 , E.spacing spacing.small
-                 , Font.size fontSize.medium
-                 , E.inFront <|
-                    E.el
-                        [ E.padding spacing.tiny ]
-                    <|
-                        iconButton
-                            { icon =
-                                FeatherIcons.x
-                            , size =
-                                fontSize.small
-                            , onPress =
-                                Just ClosePopUp
-                            }
-                 ]
-                    ++ highlightBorder borderWidth Border.dashed
-                )
-                [ Input.text
-                    [ E.width <| E.px <| fontSize.medium * 5
-                    , E.centerX
-                    , onEnter <|
-                        if isValidNewChar then
-                            Just AddPendingCompoundChar
-
-                        else
-                            Nothing
-                    ]
-                    { onChange =
-                        UpdatePendingCompoundChar
-                    , text =
-                        newCompoundChar
-                    , placeholder =
-                        Nothing
-                    , label =
-                        Input.labelAbove
-                            [ E.paddingEach { top = spacing.medium, bottom = 0, left = 0, right = 0} ]
-                            (E.text "Character")
-                    }
-                , E.el
-                    ([ E.centerX
-                     , E.below <|
-                        if isInputErrorShown then
-                            E.el
-                                [ E.centerX
-                                , Font.size fontSize.small
-                                ]
-                            <|
-                                E.text "Accept only\n 1 character"
-
-                        else
-                            E.none
-                     ]
-                        ++ (if isValidNewChar then
-                                []
-
-                            else
-                                [ Events.onMouseEnter ShowInputError
-                                , Events.onMouseLeave HideInputError
-                                ]
-                           )
-                    )
-                  <|
-                    iconButton
-                        { icon =
-                            if isValidNewChar then
-                                FeatherIcons.checkCircle
-
-                            else
-                                FeatherIcons.alertTriangle
-                        , size =
-                            fontSize.title
-                        , onPress =
-                            if isValidNewChar then
-                                Just AddPendingCompoundChar
-
-                            else
-                                Nothing
-                        }
-                ]
+            addCompoundCharPopUp model
 
         NoPopUp ->
             E.none
+
+
+addCompoundCharPopUp : Model -> E.Element Msg
+addCompoundCharPopUp { activeComponentId, boxUnits, thumbnailUnitSize, newCompoundChar, isInputErrorShown } =
+    let
+        inputLength =
+            String.length newCompoundChar
+
+        isValidNewChar =
+            inputLength == 1
+
+        borderWidth =
+            6
+    in
+    E.column
+        ([ E.centerX
+         , E.centerY
+         , Background.color palette.lightBg
+         , E.width <| E.px <| boxUnits * thumbnailUnitSize + 2 * borderWidth
+         , E.height <| E.px <| boxUnits * thumbnailUnitSize + fontSize.title + 2 * borderWidth
+         , E.spacing spacing.small
+         , Font.size fontSize.medium
+         , E.inFront <|
+            E.el
+                [ E.padding spacing.tiny ]
+            <|
+                iconButton
+                    { icon =
+                        FeatherIcons.x
+                    , size =
+                        fontSize.small
+                    , onPress =
+                        Just ClosePopUp
+                    }
+         ]
+            ++ highlightBorder borderWidth Border.dashed
+        )
+        [ Input.text
+            [ E.width <| E.px <| fontSize.medium * 5
+            , E.centerX
+            , onEnter <|
+                if isValidNewChar then
+                    Just AddPendingCompoundChar
+
+                else
+                    Nothing
+            ]
+            { onChange =
+                UpdatePendingCompoundChar
+            , text =
+                newCompoundChar
+            , placeholder =
+                Nothing
+            , label =
+                Input.labelAbove
+                    [ E.paddingEach { top = spacing.medium, bottom = 0, left = 0, right = 0 } ]
+                    (E.text "Character")
+            }
+        , E.el
+            ([ E.centerX
+             , E.below <|
+                if isInputErrorShown then
+                    E.el
+                        [ E.centerX
+                        , Font.size fontSize.small
+                        ]
+                    <|
+                        E.text "Accept only\n 1 character"
+
+                else
+                    E.none
+             ]
+                ++ (if isValidNewChar then
+                        []
+
+                    else
+                        [ Events.onMouseEnter ShowInputError
+                        , Events.onMouseLeave HideInputError
+                        ]
+                   )
+            )
+          <|
+            iconButton
+                { icon =
+                    if isValidNewChar then
+                        FeatherIcons.checkCircle
+
+                    else
+                        FeatherIcons.alertTriangle
+                , size =
+                    fontSize.title
+                , onPress =
+                    if isValidNewChar then
+                        Just AddPendingCompoundChar
+
+                    else
+                        Nothing
+                }
+        ]
 
 
 onEnter : Maybe Msg -> E.Attribute Msg
