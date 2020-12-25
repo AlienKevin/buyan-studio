@@ -1578,21 +1578,21 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
                 )
             <|
                 if Just levelwiseId == activeComponentId then
-                    [ Svg.rect
-                        [ SvgAttributes.id "active-component-border"
-                        , SvgAttributes.width <| SvgTypes.Percent 100
-                        , SvgAttributes.height <| SvgTypes.Percent 100
-                        , SvgAttributes.fill <| SvgTypes.PaintNone
-                        , SvgAttributes.stroke <| SvgTypes.Paint <| toColor palette.lightFg
-                        ]
-                        []
-                    , scaleAspectRatioLock isAspectRatioLocked
-                    , scaleHandle ( levelwiseId, ScaleTopLeft ) 0 0 unitSize isDraggable
-                    , scaleHandle ( levelwiseId, ScaleTopRight ) 100 0 unitSize isDraggable
-                    , scaleHandle ( levelwiseId, ScaleBottomLeft ) 0 100 unitSize isDraggable
-                    , scaleHandle ( levelwiseId, ScaleBottomRight ) 100 100 unitSize isDraggable
-                    ]
-                        ++ contents
+                    contents
+                        ++ [ Svg.rect
+                                [ SvgAttributes.id "active-component-border"
+                                , SvgAttributes.width <| SvgTypes.Percent 100
+                                , SvgAttributes.height <| SvgTypes.Percent 100
+                                , SvgAttributes.fill <| SvgTypes.PaintNone
+                                , SvgAttributes.stroke <| SvgTypes.Paint <| toColor palette.lightFg
+                                ]
+                                []
+                           , scaleAspectRatioLock isAspectRatioLocked
+                           , scaleHandle ( levelwiseId, ScaleTopLeft ) 0 0 unitSize isDraggable
+                           , scaleHandle ( levelwiseId, ScaleTopRight ) 100 0 unitSize isDraggable
+                           , scaleHandle ( levelwiseId, ScaleBottomLeft ) 0 100 unitSize isDraggable
+                           , scaleHandle ( levelwiseId, ScaleBottomRight ) 100 100 unitSize isDraggable
+                           ]
 
                 else
                     contents
@@ -1621,6 +1621,7 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
                         , tightDimension =
                             if level >= 1 then
                                 calculateMyCharDimension myChar
+
                             else
                                 { position = Vector2.vec2 0 0, dimension = Vector2.vec2 100 100 }
                         }
