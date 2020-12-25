@@ -4,7 +4,7 @@ self.__precacheManifest = (self.__precacheManifest || []).concat([
     "url": "/buyan-studio/favicon.ico"
   },
   {
-    "revision": "d72665935f7b40232e7e263333cc34d9",
+    "revision": "ee09aef95952b95a61053fa2865ddc1b",
     "url": "/buyan-studio/index.html"
   },
   {
@@ -16,7 +16,7 @@ self.__precacheManifest = (self.__precacheManifest || []).concat([
     "url": "/buyan-studio/manifest.json"
   },
   {
-    "revision": "35b998c7b4495d822b86",
+    "revision": "0eb161397ecd059b4230",
     "url": "/buyan-studio/static/css/main.0af5c45f.chunk.css"
   },
   {
@@ -56,8 +56,8 @@ self.__precacheManifest = (self.__precacheManifest || []).concat([
     "url": "/buyan-studio/static/js/9.714c5128.chunk.js"
   },
   {
-    "revision": "35b998c7b4495d822b86",
-    "url": "/buyan-studio/static/js/main.35b998c7.chunk.js"
+    "revision": "0eb161397ecd059b4230",
+    "url": "/buyan-studio/static/js/main.0eb16139.chunk.js"
   },
   {
     "revision": "0512f9e59f3dbc204535",

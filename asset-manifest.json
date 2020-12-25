@@ -1,7 +1,7 @@
 {
   "main.css": "/buyan-studio/static/css/main.0af5c45f.chunk.css",
-  "main.js": "/buyan-studio/static/js/main.35b998c7.chunk.js",
-  "main.js.map": "/buyan-studio/static/js/main.35b998c7.chunk.js.map",
+  "main.js": "/buyan-studio/static/js/main.0eb16139.chunk.js",
+  "main.js.map": "/buyan-studio/static/js/main.0eb16139.chunk.js.map",
   "runtime~main.js": "/buyan-studio/static/js/runtime~main.0512f9e5.js",
   "runtime~main.js.map": "/buyan-studio/static/js/runtime~main.0512f9e5.js.map",
   "vendors~main.js": "/buyan-studio/static/js/vendors~main.1a0713ce.chunk.js",
@@ -29,5 +29,5 @@
   "index.html": "/buyan-studio/index.html",
   "logo.svg": "/buyan-studio/logo.svg",
   "manifest.json": "/buyan-studio/manifest.json",
-  "precache-manifest.0de8ed63527cca58c4a9d0eabebdd048.js": "/buyan-studio/precache-manifest.0de8ed63527cca58c4a9d0eabebdd048.js"
+  "precache-manifest.b040b6c9af0fff7da76e16f284e2ecc3.js": "/buyan-studio/precache-manifest.b040b6c9af0fff7da76e16f284e2ecc3.js"
 }
