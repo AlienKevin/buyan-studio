@@ -1168,10 +1168,48 @@ preferences model =
             , selected = Just model.strokeLineCap
             , label = Input.labelLeft [] (E.text "Stroke linecap is ")
             , options =
-                [ Input.option StrokeLineCapRound (E.text "Round")
-                , Input.option StrokeLineCapSquare (E.text "Square")
+                [ Input.optionWith StrokeLineCapRound
+                    (radioOption (E.text "Round"))
+                , Input.optionWith StrokeLineCapSquare
+                    (radioOption (E.text "Square"))
                 ]
             }
+        ]
+
+radioOption : E.Element msg -> Input.OptionState -> E.Element msg
+radioOption optionLabel status =
+    E.row
+        [ E.spacing 10
+        , E.alignLeft
+        , E.width E.shrink
+        ]
+        [ E.el
+            [ E.width (E.px 14)
+            , E.height (E.px 14)
+            , Border.rounded 7
+            , Border.width <|
+                case status of
+                    Input.Idle ->
+                        1
+
+                    Input.Focused ->
+                        1
+
+                    Input.Selected ->
+                        5
+            , Border.color <|
+                case status of
+                    Input.Idle ->
+                        palette.darkFg
+
+                    Input.Focused ->
+                        palette.darkFg
+
+                    Input.Selected ->
+                        palette.darkFg
+            ]
+            E.none
+        , E.el [ E.width E.fill ] optionLabel
         ]
 
 
