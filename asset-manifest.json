@@ -25,9 +25,16 @@
   "static/js/11.23f9058f.chunk.js": "/buyan-studio/static/js/11.23f9058f.chunk.js",
   "static/js/11.23f9058f.chunk.js.map": "/buyan-studio/static/js/11.23f9058f.chunk.js.map",
   "./service-worker.js": "/buyan-studio/./service-worker.js",
+  "android-chrome-192x192.png": "/buyan-studio/android-chrome-192x192.png",
+  "android-chrome-512x512.png": "/buyan-studio/android-chrome-512x512.png",
+  "apple-touch-icon.png": "/buyan-studio/apple-touch-icon.png",
+  "browserconfig.xml": "/buyan-studio/browserconfig.xml",
+  "favicon-16x16.png": "/buyan-studio/favicon-16x16.png",
+  "favicon-32x32.png": "/buyan-studio/favicon-32x32.png",
   "favicon.ico": "/buyan-studio/favicon.ico",
   "index.html": "/buyan-studio/index.html",
-  "logo.svg": "/buyan-studio/logo.svg",
-  "manifest.json": "/buyan-studio/manifest.json",
-  "precache-manifest.b040b6c9af0fff7da76e16f284e2ecc3.js": "/buyan-studio/precache-manifest.b040b6c9af0fff7da76e16f284e2ecc3.js"
+  "mstile-150x150.png": "/buyan-studio/mstile-150x150.png",
+  "precache-manifest.c846666e08366a94f0e177daf17fa55a.js": "/buyan-studio/precache-manifest.c846666e08366a94f0e177daf17fa55a.js",
+  "safari-pinned-tab.svg": "/buyan-studio/safari-pinned-tab.svg",
+  "site.webmanifest": "/buyan-studio/site.webmanifest"
 }

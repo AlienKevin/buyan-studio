@@ -1,19 +1,47 @@
 self.__precacheManifest = (self.__precacheManifest || []).concat([
   {
-    "revision": "987da976a8b2a4169346a497ba84749d",
+    "revision": "1813b4a1af15287ed09d0d297ed03ad0",
+    "url": "/buyan-studio/android-chrome-192x192.png"
+  },
+  {
+    "revision": "571fa62ec69c502a2757e7862941ba48",
+    "url": "/buyan-studio/android-chrome-512x512.png"
+  },
+  {
+    "revision": "2df13a839e9faaf42158ef4adcfaeba9",
+    "url": "/buyan-studio/apple-touch-icon.png"
+  },
+  {
+    "revision": "7f2b2f8a4c6863cc7be0a1e4b7963bd9",
+    "url": "/buyan-studio/browserconfig.xml"
+  },
+  {
+    "revision": "eea27c0045870b634e7ab2c6b46bc6f2",
+    "url": "/buyan-studio/favicon-16x16.png"
+  },
+  {
+    "revision": "dbf69b68942836631d23c10cc8c37583",
+    "url": "/buyan-studio/favicon-32x32.png"
+  },
+  {
+    "revision": "84ffd25220e60f624dada97f2d150e7b",
     "url": "/buyan-studio/favicon.ico"
   },
   {
-    "revision": "ee09aef95952b95a61053fa2865ddc1b",
+    "revision": "e73fc080643acf119d07272767544f24",
     "url": "/buyan-studio/index.html"
   },
   {
-    "revision": "6ead519905b7b907c00965be37dd5cd7",
-    "url": "/buyan-studio/logo.svg"
+    "revision": "3ce17aaa0f1e9d7e4b90dfd6476d05dd",
+    "url": "/buyan-studio/mstile-150x150.png"
   },
   {
-    "revision": "1c82903c2994c2507b385b9042bbfac5",
-    "url": "/buyan-studio/manifest.json"
+    "revision": "c71976928658edd86148c9360119b2f7",
+    "url": "/buyan-studio/safari-pinned-tab.svg"
+  },
+  {
+    "revision": "bc98083b83032c55f461d649e66f95fa",
+    "url": "/buyan-studio/site.webmanifest"
   },
   {
     "revision": "0eb161397ecd059b4230",
