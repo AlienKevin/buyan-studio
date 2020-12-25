@@ -36,7 +36,7 @@ app.ports.addSimpleCharsPort.subscribe(function () {
         if (simpleCharSvgs === null) {
           simpleCharSvgs = {};
         }
-        files.forEach(function (file) {
+        Array.from(files).forEach(function (file) {
           var reader = new FileReader();
           reader.addEventListener('load', function (event) {
             var char = file.name.slice(0, -(".svg".length));
