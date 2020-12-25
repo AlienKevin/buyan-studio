@@ -45,6 +45,9 @@ port saveModelPort : Value -> Cmd msg
 port getModelPort : (Value -> msg) -> Sub msg
 
 
+port deleteSimpleCharPort : String -> Cmd msg
+
+
 port pageUnloadingPort : (() -> msg) -> Sub msg
 
 
@@ -171,6 +174,7 @@ type Msg
     = AddChar MyCharType
     | GetSimpleChars Value
     | SelectChar MyChar
+    | DeleteSelectedChar
     | UpdatePendingCompoundChar String
     | AddPendingCompoundChar
     | ShowInputError
@@ -209,6 +213,9 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as mod
 
         SelectChar myChar ->
             selectChar myChar model
+
+        DeleteSelectedChar ->
+            deleteSelectedChar model
 
         UpdatePendingCompoundChar charInput ->
             updatePendingCompoundChar charInput model
@@ -257,6 +264,28 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as mod
 
         ToggleIsAspectRatioLocked ->
             toggleIsAspectRatioLocked model
+
+
+deleteSelectedChar : Model -> ( Model, Cmd Msg )
+deleteSelectedChar model =
+    ( { model
+        | selectedChar =
+            Nothing
+        , chars =
+            case model.selectedChar of
+                Just char ->
+                    Dict.remove char model.chars
+
+                Nothing ->
+                    model.chars
+      }
+    , case model.selectedChar of
+        Just char ->
+            deleteSimpleCharPort (String.fromChar char)
+
+        Nothing ->
+            Cmd.none
+    )
 
 
 updateStrokeLineCap : StrokeLineCap -> Model -> ( Model, Cmd Msg )
@@ -640,6 +669,7 @@ addComponentToMyChar chars componentChar myChar =
             -- Prevent infinite recursive self-reference
             if componentChar == compoundChar.char then
                 myChar
+
             else
                 let
                     dimension =
@@ -1176,6 +1206,7 @@ preferences model =
             }
         ]
 
+
 radioOption : E.Element msg -> Input.OptionState -> E.Element msg
 radioOption optionLabel status =
     E.row
@@ -1461,15 +1492,34 @@ charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, bord
                         []
                )
         )
-        [ E.el
+        [ E.row
             [ Font.size fontSize.large
             , Font.bold
             , E.paddingXY spacing.small spacing.small
+            , E.width E.fill
             ]
-          <|
-            E.text <|
-                String.fromChar <|
-                    char
+            [ E.el
+                [ E.alignLeft ]
+                (E.text <|
+                    String.fromChar <|
+                        char
+                )
+            , if selectedChar == Just char then
+                E.el
+                    [ E.alignRight ]
+                    (iconButton
+                        { icon =
+                            FeatherIcons.trash2
+                        , size =
+                            fontSize.large
+                        , onPress =
+                            Just DeleteSelectedChar
+                        }
+                    )
+
+              else
+                E.none
+            ]
         , E.html <|
             renderChar
                 { unitSize = thumbnailUnitSize

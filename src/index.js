@@ -56,6 +56,20 @@ app.ports.addSimpleCharsPort.subscribe(function () {
     });
 });
 
+app.ports.deleteSimpleCharPort.subscribe(function(char) {
+  localforage.getItem(simpleCharSvgsStorageKey, function (error, simpleCharSvgs) {
+    if (error !== null) {
+      console.error("Error getting saved simpleCharSvgs: ", error);
+    }
+    delete simpleCharSvgs[char];
+    localforage.setItem(simpleCharSvgsStorageKey, simpleCharSvgs, function (error) {
+      if (error !== null) {
+        console.error("Error saving simpleCharSvgs: ", error);
+      }
+    });
+  });
+});
+
 app.ports.saveModelPort.subscribe(function (model) {
   console.log("Saving model: ", model);
   localforage.setItem(modelStorageKey, model, function (error) {
