@@ -405,10 +405,10 @@ gotModel savedModelJson model =
             }
 
         Err err ->
-            let
-                _ =
-                    Debug.log "err" err
-            in
+            -- let
+                -- _ =
+                --     Debug.log "err" err
+            -- in
             model
     , Cmd.none
     )
@@ -732,19 +732,19 @@ calculateMyCharDimension myChar =
 
         CompoundChar _ components ->
             (\{ minX, minY, maxX, maxY } ->
-                let
-                    _ =
-                        Debug.log "minX" minX
+                -- let
+                --     _ =
+                --         Debug.log "minX" minX
 
-                    _ =
-                        Debug.log "maxX" maxX
+                --     _ =
+                --         Debug.log "maxX" maxX
 
-                    _ =
-                        Debug.log "minY" minY
+                --     _ =
+                --         Debug.log "minY" minY
 
-                    _ =
-                        Debug.log "maxY" maxY
-                in
+                --     _ =
+                --         Debug.log "maxY" maxY
+                -- in
                 { position =
                     Vector2.vec2 minX minY
                 , dimension =
@@ -773,14 +773,14 @@ calculateMyCharDimension myChar =
                     List.map
                         (\{ char, position, dimension } ->
                             let
-                                _ =
-                                    Debug.log "char" char
+                                -- _ =
+                                --     Debug.log "char" char
 
-                                _ =
-                                    Debug.log "topLeftPoint" topLeftPoint
+                                -- _ =
+                                --     Debug.log "topLeftPoint" topLeftPoint
 
-                                _ =
-                                    Debug.log "bottomRightPoint" bottomRightPoint
+                                -- _ =
+                                --     Debug.log "bottomRightPoint" bottomRightPoint
 
                                 topLeftPoint =
                                     position
@@ -895,11 +895,11 @@ getSimpleChars svgsJson model =
                                                 height =
                                                     Vector2.getY d
 
-                                                _ =
-                                                    Debug.log "width" width
+                                                -- _ =
+                                                --     Debug.log "width" width
 
-                                                _ =
-                                                    Debug.log "height" height
+                                                -- _ =
+                                                --     Debug.log "height" height
 
                                                 f =
                                                     lerp 0 (max width height) 0 100
@@ -935,10 +935,10 @@ getSimpleChars svgsJson model =
             }
 
         Err err ->
-            let
-                _ =
-                    Debug.log "err" err
-            in
+            -- let
+            --     _ =
+            --         Debug.log "err" err
+            -- in
             model
     , Cmd.none
     )
