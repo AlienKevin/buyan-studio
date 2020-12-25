@@ -138,6 +138,7 @@ type alias SimpleCharSvg =
 
 type PopUp
     = AddCompoundCharPopUp
+    | ConfirmDeleteSelectedCharPopUp
     | NoPopUp
 
 
@@ -174,6 +175,7 @@ type Msg
     = AddChar MyCharType
     | GetSimpleChars Value
     | SelectChar MyChar
+    | RequestDeleteSelectedChar
     | DeleteSelectedChar
     | UpdatePendingCompoundChar String
     | AddPendingCompoundChar
@@ -213,6 +215,9 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as mod
 
         SelectChar myChar ->
             selectChar myChar model
+
+        RequestDeleteSelectedChar ->
+            requestDeleteSelectedChar model
 
         DeleteSelectedChar ->
             deleteSelectedChar model
@@ -266,6 +271,16 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as mod
             toggleIsAspectRatioLocked model
 
 
+requestDeleteSelectedChar : Model -> ( Model, Cmd Msg )
+requestDeleteSelectedChar model =
+    ( { model
+        | popUp =
+            ConfirmDeleteSelectedCharPopUp
+      }
+    , Cmd.none
+    )
+
+
 deleteSelectedChar : Model -> ( Model, Cmd Msg )
 deleteSelectedChar model =
     ( { model
@@ -278,6 +293,8 @@ deleteSelectedChar model =
 
                 Nothing ->
                     model.chars
+        , popUp =
+            NoPopUp
       }
     , case model.selectedChar of
         Just char ->
@@ -1043,8 +1060,76 @@ popUp model =
         AddCompoundCharPopUp ->
             addCompoundCharPopUp model
 
+        ConfirmDeleteSelectedCharPopUp ->
+            confirmDeleteSelectedCharPopUp model
+
         NoPopUp ->
             E.none
+
+
+confirmDeleteSelectedCharPopUp : Model -> E.Element Msg
+confirmDeleteSelectedCharPopUp { activeComponentId, boxUnits, thumbnailUnitSize, selectedChar } =
+    let
+        borderWidth =
+            6
+    in
+    E.column
+        ([ E.centerX
+         , E.centerY
+         , Background.color palette.lightBg
+         , E.width <| E.px <| boxUnits * thumbnailUnitSize + 3 * borderWidth
+         , E.height <| E.px <| boxUnits * thumbnailUnitSize + fontSize.title + 3 * borderWidth
+         , E.spaceEvenly
+         , E.padding spacing.small
+         , Font.size fontSize.medium
+         ]
+            ++ highlightBorder
+                { color = palette.danger
+                , width = borderWidth
+                , style = Border.dashed
+                , glowWidth = borderWidth
+                }
+        )
+        [ E.el
+            [ E.centerX ]
+            (E.paragraph []
+                [ E.text "Do you want to delete "
+                , E.el [ Font.bold, Font.size fontSize.large ] (E.text (String.fromChar (Maybe.withDefault '?' selectedChar)))
+                , E.text " ?\n"
+                , E.el [ Font.size fontSize.small ] (E.text "This can't be undone.")
+                ]
+            )
+        , E.row
+            [ E.width E.fill
+            ]
+            [ E.el
+                [ E.alignLeft
+                , Font.color palette.lightFg
+                ]
+                (iconButton
+                    { icon =
+                        FeatherIcons.xCircle
+                    , size =
+                        fontSize.large
+                    , onPress =
+                        Just ClosePopUp
+                    }
+                )
+            , E.el
+                [ E.alignRight
+                , Font.color palette.danger
+                ]
+                (iconButton
+                    { icon =
+                        FeatherIcons.trash2
+                    , size =
+                        fontSize.large
+                    , onPress =
+                        Just DeleteSelectedChar
+                    }
+                )
+            ]
+        ]
 
 
 addCompoundCharPopUp : Model -> E.Element Msg
@@ -1063,8 +1148,8 @@ addCompoundCharPopUp { activeComponentId, boxUnits, thumbnailUnitSize, newCompou
         ([ E.centerX
          , E.centerY
          , Background.color palette.lightBg
-         , E.width <| E.px <| boxUnits * thumbnailUnitSize + 2 * borderWidth
-         , E.height <| E.px <| boxUnits * thumbnailUnitSize + fontSize.title + 2 * borderWidth
+         , E.width <| E.px <| boxUnits * thumbnailUnitSize + 3 * borderWidth
+         , E.height <| E.px <| boxUnits * thumbnailUnitSize + fontSize.title + 3 * borderWidth
          , E.spacing spacing.small
          , Font.size fontSize.medium
          , E.inFront <|
@@ -1080,7 +1165,12 @@ addCompoundCharPopUp { activeComponentId, boxUnits, thumbnailUnitSize, newCompou
                         Just ClosePopUp
                     }
          ]
-            ++ highlightBorder borderWidth Border.dashed
+            ++ highlightBorder
+                { color = palette.lightFg
+                , width = borderWidth
+                , style = Border.dashed
+                , glowWidth = borderWidth
+                }
         )
         [ Input.text
             [ E.width <| E.px <| fontSize.medium * 5
@@ -1477,7 +1567,12 @@ charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, bord
             ++ (case selectedChar of
                     Just selected ->
                         if selected == char then
-                            highlightBorder 0 Border.solid
+                            highlightBorder
+                                { color = palette.lightFg
+                                , width = 0
+                                , style = Border.solid
+                                , glowWidth = spacing.small
+                                }
 
                         else
                             []
@@ -1509,7 +1604,7 @@ charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, bord
                         , size =
                             fontSize.large
                         , onPress =
-                            Just DeleteSelectedChar
+                            Just RequestDeleteSelectedChar
                         }
                     )
 
@@ -1858,13 +1953,19 @@ iconButton { icon, size, onPress } =
         }
 
 
-highlightBorder : Int -> E.Attribute Msg -> List (E.Attribute Msg)
-highlightBorder borderWidth borderStyle =
+highlightBorder :
+    { color : E.Color
+    , width : Int
+    , glowWidth : Float
+    , style : E.Attribute Msg
+    }
+    -> List (E.Attribute Msg)
+highlightBorder { color, width, glowWidth, style } =
     [ Border.rounded spacing.medium
-    , Border.color palette.lightFg
-    , Border.width borderWidth
-    , borderStyle
-    , Border.glow palette.lightFg 10
+    , Border.color color
+    , Border.width width
+    , style
+    , Border.glow color glowWidth
     ]
 
 
@@ -1964,7 +2065,7 @@ palette =
     , darkFg =
         toElmUiColor Color.lightPurple
     , danger =
-        toElmUiColor Color.red
+        E.rgb255 210 99 71
     }
 
 
