@@ -637,32 +637,36 @@ addComponentToMyChar chars componentChar myChar =
             myChar
 
         CompoundChar compoundChar components ->
-            let
-                dimension =
-                    case Dict.get componentChar chars of
-                        Just component ->
-                            Vector2.scale 0.5 <| .dimension (calculateMyCharDimension component)
+            -- Prevent infinite recursive self-reference
+            if componentChar == compoundChar.char then
+                myChar
+            else
+                let
+                    dimension =
+                        case Dict.get componentChar chars of
+                            Just component ->
+                                Vector2.scale 0.5 <| .dimension (calculateMyCharDimension component)
 
-                        -- impossible
-                        Nothing ->
-                            Vector2.vec2 50 50
+                            -- impossible
+                            Nothing ->
+                                Vector2.vec2 50 50
 
-                position =
-                    calculateCenterPosition dimension
+                    position =
+                        calculateCenterPosition dimension
 
-                id =
-                    List.length components
+                    id =
+                        List.length components
 
-                newComponent =
-                    { char = componentChar
-                    , id = id
-                    , dimension = dimension
-                    , position = position
-                    }
-            in
-            CompoundChar
-                compoundChar
-                (components ++ [ newComponent ])
+                    newComponent =
+                        { char = componentChar
+                        , id = id
+                        , dimension = dimension
+                        , position = position
+                        }
+                in
+                CompoundChar
+                    compoundChar
+                    (components ++ [ newComponent ])
 
 
 calculateCenterPosition : Vec2 -> Vec2
