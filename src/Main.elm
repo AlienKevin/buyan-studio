@@ -1492,7 +1492,9 @@ charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, bord
                 )
             , if selectedChar == Just char then
                 E.el
-                    [ E.alignRight ]
+                    [ E.alignRight
+                    , Font.color palette.danger
+                    ]
                     (iconButton
                         { icon =
                             FeatherIcons.trash2
@@ -1953,6 +1955,8 @@ palette =
         toElmUiColor Color.lightBlue
     , darkFg =
         toElmUiColor Color.lightPurple
+    , danger =
+        toElmUiColor Color.red
     }
 
 
