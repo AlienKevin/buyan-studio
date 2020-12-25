@@ -1412,13 +1412,7 @@ charPanel myCharType ({ boxUnits, thumbnailUnitSize } as model) =
     in
     E.column
         [ E.spacing spacing.medium
-        , E.height
-            (if List.length cards <= 3 then
-                E.shrink
-
-             else
-                E.fill
-            )
+        , E.height E.fill
         , E.centerY
         ]
         [ E.row
@@ -1446,14 +1440,6 @@ charPanel myCharType ({ boxUnits, thumbnailUnitSize } as model) =
         , E.wrappedRow
             [ E.width E.fill
             , E.height E.fill
-            , E.height
-                (if List.length cards == 0 then
-                    E.shrink
-
-                 else
-                    E.fill
-                        |> E.minimum (boxUnits * thumbnailUnitSize + fontSize.medium + spacing.medium)
-                )
             , E.htmlAttribute <| Html.Attributes.style "overflow-y" "auto"
             , E.htmlAttribute <| Html.Attributes.style "overflow-x" "hidden"
             , E.spacing spacing.medium
