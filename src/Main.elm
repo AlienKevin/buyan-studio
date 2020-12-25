@@ -1556,7 +1556,7 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
             id + (level - 1) * 10
 
         isDraggable =
-            isThumbnail || level > 1
+            not (isThumbnail || level > 1)
 
         constraint dimension position contents =
             let
@@ -1569,12 +1569,7 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
                  , SvgAttributes.width <| SvgTypes.Percent <| 100 / Vector2.getX tightDimension.dimension * Vector2.getX dimension
                  , SvgAttributes.height <| SvgTypes.Percent <| 100 / Vector2.getY tightDimension.dimension * Vector2.getY dimension
                  ]
-                    ++ (if isDraggable then
-                            []
-
-                        else
-                            [ Draggable.mouseTrigger ( levelwiseId, NoScale ) DragMsg ]
-                       )
+                    ++ dragTrigger isDraggable ( levelwiseId, NoScale )
                 )
             <|
                 if Just levelwiseId == activeComponentId then
@@ -1669,13 +1664,17 @@ scaleHandle ( id, scale ) x y size isDraggable =
          , SvgAttributes.r (SvgTypes.px <| toFloat size / 2)
          , SvgAttributes.class [ "scale-handle" ]
          ]
-            ++ (if isDraggable then
-                    []
-
-                else
-                    [ Draggable.mouseTrigger ( id, scale ) DragMsg ]
-               )
+            ++ dragTrigger isDraggable ( id, scale )
         )
+        []
+
+
+dragTrigger : Bool -> ( Id, Scale ) -> List (Html.Attribute Msg)
+dragTrigger isDraggable ( id, scale ) =
+    if isDraggable then
+        [ Draggable.mouseTrigger ( id, scale ) DragMsg ]
+
+    else
         []
 
 
