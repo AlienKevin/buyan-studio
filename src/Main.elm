@@ -61,6 +61,7 @@ type alias Model =
     , unitSize : Int
     , thumbnailUnitSize : Int
     , strokeWidth : Float
+    , strokeLineCap : StrokeLineCap
     , popUp : PopUp
     , newCompoundChar : String
     , isInputErrorShown : Bool
@@ -77,6 +78,11 @@ type alias SavedModel =
     { chars : Dict Char MyChar
     , strokeWidth : Float
     }
+
+
+type StrokeLineCap
+    = StrokeLineCapRound
+    | StrokeLineCapSquare
 
 
 type alias Id =
@@ -142,6 +148,7 @@ init _ =
       , unitSize = 20
       , thumbnailUnitSize = 7
       , strokeWidth = 5
+      , strokeLineCap = StrokeLineCapRound
       , popUp = NoPopUp
       , newCompoundChar = ""
       , isInputErrorShown = False
@@ -178,6 +185,7 @@ type Msg
     | GotModel Value
     | SaveModel ()
     | UpdateStrokeWidth Float
+    | UpdateStrokeLineCap StrokeLineCap
     | ToggleIsAspectRatioLocked
 
 
@@ -244,8 +252,21 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as mod
         UpdateStrokeWidth newStrokeWidth ->
             updateStrokeWidth newStrokeWidth model
 
+        UpdateStrokeLineCap newStrokeLineCap ->
+            updateStrokeLineCap newStrokeLineCap model
+
         ToggleIsAspectRatioLocked ->
             toggleIsAspectRatioLocked model
+
+
+updateStrokeLineCap : StrokeLineCap -> Model -> ( Model, Cmd Msg )
+updateStrokeLineCap newStrokeLineCap model =
+    ( { model
+        | strokeLineCap =
+            newStrokeLineCap
+      }
+    , Cmd.none
+    )
 
 
 toggleIsAspectRatioLocked : Model -> ( Model, Cmd Msg )
@@ -1135,11 +1156,23 @@ preferences model =
             , value = model.strokeWidth
             , thumb = Input.defaultThumb
             }
+        , Input.radio
+            [ E.spacing spacing.tiny
+            , E.padding spacing.small
+            ]
+            { onChange = UpdateStrokeLineCap
+            , selected = Just model.strokeLineCap
+            , label = Input.labelLeft [] (E.text "Stroke linecap is ")
+            , options =
+                [ Input.option StrokeLineCapRound (E.text "Round")
+                , Input.option StrokeLineCapSquare (E.text "Square")
+                ]
+            }
         ]
 
 
 editor : Model -> E.Element Msg
-editor ({ activeComponentId, selectedChar, chars, simpleCharSvgs, boxUnits, unitSize, borderUnits, strokeWidth, isAspectRatioLocked } as model) =
+editor ({ activeComponentId, selectedChar, chars, simpleCharSvgs, boxUnits, unitSize, borderUnits, strokeWidth, strokeLineCap, isAspectRatioLocked } as model) =
     let
         dropId =
             DragDrop.getDropId model.dragDropChar
@@ -1173,6 +1206,7 @@ editor ({ activeComponentId, selectedChar, chars, simpleCharSvgs, boxUnits, unit
                             , simpleCharSvgs = simpleCharSvgs
                             , activeComponentId = activeComponentId
                             , strokeWidth = strokeWidth
+                            , strokeLineCap = strokeLineCap
                             , isThumbnail = False
                             , isAspectRatioLocked = isAspectRatioLocked
                             }
@@ -1357,7 +1391,7 @@ charPanel myCharType ({ boxUnits, thumbnailUnitSize } as model) =
 
 
 charCard : Model -> MyChar -> E.Element Msg
-charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, borderUnits, strokeWidth, simpleCharSvgs, selectedChar, isAspectRatioLocked } myChar =
+charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, simpleCharSvgs, selectedChar, isAspectRatioLocked } myChar =
     let
         char =
             charFromMyChar myChar
@@ -1400,6 +1434,7 @@ charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, bord
                 , boxUnits = boxUnits
                 , borderUnits = borderUnits
                 , strokeWidth = strokeWidth * toFloat thumbnailUnitSize / toFloat unitSize
+                , strokeLineCap = strokeLineCap
                 , chars = chars
                 , simpleCharSvgs = simpleCharSvgs
                 , activeComponentId =
@@ -1448,6 +1483,7 @@ renderChar :
     , boxUnits : Int
     , borderUnits : Int
     , strokeWidth : Float
+    , strokeLineCap : StrokeLineCap
     , chars : Dict Char MyChar
     , simpleCharSvgs : SimpleCharSvgs
     , activeComponentId : Maybe Id
@@ -1455,7 +1491,7 @@ renderChar :
     }
     -> MyChar
     -> Svg Msg
-renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, chars, simpleCharSvgs, activeComponentId, isAspectRatioLocked } myChar =
+renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, chars, simpleCharSvgs, activeComponentId, isAspectRatioLocked } myChar =
     let
         size =
             toFloat ((boxUnits - 2 * borderUnits) * unitSize) - strokeWidth
@@ -1479,12 +1515,20 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, chars, s
                         ++ """ * {
                         fill: none;
                         stroke: #000;
-                        stroke-linecap: round;
+                        stroke-linecap: """
+                        ++ (case strokeLineCap of
+                                StrokeLineCapRound ->
+                                    "round"
+
+                                StrokeLineCapSquare ->
+                                    "square"
+                           )
+                        ++ """!important;
                         stroke-miterlimit: 10;
                         stroke-width: """
                         ++ String.fromFloat strokeWidth
                         ++ """ !important;
-                        stroke-linejoin: round;
+                        stroke-linejoin: round !important;
                         vector-effect: non-scaling-stroke;
                     }
                     #active-component-border {
