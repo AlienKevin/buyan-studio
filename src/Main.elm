@@ -468,7 +468,7 @@ onDragBy delta ({ activeComponentId, activeScale, boxUnits, unitSize, chars, isA
                     Dict.update
                         selectedChar
                         (Maybe.map
-                            (updateComponent <|
+                            (updateMyCharComponent <|
                                 let
                                     factor =
                                         100 / toFloat (boxUnits * unitSize)
@@ -529,24 +529,24 @@ onDragBy delta ({ activeComponentId, activeScale, boxUnits, unitSize, chars, isA
                                     (Maybe.withDefault -1 activeComponentId)
                                     (case activeScale of
                                         NoScale ->
-                                            updatePosition
+                                            updateMyCharRefPosition
                                                 (Vector2.add <| Vector2.scale factor delta)
 
                                         ScaleTopLeft ->
-                                            updateDimension (Vector2.add (offsetDimension -1 -1))
-                                                << updatePosition (Vector2.add (offsetPosition 1 1))
+                                            updateMyCharRefDimension (Vector2.add (offsetDimension -1 -1))
+                                                << updateMyCharRefPosition (Vector2.add (offsetPosition 1 1))
 
                                         ScaleTopRight ->
-                                            updateDimension (Vector2.add (offsetDimension 1 -1))
-                                                << updatePosition (Vector2.add (offsetPosition 0 1))
+                                            updateMyCharRefDimension (Vector2.add (offsetDimension 1 -1))
+                                                << updateMyCharRefPosition (Vector2.add (offsetPosition 0 1))
 
                                         ScaleBottomLeft ->
-                                            updateDimension (Vector2.add (offsetDimension -1 1))
-                                                << updatePosition (Vector2.add (offsetPosition 1 0))
+                                            updateMyCharRefDimension (Vector2.add (offsetDimension -1 1))
+                                                << updateMyCharRefPosition (Vector2.add (offsetPosition 1 0))
 
                                         ScaleBottomRight ->
-                                            updateDimension (Vector2.add (offsetDimension 1 1))
-                                                << updatePosition (Vector2.add (offsetPosition 0 0))
+                                            updateMyCharRefDimension (Vector2.add (offsetDimension 1 1))
+                                                << updateMyCharRefPosition (Vector2.add (offsetPosition 0 0))
                                     )
                             )
                         )
@@ -611,16 +611,23 @@ dragDropChar msg_ model =
 addComponentToMyChar : Dict Char MyChar -> Char -> MyChar -> MyChar
 addComponentToMyChar chars componentChar myChar =
     case myChar of
+        -- impossible
         SimpleChar _ ->
             myChar
 
         CompoundChar compoundChar components ->
             let
                 dimension =
-                    Vector2.vec2 50 50
+                    case Dict.get componentChar chars of
+                        Just component ->
+                            Vector2.scale 0.5 <| .dimension (calculateMyCharDimension component)
+
+                        -- impossible
+                        Nothing ->
+                            Vector2.vec2 50 50
 
                 position =
-                    Vector2.vec2 25 25
+                    calculateCenterPosition dimension
 
                 id =
                     List.length components
@@ -635,6 +642,87 @@ addComponentToMyChar chars componentChar myChar =
             CompoundChar
                 compoundChar
                 (components ++ [ newComponent ])
+
+
+calculateCenterPosition : Vec2 -> Vec2
+calculateCenterPosition dimension =
+    Vector2.scale 0.5 <|
+        Vector2.sub (Vector2.vec2 100 100) dimension
+
+
+calculateMyCharDimension : MyChar -> { position : Vec2, dimension : Vec2 }
+calculateMyCharDimension myChar =
+    case myChar of
+        SimpleChar { dimension } ->
+            { position = Vector2.vec2 0 0
+            , dimension = dimension
+            }
+
+        CompoundChar _ components ->
+            (\{ minX, minY, maxX, maxY } ->
+                let
+                    _ =
+                        Debug.log "minX" minX
+
+                    _ =
+                        Debug.log "maxX" maxX
+
+                    _ =
+                        Debug.log "minY" minY
+
+                    _ =
+                        Debug.log "maxY" maxY
+                in
+                { position =
+                    Vector2.vec2 minX minY
+                , dimension =
+                    Vector2.vec2 (maxX - minX) (maxY - minY)
+                }
+            )
+            <|
+                List.foldl
+                    (\current extreme ->
+                        { minX =
+                            min current.minX extreme.minX
+                        , minY =
+                            min current.minY extreme.minY
+                        , maxX =
+                            max current.maxX extreme.maxX
+                        , maxY =
+                            max current.maxY extreme.maxY
+                        }
+                    )
+                    { minX = 100
+                    , minY = 100
+                    , maxX = 0
+                    , maxY = 0
+                    }
+                <|
+                    List.map
+                        (\{ char, position, dimension } ->
+                            let
+                                _ =
+                                    Debug.log "char" char
+
+                                _ =
+                                    Debug.log "topLeftPoint" topLeftPoint
+
+                                _ =
+                                    Debug.log "bottomRightPoint" bottomRightPoint
+
+                                topLeftPoint =
+                                    position
+
+                                bottomRightPoint =
+                                    Vector2.add position dimension
+                            in
+                            { minX = Vector2.getX topLeftPoint
+                            , minY = Vector2.getY topLeftPoint
+                            , maxX = Vector2.getX bottomRightPoint
+                            , maxY = Vector2.getY bottomRightPoint
+                            }
+                        )
+                        components
 
 
 closePopUp : Model -> ( Model, Cmd Msg )
@@ -750,8 +838,7 @@ getSimpleChars svgsJson model =
                                             fullDimension
 
                                 position =
-                                    Vector2.scale 0.5 <|
-                                        Vector2.sub fullDimension dimension
+                                    calculateCenterPosition dimension
                             in
                             Dict.insert
                                 char
@@ -805,8 +892,8 @@ addChar myCharType model =
             )
 
 
-updateComponent : (List MyCharRef -> List MyCharRef) -> MyChar -> MyChar
-updateComponent func myChar =
+updateMyCharComponent : (List MyCharRef -> List MyCharRef) -> MyChar -> MyChar
+updateMyCharComponent func myChar =
     case myChar of
         SimpleChar _ ->
             myChar
@@ -815,16 +902,35 @@ updateComponent func myChar =
             CompoundChar c (func components)
 
 
-updatePosition : (Vec2 -> Vec2) -> MyCharRef -> MyCharRef
-updatePosition func myCharRef =
+updateMyCharRefPosition : (Vec2 -> Vec2) -> MyCharRef -> MyCharRef
+updateMyCharRefPosition func myCharRef =
     { myCharRef
         | position =
             func myCharRef.position
     }
 
 
-updateDimension : (Vec2 -> Vec2) -> MyCharRef -> MyCharRef
-updateDimension func myCharRef =
+updateMyCharDimension : (Vec2 -> Vec2) -> MyChar -> MyChar
+updateMyCharDimension func myChar =
+    case myChar of
+        SimpleChar c ->
+            SimpleChar
+                { c
+                    | dimension =
+                        func c.dimension
+                }
+
+        CompoundChar c components ->
+            CompoundChar
+                { c
+                    | dimension =
+                        func c.dimension
+                }
+                components
+
+
+updateMyCharRefDimension : (Vec2 -> Vec2) -> MyCharRef -> MyCharRef
+updateMyCharRefDimension func myCharRef =
     { myCharRef
         | dimension =
             func myCharRef.dimension
@@ -1419,6 +1525,8 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, chars, s
                 , activeComponentId = activeComponentId
                 , isThumbnail = isThumbnail
                 , isAspectRatioLocked = isAspectRatioLocked
+                , tightDimension =
+                    { position = Vector2.vec2 0 0, dimension = Vector2.vec2 100 100 }
                 }
                 0
                 myChar
@@ -1434,11 +1542,12 @@ renderCharHelper :
     , activeComponentId : Maybe Id
     , isThumbnail : Bool
     , isAspectRatioLocked : Bool
+    , tightDimension : { position : Vec2, dimension : Vec2 }
     }
     -> Int
     -> MyChar
     -> Svg Msg
-renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId, isThumbnail, isAspectRatioLocked } level myChar =
+renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId, isThumbnail, isAspectRatioLocked, tightDimension } level myChar =
     let
         id =
             getId myChar
@@ -1450,11 +1559,15 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
             isThumbnail || level > 1
 
         constraint dimension position contents =
+            let
+                tightPosition =
+                    Vector2.sub position tightDimension.position
+            in
             Svg.svg
-                ([ SvgAttributes.x <| SvgTypes.Percent <| Vector2.getX position
-                 , SvgAttributes.y <| SvgTypes.Percent <| Vector2.getY position
-                 , SvgAttributes.width <| SvgTypes.Percent <| Vector2.getX dimension
-                 , SvgAttributes.height <| SvgTypes.Percent <| Vector2.getY dimension
+                ([ SvgAttributes.x <| SvgTypes.Percent <| 100 / Vector2.getX tightDimension.dimension * Vector2.getX tightPosition
+                 , SvgAttributes.y <| SvgTypes.Percent <| 100 / Vector2.getY tightDimension.dimension * Vector2.getY tightPosition
+                 , SvgAttributes.width <| SvgTypes.Percent <| 100 / Vector2.getX tightDimension.dimension * Vector2.getX dimension
+                 , SvgAttributes.height <| SvgTypes.Percent <| 100 / Vector2.getY tightDimension.dimension * Vector2.getY dimension
                  ]
                     ++ (if isDraggable then
                             []
@@ -1494,7 +1607,7 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
                     -- impossible
                     TypedSvg.Core.text <| "Error rendering " ++ String.fromChar char
 
-        CompoundChar { char, dimension, position } components ->
+        CompoundChar ({ char, dimension, position } as compoundChar) components ->
             constraint dimension position <|
                 List.map
                     (renderCharHelper
@@ -1505,6 +1618,11 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
                         , activeComponentId = activeComponentId
                         , isThumbnail = isThumbnail
                         , isAspectRatioLocked = isAspectRatioLocked
+                        , tightDimension =
+                            if level >= 1 then
+                                calculateMyCharDimension myChar
+                            else
+                                { position = Vector2.vec2 0 0, dimension = Vector2.vec2 100 100 }
                         }
                         (level + 1)
                         << myCharFromMyCharRef chars
