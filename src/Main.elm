@@ -74,6 +74,7 @@ type alias Model =
     , activeComponentId : Maybe Id
     , activeScale : Scale
     , isAspectRatioLocked : Bool
+    , isSnapComponentToGrid : Bool
     }
 
 
@@ -162,6 +163,7 @@ init _ =
       , activeComponentId = Nothing
       , activeScale = NoScale
       , isAspectRatioLocked = True
+      , isSnapComponentToGrid = True
       }
     , Cmd.none
     )
@@ -406,8 +408,8 @@ gotModel savedModelJson model =
 
         Err err ->
             -- let
-                -- _ =
-                --     Debug.log "err" err
+            -- _ =
+            --     Debug.log "err" err
             -- in
             model
     , Cmd.none
@@ -527,7 +529,7 @@ type OffsetType
 
 
 onDragBy : Vec2 -> Model -> ( Model, Cmd Msg )
-onDragBy delta ({ activeComponentId, activeScale, boxUnits, unitSize, chars, isAspectRatioLocked } as model) =
+onDragBy delta ({ activeComponentId, activeScale, boxUnits, borderUnits, unitSize, chars, isAspectRatioLocked } as model) =
     ( { model
         | chars =
             case model.selectedChar of
@@ -735,13 +737,10 @@ calculateMyCharDimension myChar =
                 -- let
                 --     _ =
                 --         Debug.log "minX" minX
-
                 --     _ =
                 --         Debug.log "maxX" maxX
-
                 --     _ =
                 --         Debug.log "minY" minY
-
                 --     _ =
                 --         Debug.log "maxY" maxY
                 -- in
@@ -775,13 +774,10 @@ calculateMyCharDimension myChar =
                             let
                                 -- _ =
                                 --     Debug.log "char" char
-
                                 -- _ =
                                 --     Debug.log "topLeftPoint" topLeftPoint
-
                                 -- _ =
                                 --     Debug.log "bottomRightPoint" bottomRightPoint
-
                                 topLeftPoint =
                                     position
 
@@ -897,10 +893,8 @@ getSimpleChars svgsJson model =
 
                                                 -- _ =
                                                 --     Debug.log "width" width
-
                                                 -- _ =
                                                 --     Debug.log "height" height
-
                                                 f =
                                                     lerp 0 (max width height) 0 100
                                             in
@@ -980,6 +974,20 @@ updateMyCharRefPosition func myCharRef =
         | position =
             func myCharRef.position
     }
+
+
+snapToGrid : Int -> Int -> Vec2 -> Vec2
+snapToGrid boxUnits borderUnits position =
+    let
+        unitPercent =
+            100 / toFloat (boxUnits - borderUnits * 2)
+
+        roundToGrid pos =
+            (*) unitPercent <| toFloat <| round <| pos / unitPercent
+    in
+    Vector2.vec2
+        (roundToGrid <| Vector2.getX position)
+        (roundToGrid <| Vector2.getY position)
 
 
 updateMyCharDimension : (Vec2 -> Vec2) -> MyChar -> MyChar
@@ -1343,7 +1351,7 @@ radioOption optionLabel status =
 
 
 editor : Model -> E.Element Msg
-editor ({ activeComponentId, selectedChar, chars, simpleCharSvgs, boxUnits, unitSize, borderUnits, strokeWidth, strokeLineCap, isAspectRatioLocked } as model) =
+editor ({ activeComponentId, selectedChar, chars, simpleCharSvgs, boxUnits, unitSize, borderUnits, strokeWidth, strokeLineCap, isAspectRatioLocked, isSnapComponentToGrid } as model) =
     let
         dropId =
             DragDrop.getDropId model.dragDropChar
@@ -1380,6 +1388,7 @@ editor ({ activeComponentId, selectedChar, chars, simpleCharSvgs, boxUnits, unit
                             , strokeLineCap = strokeLineCap
                             , isThumbnail = False
                             , isAspectRatioLocked = isAspectRatioLocked
+                            , isSnapComponentToGrid = isSnapComponentToGrid
                             }
                             (Maybe.withDefault emptyMyChar <|
                                 -- impossible
@@ -1548,7 +1557,7 @@ charPanel myCharType ({ boxUnits, thumbnailUnitSize } as model) =
 
 
 charCard : Model -> MyChar -> E.Element Msg
-charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, simpleCharSvgs, selectedChar, isAspectRatioLocked } myChar =
+charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, simpleCharSvgs, selectedChar, isAspectRatioLocked, isSnapComponentToGrid } myChar =
     let
         char =
             charFromMyChar myChar
@@ -1632,6 +1641,7 @@ charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, bord
                         selectedChar
                 , isThumbnail = True
                 , isAspectRatioLocked = isAspectRatioLocked
+                , isSnapComponentToGrid = isSnapComponentToGrid
                 }
                 myChar
         ]
@@ -1671,10 +1681,11 @@ renderChar :
     , simpleCharSvgs : SimpleCharSvgs
     , activeComponentId : Maybe Id
     , isAspectRatioLocked : Bool
+    , isSnapComponentToGrid : Bool
     }
     -> MyChar
     -> Svg Msg
-renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, chars, simpleCharSvgs, activeComponentId, isAspectRatioLocked } myChar =
+renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, chars, simpleCharSvgs, activeComponentId, isAspectRatioLocked, isSnapComponentToGrid } myChar =
     let
         size =
             toFloat ((boxUnits - 2 * borderUnits) * unitSize) - strokeWidth
@@ -1752,6 +1763,15 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLi
                 , activeComponentId = activeComponentId
                 , isThumbnail = isThumbnail
                 , isAspectRatioLocked = isAspectRatioLocked
+                , isSnapComponentToGrid =
+                    isSnapComponentToGrid
+                        && (case myChar of
+                                CompoundChar _ _ ->
+                                    True
+
+                                SimpleChar _ ->
+                                    False
+                           )
                 , tightDimension =
                     { position = Vector2.vec2 0 0, dimension = Vector2.vec2 100 100 }
                 }
@@ -1769,12 +1789,13 @@ renderCharHelper :
     , activeComponentId : Maybe Id
     , isThumbnail : Bool
     , isAspectRatioLocked : Bool
+    , isSnapComponentToGrid : Bool
     , tightDimension : { position : Vec2, dimension : Vec2 }
     }
     -> Int
     -> MyChar
     -> Svg Msg
-renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId, isThumbnail, isAspectRatioLocked, tightDimension } level myChar =
+renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId, isThumbnail, isAspectRatioLocked, isSnapComponentToGrid, tightDimension } level myChar =
     let
         id =
             getId myChar
@@ -1788,7 +1809,14 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
         constraint dimension position contents =
             let
                 tightPosition =
-                    Vector2.sub position tightDimension.position
+                    (if isSnapComponentToGrid then
+                        snapToGrid boxUnits 1
+
+                     else
+                        identity
+                    )
+                    <|
+                        Vector2.sub position tightDimension.position
             in
             Svg.svg
                 ([ SvgAttributes.x <| SvgTypes.Percent <| 100 / Vector2.getX tightDimension.dimension * Vector2.getX tightPosition
@@ -1840,6 +1868,7 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
                         , activeComponentId = activeComponentId
                         , isThumbnail = isThumbnail
                         , isAspectRatioLocked = isAspectRatioLocked
+                        , isSnapComponentToGrid = isSnapComponentToGrid
                         , tightDimension =
                             if level >= 1 then
                                 calculateMyCharDimension myChar
