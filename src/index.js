@@ -28,7 +28,7 @@ app.ports.addSimpleCharsPort.subscribe(function () {
   };
   fileOpen(options)
     .then(function (files) {
-      console.log(files);
+      // console.log(files);
       localforage.getItem(simpleCharSvgsStorageKey, function (error, simpleCharSvgs) {
         if (error !== null) {
           console.error("Error getting saved simpleCharSvgs: ", error);
@@ -73,12 +73,12 @@ app.ports.deleteSimpleCharPort.subscribe(function(char) {
 });
 
 app.ports.saveModelPort.subscribe(function (model) {
-  console.log("Saving model: ", model);
+  // console.log("Saving model: ", model);
   localforage.setItem(modelStorageKey, model, function (error) {
     if (error !== null) {
       console.error("error saving model: ", error);
     } else {
-      console.log("Successfully saved model!");
+      // console.log("Successfully saved model!");
     }
   });
 });
@@ -87,7 +87,7 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
   if (error !== null) {
     console.error("Error getting saved model: ", error);
   }
-  console.log("Getting saved model: ", savedModelJson);
+  // console.log("Getting saved model: ", savedModelJson);
   app.ports.getModelPort.send(savedModelJson);
 });
 
@@ -95,7 +95,7 @@ localforage.getItem(simpleCharSvgsStorageKey, function (error, savedSimpleCharSv
   if (error !== null) {
     console.error("Error getting saved simpleCharSvgs: ", error);
   }
-  console.log("Getting saved simpleCharSvgs: ", savedSimpleCharSvgs);
+  // console.log("Getting saved simpleCharSvgs: ", savedSimpleCharSvgs);
   app.ports.getSimpleCharsPort.send(savedSimpleCharSvgs);
 });
 
