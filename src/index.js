@@ -36,12 +36,14 @@ app.ports.addSimpleCharsPort.subscribe(function () {
         if (simpleCharSvgs === null) {
           simpleCharSvgs = {};
         }
+        var numberOfNewCharsAdded = 0;
         Array.from(files).forEach(function (file) {
           var reader = new FileReader();
           reader.addEventListener('load', function (event) {
             var char = file.name.slice(0, -(".svg".length));
             simpleCharSvgs[char] = event.target.result;
-            if (Object.keys(simpleCharSvgs).length === files.length) {
+            numberOfNewCharsAdded += 1;
+            if (numberOfNewCharsAdded === files.length) {
               app.ports.getSimpleCharsPort.send(simpleCharSvgs);
               localforage.setItem(simpleCharSvgsStorageKey, simpleCharSvgs, function (error) {
                 if (error !== null) {
