@@ -1817,12 +1817,24 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
                     )
                     <|
                         Vector2.sub position tightDimension.position
+
+                snappedTightDimension =
+                    (if isSnapComponentToGrid then
+                        snapToGrid boxUnits 1
+
+                     else
+                        identity
+                    )
+                    <|
+                        Vector2.vec2
+                            (100 / Vector2.getX tightDimension.dimension * Vector2.getX dimension)
+                            (100 / Vector2.getY tightDimension.dimension * Vector2.getY dimension)
             in
             Svg.svg
                 ([ SvgAttributes.x <| SvgTypes.Percent <| 100 / Vector2.getX tightDimension.dimension * Vector2.getX tightPosition
                  , SvgAttributes.y <| SvgTypes.Percent <| 100 / Vector2.getY tightDimension.dimension * Vector2.getY tightPosition
-                 , SvgAttributes.width <| SvgTypes.Percent <| 100 / Vector2.getX tightDimension.dimension * Vector2.getX dimension
-                 , SvgAttributes.height <| SvgTypes.Percent <| 100 / Vector2.getY tightDimension.dimension * Vector2.getY dimension
+                 , SvgAttributes.width <| SvgTypes.Percent <| Vector2.getX snappedTightDimension
+                 , SvgAttributes.height <| SvgTypes.Percent <| Vector2.getY snappedTightDimension
                  ]
                     ++ dragTrigger isDraggable ( levelwiseId, NoScale )
                 )
