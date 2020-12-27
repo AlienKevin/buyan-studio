@@ -61,8 +61,8 @@ type alias Model =
     , simpleCharSvgs : SimpleCharSvgs
     , boxUnits : Int
     , borderUnits : Int
-    , unitSize : Int
-    , thumbnailUnitSize : Int
+    , unitSize : Float
+    , thumbnailUnitSize : Float
     , strokeWidth : Float
     , strokeLineCap : StrokeLineCap
     , popUp : PopUp
@@ -75,6 +75,7 @@ type alias Model =
     , activeScale : Scale
     , isAspectRatioLocked : Bool
     , isSnapComponentToGrid : Bool
+    , paragraphForPreview : String
     }
 
 
@@ -140,6 +141,7 @@ type alias SimpleCharSvg =
 type PopUp
     = AddCompoundCharPopUp
     | ConfirmDeleteSelectedCharPopUp
+    | PreviewInParagraphPopUp
     | NoPopUp
 
 
@@ -164,6 +166,7 @@ init _ =
       , activeScale = NoScale
       , isAspectRatioLocked = True
       , isSnapComponentToGrid = True
+      , paragraphForPreview = ""
       }
     , Cmd.none
     )
@@ -195,6 +198,8 @@ type Msg
     | UpdateStrokeWidth Float
     | UpdateStrokeLineCap StrokeLineCap
     | ToggleIsAspectRatioLocked
+    | PreviewInParagraph
+    | UpdateParagraphForPreview String
 
 
 dragConfig : Draggable.Config ( Id, Scale ) Msg
@@ -271,6 +276,32 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as mod
 
         ToggleIsAspectRatioLocked ->
             toggleIsAspectRatioLocked model
+
+        PreviewInParagraph ->
+            previewInParagraph model
+
+        UpdateParagraphForPreview paragraph ->
+            updateParagraphForPreview paragraph model
+
+
+updateParagraphForPreview : String -> Model -> ( Model, Cmd Msg )
+updateParagraphForPreview paragraph model =
+    ( { model
+        | paragraphForPreview =
+            paragraph
+      }
+    , Cmd.none
+    )
+
+
+previewInParagraph : Model -> ( Model, Cmd Msg )
+previewInParagraph model =
+    ( { model
+        | popUp =
+            PreviewInParagraphPopUp
+      }
+    , Cmd.none
+    )
 
 
 requestDeleteSelectedChar : Model -> ( Model, Cmd Msg )
@@ -540,7 +571,7 @@ onDragBy delta ({ activeComponentId, activeScale, boxUnits, borderUnits, unitSiz
                             (updateMyCharComponent <|
                                 let
                                     factor =
-                                        100 / toFloat (boxUnits * unitSize)
+                                        100 / (toFloat boxUnits * unitSize)
 
                                     deltaX =
                                         Vector2.getX delta
@@ -1057,9 +1088,28 @@ view model =
             , E.column
                 [ E.spacing spacing.medium ]
                 [ editor model
-                , preferences model
+                , E.row
+                    [ E.width E.fill
+                    , E.height E.fill
+                    , E.spacing spacing.medium
+                    ]
+                    [ preferences model
+                    , export model
+                    ]
                 ]
             ]
+
+
+export : Model -> E.Element Msg
+export model =
+    E.column
+        [ E.spacing spacing.small
+        , E.alignTop
+        ]
+        [ E.el [ Font.size fontSize.title ] <|
+            E.text "Export"
+        , textButton "Preview in Paragraph" (Just PreviewInParagraph)
+        ]
 
 
 popUp : Model -> E.Element Msg
@@ -1071,8 +1121,100 @@ popUp model =
         ConfirmDeleteSelectedCharPopUp ->
             confirmDeleteSelectedCharPopUp model
 
+        PreviewInParagraphPopUp ->
+            previewInParagraphPopUp model
+
         NoPopUp ->
             E.none
+
+
+previewInParagraphPopUp : Model -> E.Element Msg
+previewInParagraphPopUp model =
+    let
+        previewFontSize =
+            fontSize.title * 2
+    in
+    E.column
+        [ E.centerX
+        , E.centerY
+        , Background.color palette.lightBg
+        , E.width E.fill
+        , E.height E.fill
+        , E.spacing spacing.medium
+        , E.padding spacing.large
+        , Font.size fontSize.medium
+        ]
+        [ E.el
+            [ E.centerX ]
+            (E.text "Paragraph")
+        , E.el
+            [ E.centerX
+            , E.width (E.fill |> E.maximum (fontSize.medium * 30))
+            , E.height <| E.fillPortion 1
+            , E.scrollbarY
+            ]
+            (Input.multiline
+                [ E.width <| E.fill
+                , E.height <| E.fill
+                ]
+                { onChange =
+                    UpdateParagraphForPreview
+                , text =
+                    model.paragraphForPreview
+                , placeholder =
+                    Nothing
+                , label =
+                    Input.labelHidden "Enter Paragraph Here"
+                , spellcheck =
+                    False
+                }
+            )
+        , E.el
+            [ E.width <| E.fillPortion 2
+            , E.height <| E.fillPortion 2
+            , Font.size <| round previewFontSize
+            , E.scrollbarY
+            ]
+            (renderPreviewInParagraph previewFontSize model)
+        ]
+
+
+renderPreviewInParagraph : Float -> Model -> E.Element Msg
+renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, simpleCharSvgs, activeComponentId, isAspectRatioLocked, isSnapComponentToGrid } as model) =
+    let
+        charsForPreview =
+            String.toList paragraphForPreview
+    in
+    E.wrappedRow
+        []
+    <|
+        List.map
+            (\char ->
+                case Dict.get char chars of
+                    Just myChar ->
+                        E.html <|
+                            renderChar
+                                { unitSize = displayFontSize / toFloat boxUnits
+                                , boxUnits = boxUnits
+                                , borderUnits = borderUnits
+                                , chars = chars
+                                , simpleCharSvgs = simpleCharSvgs
+                                , activeComponentId = activeComponentId
+                                , strokeWidth = strokeWidth * displayFontSize / (toFloat boxUnits * unitSize)
+                                , strokeLineCap = strokeLineCap
+                                , isThumbnail = True
+                                , isAspectRatioLocked = isAspectRatioLocked
+                                , isSnapComponentToGrid = isSnapComponentToGrid
+                                }
+                                myChar
+
+                    Nothing ->
+                        if char == '\n' || char == '\r' then
+                            E.html <| Html.div [ Html.Attributes.style "width" "100%" ] []
+                        else
+                            E.text <| String.fromChar char
+            )
+            charsForPreview
 
 
 confirmDeleteSelectedCharPopUp : Model -> E.Element Msg
@@ -1085,8 +1227,8 @@ confirmDeleteSelectedCharPopUp { activeComponentId, boxUnits, thumbnailUnitSize,
         ([ E.centerX
          , E.centerY
          , Background.color palette.lightBg
-         , E.width <| E.px <| boxUnits * thumbnailUnitSize + 3 * borderWidth
-         , E.height <| E.px <| boxUnits * thumbnailUnitSize + fontSize.title + 3 * borderWidth
+         , E.width <| E.px <| round <| toFloat boxUnits * thumbnailUnitSize + 3 * borderWidth
+         , E.height <| E.px <| round <| toFloat boxUnits * thumbnailUnitSize + fontSize.title + 3 * borderWidth
          , E.spaceEvenly
          , E.padding spacing.small
          , Font.size fontSize.medium
@@ -1156,8 +1298,8 @@ addCompoundCharPopUp { activeComponentId, boxUnits, thumbnailUnitSize, newCompou
         ([ E.centerX
          , E.centerY
          , Background.color palette.lightBg
-         , E.width <| E.px <| boxUnits * thumbnailUnitSize + 3 * borderWidth
-         , E.height <| E.px <| boxUnits * thumbnailUnitSize + fontSize.title + 3 * borderWidth
+         , E.width <| E.px <| round <| toFloat boxUnits * thumbnailUnitSize + 3 * borderWidth
+         , E.height <| E.px <| round <| toFloat boxUnits * thumbnailUnitSize + fontSize.title + 3 * borderWidth
          , E.spacing spacing.small
          , Font.size fontSize.medium
          , E.inFront <|
@@ -1409,16 +1551,16 @@ editor ({ activeComponentId, selectedChar, chars, simpleCharSvgs, boxUnits, unit
 gridBackground :
     { boxUnits : Int
     , borderUnits : Int
-    , unitSize : Int
+    , unitSize : Float
     }
     -> Svg Msg
 gridBackground { boxUnits, borderUnits, unitSize } =
     let
         boxSize =
-            boxUnits * unitSize
+            toFloat boxUnits * unitSize
 
         borderSize =
-            borderUnits * unitSize
+            toFloat borderUnits * unitSize
 
         strokeWidth =
             { normal =
@@ -1428,8 +1570,8 @@ gridBackground { boxUnits, borderUnits, unitSize } =
             }
     in
     Svg.svg
-        [ SvgAttributes.width <| SvgTypes.px <| toFloat <| boxSize
-        , SvgAttributes.height <| SvgTypes.px <| toFloat <| boxSize
+        [ SvgAttributes.width <| SvgTypes.px <| boxSize
+        , SvgAttributes.height <| SvgTypes.px <| boxSize
         , SvgAttributes.stroke <| SvgTypes.Paint <| Color.lightBlue
         ]
     <|
@@ -1460,17 +1602,17 @@ gridBackground { boxUnits, borderUnits, unitSize } =
                             []
                         )
                         [ Svg.line
-                            [ SvgAttributes.x1 <| SvgTypes.px <| toFloat <| (2 + units) * unitSize
-                            , SvgAttributes.y1 <| SvgTypes.px <| toFloat <| unitSize
-                            , SvgAttributes.x2 <| SvgTypes.px <| toFloat <| (2 + units) * unitSize
-                            , SvgAttributes.y2 <| SvgTypes.px <| toFloat <| (boxUnits - 1) * unitSize
+                            [ SvgAttributes.x1 <| SvgTypes.px <| toFloat (2 + units) * unitSize
+                            , SvgAttributes.y1 <| SvgTypes.px <| unitSize
+                            , SvgAttributes.x2 <| SvgTypes.px <| toFloat (2 + units) * unitSize
+                            , SvgAttributes.y2 <| SvgTypes.px <| toFloat (boxUnits - 1) * unitSize
                             ]
                             []
                         , Svg.line
-                            [ SvgAttributes.x1 <| SvgTypes.px <| toFloat <| unitSize
-                            , SvgAttributes.y1 <| SvgTypes.px <| toFloat <| (2 + units) * unitSize
-                            , SvgAttributes.x2 <| SvgTypes.px <| toFloat <| (boxUnits - 1) * unitSize
-                            , SvgAttributes.y2 <| SvgTypes.px <| toFloat <| (2 + units) * unitSize
+                            [ SvgAttributes.x1 <| SvgTypes.px <| unitSize
+                            , SvgAttributes.y1 <| SvgTypes.px <| toFloat (2 + units) * unitSize
+                            , SvgAttributes.x2 <| SvgTypes.px <| toFloat (boxUnits - 1) * unitSize
+                            , SvgAttributes.y2 <| SvgTypes.px <| toFloat (2 + units) * unitSize
                             ]
                             []
                         ]
@@ -1478,13 +1620,13 @@ gridBackground { boxUnits, borderUnits, unitSize } =
                 (List.range 0 (boxUnits - 4))
 
 
-gridOutline : { x : Int, y : Int, strokeWidth : Float, size : Int } -> Svg Msg
+gridOutline : { x : Float, y : Float, strokeWidth : Float, size : Float } -> Svg Msg
 gridOutline { x, y, strokeWidth, size } =
     Svg.rect
-        [ SvgAttributes.width <| SvgTypes.px <| toFloat size
-        , SvgAttributes.height <| SvgTypes.px <| toFloat size
-        , SvgAttributes.x <| SvgTypes.px <| toFloat x
-        , SvgAttributes.y <| SvgTypes.px <| toFloat y
+        [ SvgAttributes.width <| SvgTypes.px <| size
+        , SvgAttributes.height <| SvgTypes.px <| size
+        , SvgAttributes.x <| SvgTypes.px <| x
+        , SvgAttributes.y <| SvgTypes.px <| y
         , SvgAttributes.fill <| SvgTypes.PaintNone
         , SvgAttributes.strokeWidth <| SvgTypes.px strokeWidth
         ]
@@ -1563,7 +1705,7 @@ charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, bord
             charFromMyChar myChar
     in
     E.column
-        (([ E.width <| E.px <| boxUnits * thumbnailUnitSize
+        (([ E.width <| E.px <| round <| toFloat boxUnits * thumbnailUnitSize
           , Background.color palette.lightBg
           , Border.rounded spacing.medium
           , Events.onClick <| SelectChar myChar
@@ -1625,7 +1767,7 @@ charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, bord
                 { unitSize = thumbnailUnitSize
                 , boxUnits = boxUnits
                 , borderUnits = borderUnits
-                , strokeWidth = strokeWidth * toFloat thumbnailUnitSize / toFloat unitSize
+                , strokeWidth = strokeWidth * thumbnailUnitSize / unitSize
                 , strokeLineCap = strokeLineCap
                 , chars = chars
                 , simpleCharSvgs = simpleCharSvgs
@@ -1672,7 +1814,7 @@ isMyCharType myCharType myChar =
 
 renderChar :
     { isThumbnail : Bool
-    , unitSize : Int
+    , unitSize : Float
     , boxUnits : Int
     , borderUnits : Int
     , strokeWidth : Float
@@ -1688,17 +1830,17 @@ renderChar :
 renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, chars, simpleCharSvgs, activeComponentId, isAspectRatioLocked, isSnapComponentToGrid } myChar =
     let
         size =
-            toFloat ((boxUnits - 2 * borderUnits) * unitSize) - strokeWidth
+            (toFloat (boxUnits - 2 * borderUnits) * unitSize) - strokeWidth
 
         offset =
-            toFloat (borderUnits * unitSize) + strokeWidth / 2
+            (toFloat borderUnits * unitSize) + strokeWidth / 2
 
         charClassName =
             "char-with-size-" ++ (String.fromInt <| round strokeWidth)
     in
     Svg.svg
-        [ SvgAttributes.width <| SvgTypes.px <| toFloat (boxUnits * unitSize)
-        , SvgAttributes.height <| SvgTypes.px <| toFloat (boxUnits * unitSize)
+        [ SvgAttributes.width <| SvgTypes.px <| toFloat boxUnits * unitSize
+        , SvgAttributes.height <| SvgTypes.px <| toFloat boxUnits * unitSize
         , SvgAttributes.class [ charClassName ]
         ]
         [ Svg.defs []
@@ -1782,7 +1924,7 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLi
 
 
 renderCharHelper :
-    { unitSize : Int
+    { unitSize : Float
     , boxUnits : Int
     , chars : Dict Char MyChar
     , simpleCharSvgs : SimpleCharSvgs
@@ -1924,12 +2066,12 @@ scaleAspectRatioLock isAspectRatioLocked =
         ]
 
 
-scaleHandle : ( Id, Scale ) -> Float -> Float -> Int -> Bool -> Svg Msg
+scaleHandle : ( Id, Scale ) -> Float -> Float -> Float -> Bool -> Svg Msg
 scaleHandle ( id, scale ) x y size isDraggable =
     Svg.circle
         ([ SvgAttributes.cx (SvgTypes.percent x)
          , SvgAttributes.cy (SvgTypes.percent y)
-         , SvgAttributes.r (SvgTypes.px <| toFloat size / 2)
+         , SvgAttributes.r (SvgTypes.px <| size / 2)
          , SvgAttributes.class [ "scale-handle" ]
          ]
             ++ dragTrigger isDraggable ( id, scale )
@@ -1989,6 +2131,21 @@ iconButton { icon, size, onPress } =
                     |> FeatherIcons.withSize size
                     |> FeatherIcons.toHtml []
                 )
+        , onPress =
+            onPress
+        }
+
+
+textButton : String -> Maybe Msg -> E.Element Msg
+textButton text onPress =
+    Input.button
+        [ Border.width 2
+        , Border.color palette.black
+        , Border.rounded fontSize.small
+        , E.padding spacing.small
+        ]
+        { label =
+            E.text text
         , onPress =
             onPress
         }
@@ -2107,6 +2264,8 @@ palette =
         toElmUiColor Color.lightPurple
     , danger =
         E.rgb255 210 99 71
+    , black =
+        toElmUiColor Color.black
     }
 
 
