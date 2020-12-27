@@ -1182,39 +1182,51 @@ previewInParagraphPopUp model =
 renderPreviewInParagraph : Float -> Model -> E.Element Msg
 renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, simpleCharSvgs, activeComponentId, isAspectRatioLocked, isSnapComponentToGrid } as model) =
     let
-        charsForPreview =
-            String.toList paragraphForPreview
+        lines =
+            String.split "\n" paragraphForPreview
     in
-    E.wrappedRow
-        []
+    E.column
+        [ E.centerX
+        , E.centerY
+        ]
     <|
         List.map
-            (\char ->
-                case Dict.get char chars of
-                    Just myChar ->
-                        E.html <|
-                            renderChar
-                                { unitSize = displayFontSize / toFloat boxUnits
-                                , boxUnits = boxUnits
-                                , borderUnits = borderUnits
-                                , chars = chars
-                                , simpleCharSvgs = simpleCharSvgs
-                                , activeComponentId = activeComponentId
-                                , strokeWidth = strokeWidth * displayFontSize / (toFloat boxUnits * unitSize)
-                                , strokeLineCap = strokeLineCap
-                                , isThumbnail = True
-                                , isAspectRatioLocked = isAspectRatioLocked
-                                , isSnapComponentToGrid = isSnapComponentToGrid
-                                }
-                                myChar
+            (E.wrappedRow
+                [ E.width E.fill
+                ]
+                << List.map
+                    (\char ->
+                        case Dict.get char chars of
+                            Just myChar ->
+                                E.html <|
+                                    renderChar
+                                        { unitSize = displayFontSize / toFloat boxUnits
+                                        , boxUnits = boxUnits
+                                        , borderUnits = borderUnits
+                                        , chars = chars
+                                        , simpleCharSvgs = simpleCharSvgs
+                                        , activeComponentId = activeComponentId
+                                        , strokeWidth = strokeWidth * displayFontSize / (toFloat boxUnits * unitSize)
+                                        , strokeLineCap = strokeLineCap
+                                        , isThumbnail = True
+                                        , isAspectRatioLocked = isAspectRatioLocked
+                                        , isSnapComponentToGrid = isSnapComponentToGrid
+                                        }
+                                        myChar
 
-                    Nothing ->
-                        if char == '\n' || char == '\r' then
-                            E.html <| Html.div [ Html.Attributes.style "width" "100%" ] []
+                            Nothing ->
+                                E.text <| String.fromChar char
+                    )
+                << (\charsInLine ->
+                        if List.isEmpty charsInLine then
+                            [ ' ' ]
+
                         else
-                            E.text <| String.fromChar char
+                            charsInLine
+                   )
+                << String.toList
             )
-            charsForPreview
+            lines
 
 
 confirmDeleteSelectedCharPopUp : Model -> E.Element Msg
