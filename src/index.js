@@ -72,6 +72,25 @@ app.ports.deleteSimpleCharPort.subscribe(function(char) {
   });
 });
 
+app.ports.downloadCharPort.subscribe(function(char) {
+  var svgData = document.getElementById("char-" + char).outerHTML;
+  //add name spaces.
+  if(!svgData.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)){
+    svgData = svgData.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+  }
+  if(!svgData.match(/^<svg[^>]+"http\:\/\/www\.w3\.org\/1999\/xlink"/)){
+    svgData = svgData.replace(/^<svg/, '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
+  }
+  var svgBlob = new Blob([svgData], {type:"image/svg+xml;charset=utf-8"});
+  var svgUrl = URL.createObjectURL(svgBlob);
+  var downloadLink = document.createElement("a");
+  downloadLink.href = svgUrl;
+  downloadLink.download = char + ".svg";
+  document.body.appendChild(downloadLink);
+  downloadLink.click();
+  document.body.removeChild(downloadLink);
+});
+
 app.ports.saveModelPort.subscribe(function (model) {
   // console.log("Saving model: ", model);
   localforage.setItem(modelStorageKey, model, function (error) {

@@ -15,7 +15,6 @@ import Element.Font as Font
 import Element.Input as Input
 import FeatherIcons
 import File exposing (File)
-import File.Select as Select
 import Html exposing (Html)
 import Html.Attributes
 import Html.Events
@@ -37,6 +36,9 @@ port addSimpleCharsPort : () -> Cmd msg
 
 
 port getSimpleCharsPort : (Encode.Value -> msg) -> Sub msg
+
+
+port downloadCharPort : String -> Cmd msg
 
 
 port saveModelPort : Value -> Cmd msg
@@ -201,6 +203,7 @@ type Msg
     | PreviewInParagraph
     | UpdateParagraphForPreview String
     | ToggleSnapToGrid
+    | DownloadSelectedChar
 
 
 dragConfig : Draggable.Config ( Id, Scale ) Msg
@@ -286,6 +289,21 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as mod
 
         ToggleSnapToGrid ->
             toggleSnapToGrid model
+
+        DownloadSelectedChar ->
+            downloadSelectedChar model
+
+
+downloadSelectedChar : Model -> ( Model, Cmd Msg )
+downloadSelectedChar model =
+    ( model
+    , downloadCharPort <|
+        String.fromChar
+            -- impossible
+            (Maybe.withDefault '?'
+                model.selectedChar
+            )
+    )
 
 
 toggleSnapToGrid : Model -> ( Model, Cmd Msg )
@@ -1870,19 +1888,35 @@ charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, bord
                         char
                 )
             , if selectedChar == Just char then
-                E.el
+                E.row
                     [ E.alignRight
-                    , Font.color palette.danger
+                    , E.spacing spacing.tiny
                     ]
-                    (iconButton
-                        { icon =
-                            FeatherIcons.trash2
-                        , size =
-                            fontSize.large
-                        , onPress =
-                            Just RequestDeleteSelectedChar
-                        }
-                    )
+                    [ E.el
+                        [ Font.color palette.lightFg
+                        ]
+                        (iconButton
+                            { icon =
+                                FeatherIcons.download
+                            , size =
+                                fontSize.large
+                            , onPress =
+                                Just DownloadSelectedChar
+                            }
+                        )
+                    , E.el
+                        [ Font.color palette.danger
+                        ]
+                        (iconButton
+                            { icon =
+                                FeatherIcons.trash2
+                            , size =
+                                fontSize.large
+                            , onPress =
+                                Just RequestDeleteSelectedChar
+                            }
+                        )
+                    ]
 
               else
                 E.none
@@ -1964,10 +1998,17 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLi
             "char-with-size-" ++ (String.fromInt <| round strokeWidth)
     in
     Svg.svg
-        [ SvgAttributes.width <| SvgTypes.px <| toFloat boxUnits * unitSize
-        , SvgAttributes.height <| SvgTypes.px <| toFloat boxUnits * unitSize
-        , SvgAttributes.class [ charClassName ]
-        ]
+        ([ SvgAttributes.width <| SvgTypes.px <| toFloat boxUnits * unitSize
+         , SvgAttributes.height <| SvgTypes.px <| toFloat boxUnits * unitSize
+         , SvgAttributes.class [ charClassName ]
+         ]
+            ++ (if isThumbnail then
+                    [ SvgAttributes.id ("char-" ++ String.fromChar (charFromMyChar myChar)) ]
+
+                else
+                    []
+               )
+        )
         [ Svg.defs []
             [ Svg.style []
                 [ TypedSvg.Core.text <|
