@@ -74,7 +74,7 @@ type alias Model =
     , activeComponentId : Maybe Id
     , activeScale : Scale
     , isAspectRatioLocked : Bool
-    , isSnapComponentToGrid : Bool
+    , isSnapToGrid : Bool
     , paragraphForPreview : String
     }
 
@@ -165,7 +165,7 @@ init _ =
       , activeComponentId = Nothing
       , activeScale = NoScale
       , isAspectRatioLocked = True
-      , isSnapComponentToGrid = True
+      , isSnapToGrid = True
       , paragraphForPreview = ""
       }
     , Cmd.none
@@ -200,6 +200,7 @@ type Msg
     | ToggleIsAspectRatioLocked
     | PreviewInParagraph
     | UpdateParagraphForPreview String
+    | ToggleSnapToGrid
 
 
 dragConfig : Draggable.Config ( Id, Scale ) Msg
@@ -282,6 +283,19 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as mod
 
         UpdateParagraphForPreview paragraph ->
             updateParagraphForPreview paragraph model
+
+        ToggleSnapToGrid ->
+            toggleSnapToGrid model
+
+
+toggleSnapToGrid : Model -> ( Model, Cmd Msg )
+toggleSnapToGrid model =
+    ( { model
+        | isSnapToGrid =
+            not model.isSnapToGrid
+      }
+    , Cmd.none
+    )
 
 
 updateParagraphForPreview : String -> Model -> ( Model, Cmd Msg )
@@ -1218,7 +1232,7 @@ previewInParagraphPopUp model =
 
 
 renderPreviewInParagraph : Float -> Model -> E.Element Msg
-renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, simpleCharSvgs, activeComponentId, isAspectRatioLocked, isSnapComponentToGrid } as model) =
+renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, simpleCharSvgs, activeComponentId, isAspectRatioLocked, isSnapToGrid } as model) =
     let
         lines =
             String.split "\n" paragraphForPreview
@@ -1248,7 +1262,7 @@ renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize
                                         , strokeLineCap = strokeLineCap
                                         , isThumbnail = True
                                         , isAspectRatioLocked = isAspectRatioLocked
-                                        , isSnapComponentToGrid = isSnapComponentToGrid
+                                        , isSnapToGrid = isSnapToGrid
                                         }
                                         myChar
 
@@ -1507,7 +1521,62 @@ preferences model =
                     (radioOption (E.text "Square"))
                 ]
             }
+        , Input.checkbox []
+            { onChange = \_ -> ToggleSnapToGrid
+            , icon = checkbox
+            , checked = model.isSnapToGrid
+            , label =
+                Input.labelLeft []
+                    (E.text "Snap to grid")
+            }
         ]
+
+
+checkbox : Bool -> E.Element msg
+checkbox checked =
+    E.el
+        [ E.width
+            (E.px 14)
+        , E.height (E.px 14)
+        , Font.color palette.white
+        , E.centerY
+        , Font.size 9
+        , Font.center
+        , Border.rounded 3
+        , Border.color palette.darkFg
+        , Background.color <|
+            if checked then
+                palette.darkFg
+
+            else
+                palette.white
+        , Border.width <|
+            if checked then
+                0
+
+            else
+                2
+        , E.inFront
+            (E.el
+                [ Border.color palette.white
+                , E.height (E.px 6)
+                , E.width (E.px 9)
+                , E.rotate (degrees -45)
+                , E.centerX
+                , E.centerY
+                , E.moveUp 1
+                , E.transparent (not checked)
+                , Border.widthEach
+                    { top = 0
+                    , left = 2
+                    , bottom = 2
+                    , right = 0
+                    }
+                ]
+                E.none
+            )
+        ]
+        E.none
 
 
 radioOption : E.Element msg -> Input.OptionState -> E.Element msg
@@ -1524,10 +1593,10 @@ radioOption optionLabel status =
             , Border.width <|
                 case status of
                     Input.Idle ->
-                        1
+                        2
 
                     Input.Focused ->
-                        1
+                        2
 
                     Input.Selected ->
                         5
@@ -1541,6 +1610,7 @@ radioOption optionLabel status =
 
                     Input.Selected ->
                         palette.darkFg
+            , Background.color palette.white
             ]
             E.none
         , E.el [ E.width E.fill ] optionLabel
@@ -1548,7 +1618,7 @@ radioOption optionLabel status =
 
 
 editor : Model -> E.Element Msg
-editor ({ activeComponentId, selectedChar, chars, simpleCharSvgs, boxUnits, unitSize, borderUnits, strokeWidth, strokeLineCap, isAspectRatioLocked, isSnapComponentToGrid } as model) =
+editor ({ activeComponentId, selectedChar, chars, simpleCharSvgs, boxUnits, unitSize, borderUnits, strokeWidth, strokeLineCap, isAspectRatioLocked, isSnapToGrid } as model) =
     let
         dropId =
             DragDrop.getDropId model.dragDropChar
@@ -1585,7 +1655,7 @@ editor ({ activeComponentId, selectedChar, chars, simpleCharSvgs, boxUnits, unit
                             , strokeLineCap = strokeLineCap
                             , isThumbnail = False
                             , isAspectRatioLocked = isAspectRatioLocked
-                            , isSnapComponentToGrid = isSnapComponentToGrid
+                            , isSnapToGrid = isSnapToGrid
                             }
                             (Maybe.withDefault emptyMyChar <|
                                 -- impossible
@@ -1754,7 +1824,7 @@ charPanel myCharType ({ boxUnits, thumbnailUnitSize } as model) =
 
 
 charCard : Model -> MyChar -> E.Element Msg
-charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, simpleCharSvgs, selectedChar, isAspectRatioLocked, isSnapComponentToGrid } myChar =
+charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, simpleCharSvgs, selectedChar, isAspectRatioLocked, isSnapToGrid } myChar =
     let
         char =
             charFromMyChar myChar
@@ -1838,7 +1908,7 @@ charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, bord
                         selectedChar
                 , isThumbnail = True
                 , isAspectRatioLocked = isAspectRatioLocked
-                , isSnapComponentToGrid = isSnapComponentToGrid
+                , isSnapToGrid = isSnapToGrid
                 }
                 myChar
         ]
@@ -1878,11 +1948,11 @@ renderChar :
     , simpleCharSvgs : SimpleCharSvgs
     , activeComponentId : Maybe Id
     , isAspectRatioLocked : Bool
-    , isSnapComponentToGrid : Bool
+    , isSnapToGrid : Bool
     }
     -> MyChar
     -> Svg Msg
-renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, chars, simpleCharSvgs, activeComponentId, isAspectRatioLocked, isSnapComponentToGrid } myChar =
+renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, chars, simpleCharSvgs, activeComponentId, isAspectRatioLocked, isSnapToGrid } myChar =
     let
         size =
             (toFloat (boxUnits - 2 * borderUnits) * unitSize) - strokeWidth
@@ -1960,8 +2030,8 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLi
                 , activeComponentId = activeComponentId
                 , isThumbnail = isThumbnail
                 , isAspectRatioLocked = isAspectRatioLocked
-                , isSnapComponentToGrid =
-                    isSnapComponentToGrid
+                , isSnapToGrid =
+                    isSnapToGrid
                         && (case myChar of
                                 CompoundChar _ _ ->
                                     True
@@ -1986,13 +2056,13 @@ renderCharHelper :
     , activeComponentId : Maybe Id
     , isThumbnail : Bool
     , isAspectRatioLocked : Bool
-    , isSnapComponentToGrid : Bool
+    , isSnapToGrid : Bool
     , tightDimension : { position : Vec2, dimension : Vec2 }
     }
     -> Int
     -> MyChar
     -> Svg Msg
-renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId, isThumbnail, isAspectRatioLocked, isSnapComponentToGrid, tightDimension } level myChar =
+renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId, isThumbnail, isAspectRatioLocked, isSnapToGrid, tightDimension } level myChar =
     let
         id =
             getId myChar
@@ -2006,7 +2076,7 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
         constraint dimension position contents =
             let
                 tightPosition =
-                    (if isSnapComponentToGrid then
+                    (if isSnapToGrid then
                         snapToGrid boxUnits 1
 
                      else
@@ -2016,7 +2086,7 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
                         Vector2.sub position tightDimension.position
 
                 snappedTightDimension =
-                    (if isSnapComponentToGrid then
+                    (if isSnapToGrid then
                         snapToGrid boxUnits 1
 
                      else
@@ -2077,7 +2147,7 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
                         , activeComponentId = activeComponentId
                         , isThumbnail = isThumbnail
                         , isAspectRatioLocked = isAspectRatioLocked
-                        , isSnapComponentToGrid = isSnapComponentToGrid
+                        , isSnapToGrid = isSnapToGrid
                         , tightDimension =
                             if level >= 1 then
                                 calculateMyCharDimension myChar
@@ -2321,6 +2391,8 @@ palette =
         E.rgb255 210 99 71
     , black =
         toElmUiColor Color.black
+    , white =
+        toElmUiColor Color.white
     }
 
 
