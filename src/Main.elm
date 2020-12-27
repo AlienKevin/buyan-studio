@@ -23,6 +23,7 @@ import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode exposing (Value)
 import List.Extra
 import Math.Vector2 as Vector2 exposing (Vec2)
+import String.Extra
 import SvgParser
 import Task
 import TypedSvg as Svg
@@ -48,6 +49,9 @@ port getModelPort : (Value -> msg) -> Sub msg
 
 
 port deleteSimpleCharPort : String -> Cmd msg
+
+
+port clearSimpleCharsPort : () -> Cmd msg
 
 
 port pageUnloadingPort : (() -> msg) -> Sub msg
@@ -144,6 +148,7 @@ type alias SimpleCharSvg =
 type PopUp
     = AddCompoundCharPopUp
     | ConfirmDeleteSelectedCharPopUp
+    | ConfirmClearCharsPopUp MyCharType
     | PreviewInParagraphPopUp
     | NoPopUp
 
@@ -185,6 +190,8 @@ type Msg
     | SelectChar MyChar
     | RequestDeleteSelectedChar
     | DeleteSelectedChar
+    | RequestClearChars MyCharType
+    | ClearChars MyCharType
     | UpdatePendingCompoundChar String
     | AddPendingCompoundChar
     | ShowInputError
@@ -233,6 +240,12 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as mod
 
         DeleteSelectedChar ->
             deleteSelectedChar model
+
+        RequestClearChars myCharType ->
+            requestClearChars myCharType model
+
+        ClearChars myCharType ->
+            clearChars myCharType model
 
         UpdatePendingCompoundChar charInput ->
             updatePendingCompoundChar charInput model
@@ -293,6 +306,58 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as mod
 
         DownloadSelectedChar ->
             downloadSelectedChar model
+
+
+requestClearChars : MyCharType -> Model -> ( Model, Cmd Msg )
+requestClearChars myCharType model =
+    ( { model
+        | popUp =
+            ConfirmClearCharsPopUp myCharType
+      }
+    , Cmd.none
+    )
+
+
+clearChars : MyCharType -> Model -> ( Model, Cmd Msg )
+clearChars myCharType model =
+    case myCharType of
+        SimpleCharType ->
+            ( { model
+                | chars =
+                    Dict.filter
+                        (\char myChar ->
+                            case myChar of
+                                SimpleChar _ ->
+                                    False
+
+                                _ ->
+                                    True
+                        )
+                        model.chars
+                , popUp =
+                    NoPopUp
+              }
+            , clearSimpleCharsPort ()
+            )
+
+        CompoundCharType ->
+            ( { model
+                | chars =
+                    Dict.filter
+                        (\char myChar ->
+                            case myChar of
+                                CompoundChar _ _ ->
+                                    False
+
+                                _ ->
+                                    True
+                        )
+                        model.chars
+                , popUp =
+                    NoPopUp
+              }
+            , Cmd.none
+            )
 
 
 downloadSelectedChar : Model -> ( Model, Cmd Msg )
@@ -1180,11 +1245,93 @@ popUp model =
         ConfirmDeleteSelectedCharPopUp ->
             confirmDeleteSelectedCharPopUp model
 
+        ConfirmClearCharsPopUp myCharType ->
+            confirmClearCharsPopUp myCharType model
+
         PreviewInParagraphPopUp ->
             previewInParagraphPopUp model
 
         NoPopUp ->
             E.none
+
+
+confirmClearCharsPopUp : MyCharType -> Model -> E.Element Msg
+confirmClearCharsPopUp myCharType ({ boxUnits, thumbnailUnitSize } as model) =
+    confirmDeletePopUpTemplate boxUnits
+        thumbnailUnitSize
+        ("all "
+            ++ stringFromMyCharType myCharType
+            ++ " characters"
+        )
+        (ClearChars myCharType)
+
+
+confirmDeletePopUpTemplate : Int -> Float -> String -> Msg -> E.Element Msg
+confirmDeletePopUpTemplate boxUnits thumbnailUnitSize targetName onConfirm =
+    let
+        borderWidth =
+            6
+    in
+    E.column
+        ([ E.centerX
+         , E.centerY
+         , Background.color palette.lightBg
+         , E.width <| E.px <| round <| toFloat boxUnits * thumbnailUnitSize + 10 * borderWidth
+         , E.height <| E.px <| round <| toFloat boxUnits * thumbnailUnitSize + fontSize.title + 10 * borderWidth
+         , E.spaceEvenly
+         , E.padding spacing.small
+         , Font.size fontSize.medium
+         ]
+            ++ highlightBorder
+                { color = palette.danger
+                , width = borderWidth
+                , style = Border.dashed
+                , glowWidth = borderWidth
+                }
+        )
+        [ E.el
+            [ E.centerX ]
+            (E.column
+                [ E.spacing spacing.medium ]
+                [ E.paragraph []
+                    [ E.text "Do you want to delete "
+                    , E.el [ Font.bold, Font.size fontSize.large ] (E.text targetName)
+                    , E.text " ?"
+                    ]
+                , E.el [ Font.size fontSize.small ] (E.text "This can't be undone.")
+                ]
+            )
+        , E.row
+            [ E.width E.fill
+            ]
+            [ E.el
+                [ E.alignLeft
+                , Font.color palette.lightFg
+                ]
+                (iconButton
+                    { icon =
+                        FeatherIcons.xCircle
+                    , size =
+                        fontSize.large
+                    , onPress =
+                        Just ClosePopUp
+                    }
+                )
+            , E.el
+                [ E.alignRight
+                , Font.color palette.danger
+                ]
+                (iconButton
+                    { icon =
+                        FeatherIcons.trash2
+                    , size =
+                        fontSize.large
+                    , onPress =
+                        Just onConfirm
+                    }
+                )
+            ]
+        ]
 
 
 previewInParagraphPopUp : Model -> E.Element Msg
@@ -1326,67 +1473,10 @@ renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize
 
 confirmDeleteSelectedCharPopUp : Model -> E.Element Msg
 confirmDeleteSelectedCharPopUp { activeComponentId, boxUnits, thumbnailUnitSize, selectedChar } =
-    let
-        borderWidth =
-            6
-    in
-    E.column
-        ([ E.centerX
-         , E.centerY
-         , Background.color palette.lightBg
-         , E.width <| E.px <| round <| toFloat boxUnits * thumbnailUnitSize + 3 * borderWidth
-         , E.height <| E.px <| round <| toFloat boxUnits * thumbnailUnitSize + fontSize.title + 3 * borderWidth
-         , E.spaceEvenly
-         , E.padding spacing.small
-         , Font.size fontSize.medium
-         ]
-            ++ highlightBorder
-                { color = palette.danger
-                , width = borderWidth
-                , style = Border.dashed
-                , glowWidth = borderWidth
-                }
-        )
-        [ E.el
-            [ E.centerX ]
-            (E.paragraph []
-                [ E.text "Do you want to delete "
-                , E.el [ Font.bold, Font.size fontSize.large ] (E.text (String.fromChar (Maybe.withDefault '?' selectedChar)))
-                , E.text " ?\n"
-                , E.el [ Font.size fontSize.small ] (E.text "This can't be undone.")
-                ]
-            )
-        , E.row
-            [ E.width E.fill
-            ]
-            [ E.el
-                [ E.alignLeft
-                , Font.color palette.lightFg
-                ]
-                (iconButton
-                    { icon =
-                        FeatherIcons.xCircle
-                    , size =
-                        fontSize.large
-                    , onPress =
-                        Just ClosePopUp
-                    }
-                )
-            , E.el
-                [ E.alignRight
-                , Font.color palette.danger
-                ]
-                (iconButton
-                    { icon =
-                        FeatherIcons.trash2
-                    , size =
-                        fontSize.large
-                    , onPress =
-                        Just DeleteSelectedChar
-                    }
-                )
-            ]
-        ]
+    confirmDeletePopUpTemplate boxUnits
+        thumbnailUnitSize
+        (String.fromChar (Maybe.withDefault '?' selectedChar))
+        DeleteSelectedChar
 
 
 addCompoundCharPopUp : Model -> E.Element Msg
@@ -1837,22 +1927,26 @@ charPanel myCharType ({ boxUnits, thumbnailUnitSize } as model) =
             , Font.size fontSize.title
             ]
             [ E.text <|
-                (case myCharType of
-                    SimpleCharType ->
-                        "Simple"
-
-                    CompoundCharType ->
-                        "Compound"
-                )
+                (String.Extra.toSentenceCase <| stringFromMyCharType myCharType)
                     ++ " Characters"
-            , iconButton
-                { icon =
-                    FeatherIcons.plusCircle
-                , size =
-                    fontSize.title
-                , onPress =
-                    Just <| AddChar myCharType
-                }
+            , E.el [ Font.color palette.lightFg ] <|
+                iconButton
+                    { icon =
+                        FeatherIcons.plusCircle
+                    , size =
+                        fontSize.title
+                    , onPress =
+                        Just <| AddChar myCharType
+                    }
+            , E.el [ Font.color palette.danger ] <|
+                iconButton
+                    { icon =
+                        FeatherIcons.trash2
+                    , size =
+                        fontSize.title
+                    , onPress =
+                        Just <| RequestClearChars myCharType
+                    }
             ]
         , E.wrappedRow
             [ E.width E.fill
@@ -1864,6 +1958,16 @@ charPanel myCharType ({ boxUnits, thumbnailUnitSize } as model) =
           <|
             cards
         ]
+
+
+stringFromMyCharType : MyCharType -> String
+stringFromMyCharType myCharType =
+    case myCharType of
+        SimpleCharType ->
+            "simple"
+
+        CompoundCharType ->
+            "compound"
 
 
 charCard : Model -> MyChar -> E.Element Msg

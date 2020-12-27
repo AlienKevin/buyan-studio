@@ -72,6 +72,19 @@ app.ports.deleteSimpleCharPort.subscribe(function (char) {
   });
 });
 
+app.ports.clearSimpleCharsPort.subscribe(function() {
+  localforage.getItem(simpleCharSvgsStorageKey, function (error, simpleCharSvgs) {
+    if (error !== null) {
+      console.error("Error getting saved simpleCharSvgs: ", error);
+    }
+    localforage.setItem(simpleCharSvgsStorageKey, {}, function (error) {
+      if (error !== null) {
+        console.error("Error saving simpleCharSvgs: ", error);
+      }
+    });
+  });
+});
+
 app.ports.downloadCharPort.subscribe(function (char) {
   var svgData = document.getElementById("char-" + char).outerHTML;
   //add name spaces.
