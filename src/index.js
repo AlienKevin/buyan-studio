@@ -58,7 +58,7 @@ app.ports.addSimpleCharsPort.subscribe(function () {
     });
 });
 
-app.ports.deleteSimpleCharPort.subscribe(function(char) {
+app.ports.deleteSimpleCharPort.subscribe(function (char) {
   localforage.getItem(simpleCharSvgsStorageKey, function (error, simpleCharSvgs) {
     if (error !== null) {
       console.error("Error getting saved simpleCharSvgs: ", error);
@@ -72,16 +72,16 @@ app.ports.deleteSimpleCharPort.subscribe(function(char) {
   });
 });
 
-app.ports.downloadCharPort.subscribe(function(char) {
+app.ports.downloadCharPort.subscribe(function (char) {
   var svgData = document.getElementById("char-" + char).outerHTML;
   //add name spaces.
-  if(!svgData.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)){
+  if (!svgData.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) {
     svgData = svgData.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
   }
-  if(!svgData.match(/^<svg[^>]+"http\:\/\/www\.w3\.org\/1999\/xlink"/)){
+  if (!svgData.match(/^<svg[^>]+"http\:\/\/www\.w3\.org\/1999\/xlink"/)) {
     svgData = svgData.replace(/^<svg/, '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
   }
-  var svgBlob = new Blob([svgData], {type:"image/svg+xml;charset=utf-8"});
+  var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
   var svgUrl = URL.createObjectURL(svgBlob);
   var downloadLink = document.createElement("a");
   downloadLink.href = svgUrl;
@@ -113,6 +113,28 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
 localforage.getItem(simpleCharSvgsStorageKey, function (error, savedSimpleCharSvgs) {
   if (error !== null) {
     console.error("Error getting saved simpleCharSvgs: ", error);
+  }
+  if (savedSimpleCharSvgs == null || Object.keys(savedSimpleCharSvgs).length === 0) {
+    var defaultChars = "上下不儿几卜口犬車門".split("");
+    var simpleCharSvgs = {};
+    defaultChars.forEach(function (char) {
+      fetch(`default-simple-char-svgs/${char}.svg`)
+        .then(function (r) {
+          return r.text()
+        })
+        .then(function (svg) {
+          console.log("Loaded default SimpleCharSvg " + char);
+          simpleCharSvgs[char] = svg;
+          if (Object.keys(simpleCharSvgs).length === defaultChars.length) {
+            app.ports.getSimpleCharsPort.send(simpleCharSvgs);
+            localforage.setItem(simpleCharSvgsStorageKey, simpleCharSvgs, function (error) {
+              if (error !== null) {
+                console.error("Error saving simpleCharSvgs: ", error);
+              }
+            });
+          }
+        });
+    });
   }
   // console.log("Getting saved simpleCharSvgs: ", savedSimpleCharSvgs);
   app.ports.getSimpleCharsPort.send(savedSimpleCharSvgs);
