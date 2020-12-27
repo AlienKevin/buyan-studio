@@ -2036,7 +2036,7 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
                     ++ dragTrigger isDraggable ( levelwiseId, NoScale )
                 )
             <|
-                if Just levelwiseId == activeComponentId then
+                if Just levelwiseId == activeComponentId && not isThumbnail then
                     contents
                         ++ [ Svg.rect
                                 [ SvgAttributes.id "active-component-border"
