@@ -84,6 +84,7 @@ type alias Model =
 type alias SavedModel =
     { chars : Dict Char MyChar
     , strokeWidth : Float
+    , strokeLineCap : StrokeLineCap
     }
 
 
@@ -406,11 +407,23 @@ saveModel model =
 
 
 encodeModel : Model -> Value
-encodeModel { chars, simpleCharSvgs, strokeWidth } =
+encodeModel { chars, simpleCharSvgs, strokeWidth, strokeLineCap } =
     Encode.object
         [ ( "chars", Encode.dict String.fromChar encodeMyChar chars )
         , ( "strokeWidth", Encode.float strokeWidth )
+        , ( "strokeLineCap", encodeStrokeLineCap strokeLineCap )
         ]
+
+
+encodeStrokeLineCap : StrokeLineCap -> Value
+encodeStrokeLineCap strokeLineCap =
+    Encode.string <|
+        case strokeLineCap of
+            StrokeLineCapRound ->
+                "StrokeLineCapRound"
+
+            StrokeLineCapSquare ->
+                "StrokeLineCapSquare"
 
 
 encodeChar : Char -> Value
@@ -461,12 +474,14 @@ encodeId =
 gotModel : Value -> Model -> ( Model, Cmd Msg )
 gotModel savedModelJson model =
     ( case Decode.decodeValue decodeSavedModel savedModelJson of
-        Ok { chars, strokeWidth } ->
+        Ok { chars, strokeWidth, strokeLineCap } ->
             { model
                 | chars =
                     chars
                 , strokeWidth =
                     strokeWidth
+                , strokeLineCap =
+                    strokeLineCap
             }
 
         Err err ->
@@ -481,13 +496,34 @@ gotModel savedModelJson model =
 
 decodeSavedModel : Decoder SavedModel
 decodeSavedModel =
-    Decode.map2 SavedModel
+    Decode.map3 SavedModel
         (Decode.field "chars"
             (Decode.map (Dict.Extra.mapKeys charFromString) <|
                 Decode.dict decodeMyChar
             )
         )
         (Decode.field "strokeWidth" Decode.float)
+        (Decode.field "strokeLineCap" decodeStrokeLineCap)
+
+
+decodeStrokeLineCap : Decoder StrokeLineCap
+decodeStrokeLineCap =
+    Decode.string
+        |> Decode.andThen
+            (\strokeLineCap ->
+                case strokeLineCap of
+                    "StrokeLineCapRound" ->
+                        Decode.succeed StrokeLineCapRound
+
+                    "StrokeLineCapSquare" ->
+                        Decode.succeed StrokeLineCapSquare
+
+                    _ ->
+                        Decode.fail <|
+                            "Trying to decode StrokeLineCapRound, but "
+                                ++ strokeLineCap
+                                ++ " is not supported."
+            )
 
 
 decodeChar : Decoder Char
