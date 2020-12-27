@@ -1093,7 +1093,10 @@ view model =
                     , E.height E.fill
                     , E.spacing spacing.medium
                     ]
-                    [ preferences model
+                    [ E.column [ E.spacing spacing.small ]
+                        [ title "Preferences"
+                        , preferences model
+                        ]
                     , export model
                     ]
                 ]
@@ -1106,8 +1109,7 @@ export model =
         [ E.spacing spacing.small
         , E.alignTop
         ]
-        [ E.el [ Font.size fontSize.title ] <|
-            E.text "Export"
+        [ title "Export"
         , textButton "Preview in Paragraph" (Just PreviewInParagraph)
         ]
 
@@ -1133,6 +1135,10 @@ previewInParagraphPopUp model =
     let
         previewFontSize =
             fontSize.title * 2
+        maxParagraphInputWidth =
+            fontSize.medium * 30
+        maxControlWidth =
+            maxParagraphInputWidth + 300
     in
     E.column
         [ E.centerX
@@ -1146,29 +1152,46 @@ previewInParagraphPopUp model =
         ]
         [ E.el
             [ E.centerX ]
-            (E.text "Preview in Paragraph")
-        , E.el
-            [ E.centerX
-            , E.width (E.fill |> E.maximum (fontSize.medium * 30))
-            , E.height <| E.fillPortion 1
-            , E.scrollbarY
+            (title "Preview in Paragraph")
+        , E.row
+            [ E.height E.fill
+            , E.width
+                (E.fill
+                    |> E.maximum maxControlWidth
+                )
+            , E.centerX
+            , E.spacing spacing.medium
             ]
-            (Input.multiline
-                [ E.width <| E.fill
-                , E.height <| E.fill
+            [ E.column
+                [ E.width <| E.fillPortion 5
+                , E.height E.fill
+                , E.spacing spacing.medium
                 ]
-                { onChange =
-                    UpdateParagraphForPreview
-                , text =
-                    model.paragraphForPreview
-                , placeholder =
-                    Just <| Input.placeholder [ E.alignLeft ] (E.text "Write text here to preview")
-                , label =
-                    Input.labelHidden "Write text here to preview"
-                , spellcheck =
-                    False
-                }
-            )
+                [ E.el
+                    [ E.alignRight
+                    , E.width (E.fill |> E.maximum maxParagraphInputWidth)
+                    , E.height <| E.fillPortion 1
+                    , E.scrollbarY
+                    ]
+                    (Input.multiline
+                        [ E.width <| E.fill
+                        , E.height <| E.fill
+                        ]
+                        { onChange =
+                            UpdateParagraphForPreview
+                        , text =
+                            model.paragraphForPreview
+                        , placeholder =
+                            Just <| Input.placeholder [ E.alignLeft ] (E.text "Write text here to preview")
+                        , label =
+                            Input.labelHidden "Write text here to preview"
+                        , spellcheck =
+                            False
+                        }
+                    )
+                ]
+            , E.el [ E.width <| E.fillPortion 2, E.height E.fill ] <| preferences model
+            ]
         , E.el
             [ E.width E.fill
             , E.height <| E.fillPortion 3
@@ -1420,13 +1443,18 @@ onEnter =
             )
 
 
+title : String -> E.Element Msg
+title text =
+    E.el [ Font.size fontSize.title ] <|
+        E.text text
+
+
 preferences : Model -> E.Element Msg
 preferences model =
     E.column
-        [ E.spacing spacing.small ]
-        [ E.el [ Font.size fontSize.title ] <|
-            E.text "Preferences"
-        , Input.slider
+        [ E.spacing spacing.small
+        ]
+        [ Input.slider
             [ E.height (E.px fontSize.small)
             , E.width (E.px <| fontSize.small * 7)
             , E.behindContent
