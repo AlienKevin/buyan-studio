@@ -1135,8 +1135,10 @@ previewInParagraphPopUp model =
     let
         previewFontSize =
             fontSize.title * 2
+
         maxParagraphInputWidth =
             fontSize.medium * 30
+
         maxControlWidth =
             maxParagraphInputWidth + 300
     in
@@ -1149,6 +1151,19 @@ previewInParagraphPopUp model =
         , E.spacing spacing.medium
         , E.padding spacing.large
         , Font.size fontSize.medium
+        , E.inFront
+            (E.el
+                [ E.padding spacing.medium ]
+             <|
+                iconButton
+                    { icon =
+                        FeatherIcons.x
+                    , size =
+                        fontSize.large
+                    , onPress =
+                        Just ClosePopUp
+                    }
+            )
         ]
         [ E.el
             [ E.centerX ]
