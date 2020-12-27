@@ -1146,7 +1146,7 @@ previewInParagraphPopUp model =
         ]
         [ E.el
             [ E.centerX ]
-            (E.text "Paragraph")
+            (E.text "Preview in Paragraph")
         , E.el
             [ E.centerX
             , E.width (E.fill |> E.maximum (fontSize.medium * 30))
@@ -1162,9 +1162,9 @@ previewInParagraphPopUp model =
                 , text =
                     model.paragraphForPreview
                 , placeholder =
-                    Nothing
+                    Just <| Input.placeholder [ E.alignLeft ] (E.text "Write text here to preview")
                 , label =
-                    Input.labelHidden "Enter Paragraph Here"
+                    Input.labelHidden "Write text here to preview"
                 , spellcheck =
                     False
                 }
