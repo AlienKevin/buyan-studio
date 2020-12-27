@@ -1170,8 +1170,8 @@ previewInParagraphPopUp model =
                 }
             )
         , E.el
-            [ E.width <| E.fillPortion 2
-            , E.height <| E.fillPortion 2
+            [ E.width E.fill
+            , E.height <| E.fillPortion 3
             , Font.size <| round previewFontSize
             , E.scrollbarY
             ]
