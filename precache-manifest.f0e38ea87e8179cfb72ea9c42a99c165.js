@@ -16,6 +16,46 @@ self.__precacheManifest = (self.__precacheManifest || []).concat([
     "url": "/buyan-studio/browserconfig.xml"
   },
   {
+    "revision": "78bd983658b2f26a8de18b517e78fd5b",
+    "url": "/buyan-studio/default-simple-char-svgs/上.svg"
+  },
+  {
+    "revision": "14f2419dd6eebcfe465b31086f114640",
+    "url": "/buyan-studio/default-simple-char-svgs/下.svg"
+  },
+  {
+    "revision": "60effe7895580685fe9c06400d265d89",
+    "url": "/buyan-studio/default-simple-char-svgs/不.svg"
+  },
+  {
+    "revision": "5bde5c95e011cfe0e40432ae29527940",
+    "url": "/buyan-studio/default-simple-char-svgs/儿.svg"
+  },
+  {
+    "revision": "837896d0f294f20995767cda8a1c1d10",
+    "url": "/buyan-studio/default-simple-char-svgs/几.svg"
+  },
+  {
+    "revision": "3e374909f52de263cc1acbdbf4734be4",
+    "url": "/buyan-studio/default-simple-char-svgs/卜.svg"
+  },
+  {
+    "revision": "08fbe9cbed5e750c6e7f301a9b46f7ac",
+    "url": "/buyan-studio/default-simple-char-svgs/口.svg"
+  },
+  {
+    "revision": "74572e16f9e4dfa033baa0d01aa4f50f",
+    "url": "/buyan-studio/default-simple-char-svgs/犬.svg"
+  },
+  {
+    "revision": "58b4e5944d8c269a300d79ce112af064",
+    "url": "/buyan-studio/default-simple-char-svgs/車.svg"
+  },
+  {
+    "revision": "b6a42e804c51ab0cb7e07540e81351a6",
+    "url": "/buyan-studio/default-simple-char-svgs/門.svg"
+  },
+  {
     "revision": "eea27c0045870b634e7ab2c6b46bc6f2",
     "url": "/buyan-studio/favicon-16x16.png"
   },
@@ -28,7 +68,7 @@ self.__precacheManifest = (self.__precacheManifest || []).concat([
     "url": "/buyan-studio/favicon.ico"
   },
   {
-    "revision": "a4e09a418585e87fd9af24fdd4d4c8f8",
+    "revision": "ef13b4328a3ac3ceabea8274bb6da265",
     "url": "/buyan-studio/index.html"
   },
   {
@@ -44,7 +84,7 @@ self.__precacheManifest = (self.__precacheManifest || []).concat([
     "url": "/buyan-studio/site.webmanifest"
   },
   {
-    "revision": "5d8915234ab0774a7924",
+    "revision": "a4051c4de0cb509ac743",
     "url": "/buyan-studio/static/css/main.0af5c45f.chunk.css"
   },
   {
@@ -84,8 +124,8 @@ self.__precacheManifest = (self.__precacheManifest || []).concat([
     "url": "/buyan-studio/static/js/9.714c5128.chunk.js"
   },
   {
-    "revision": "5d8915234ab0774a7924",
-    "url": "/buyan-studio/static/js/main.5d891523.chunk.js"
+    "revision": "a4051c4de0cb509ac743",
+    "url": "/buyan-studio/static/js/main.a4051c4d.chunk.js"
   },
   {
     "revision": "0512f9e59f3dbc204535",
