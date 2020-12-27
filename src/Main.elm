@@ -1161,25 +1161,14 @@ view model =
                     , E.height E.fill
                     , E.spacing spacing.medium
                     ]
-                    [ E.column [ E.spacing spacing.small ]
+                    [ E.column [ E.spacing spacing.medium ]
                         [ title "Preferences"
                         , preferences model
+                        , textButton "Preview in Paragraph" (Just PreviewInParagraph)
                         ]
-                    , export model
                     ]
                 ]
             ]
-
-
-export : Model -> E.Element Msg
-export model =
-    E.column
-        [ E.spacing spacing.small
-        , E.alignTop
-        ]
-        [ title "Export"
-        , textButton "Preview in Paragraph" (Just PreviewInParagraph)
-        ]
 
 
 popUp : Model -> E.Element Msg
@@ -2341,7 +2330,7 @@ iconButton { icon, size, onPress } =
 textButton : String -> Maybe Msg -> E.Element Msg
 textButton text onPress =
     Input.button
-        [ Border.width 2
+        [ Border.width 3
         , Border.color palette.black
         , Border.rounded fontSize.small
         , E.padding spacing.small
