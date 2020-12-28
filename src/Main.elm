@@ -714,13 +714,10 @@ onDragBy delta ({ dragDelta, isSnapToGrid, activeComponentId, activeScale, boxUn
 
             -- _ =
             --     Debug.log "newDragDelta" newDragDelta
-
             -- _ =
             --     Debug.log "deltaX" deltaX
-            
             -- _ =
             --     Debug.log "deltaY" deltaY
-
             deltaX =
                 Vector2.getX delta
 
@@ -770,13 +767,6 @@ updateOnDrag factor delta ({ dragDelta, isSnapToGrid, activeComponentId, activeS
         | chars =
             case model.selectedChar of
                 Just selectedChar ->
-                    let
-                        offsetDimension xDir yDir =
-                            offsetDrag DimensionOffset isAspectRatioLocked factor xDir yDir delta
-
-                        offsetPosition xDir yDir =
-                            offsetDrag PositionOffset isAspectRatioLocked factor xDir yDir delta
-                    in
                     Dict.update
                         selectedChar
                         (Maybe.map
@@ -784,26 +774,36 @@ updateOnDrag factor delta ({ dragDelta, isSnapToGrid, activeComponentId, activeS
                                 List.Extra.updateAt
                                     -- impossible
                                     (Maybe.withDefault -1 activeComponentId)
-                                    (case activeScale of
-                                        NoScale ->
-                                            updateMyCharRefPosition
-                                                (Vector2.add <| Vector2.scale factor delta)
+                                    (\char ->
+                                        let
+                                            offsetDimension xDir yDir =
+                                                offsetDrag DimensionOffset isAspectRatioLocked char.dimension factor xDir yDir delta
 
-                                        ScaleTopLeft ->
-                                            updateMyCharRefDimension (Vector2.add (offsetDimension -1 -1))
-                                                << updateMyCharRefPosition (Vector2.add (offsetPosition 1 1))
+                                            offsetPosition xDir yDir =
+                                                offsetDrag PositionOffset isAspectRatioLocked char.dimension factor xDir yDir delta
+                                        in
+                                        (case activeScale of
+                                            NoScale ->
+                                                updateMyCharRefPosition
+                                                    (Vector2.add <| Vector2.scale factor delta)
 
-                                        ScaleTopRight ->
-                                            updateMyCharRefDimension (Vector2.add (offsetDimension 1 -1))
-                                                << updateMyCharRefPosition (Vector2.add (offsetPosition 0 1))
+                                            ScaleTopLeft ->
+                                                updateMyCharRefDimension (Vector2.add (offsetDimension -1 -1))
+                                                    << updateMyCharRefPosition (Vector2.add (offsetPosition 1 1))
 
-                                        ScaleBottomLeft ->
-                                            updateMyCharRefDimension (Vector2.add (offsetDimension -1 1))
-                                                << updateMyCharRefPosition (Vector2.add (offsetPosition 1 0))
+                                            ScaleTopRight ->
+                                                updateMyCharRefDimension (Vector2.add (offsetDimension 1 -1))
+                                                    << updateMyCharRefPosition (Vector2.add (offsetPosition 0 1))
 
-                                        ScaleBottomRight ->
-                                            updateMyCharRefDimension (Vector2.add (offsetDimension 1 1))
-                                                << updateMyCharRefPosition (Vector2.add (offsetPosition 0 0))
+                                            ScaleBottomLeft ->
+                                                updateMyCharRefDimension (Vector2.add (offsetDimension -1 1))
+                                                    << updateMyCharRefPosition (Vector2.add (offsetPosition 1 0))
+
+                                            ScaleBottomRight ->
+                                                updateMyCharRefDimension (Vector2.add (offsetDimension 1 1))
+                                                    << updateMyCharRefPosition (Vector2.add (offsetPosition 0 0))
+                                        )
+                                            char
                                     )
                             )
                         )
@@ -814,8 +814,8 @@ updateOnDrag factor delta ({ dragDelta, isSnapToGrid, activeComponentId, activeS
     }
 
 
-offsetDrag : OffsetType -> Bool -> Float -> Float -> Float -> Vec2 -> Vec2
-offsetDrag offsetType isAspectRatioLocked factor xDir yDir delta =
+offsetDrag : OffsetType -> Bool -> Vec2 -> Float -> Float -> Float -> Vec2 -> Vec2
+offsetDrag offsetType isAspectRatioLocked dimension factor xDir yDir delta =
     let
         deltaX =
             Vector2.getX delta
@@ -829,8 +829,11 @@ offsetDrag offsetType isAspectRatioLocked factor xDir yDir delta =
                 averagedDelta =
                     (abs deltaX + abs deltaY) / 2
 
+                ratioOfXOverY =
+                    Vector2.getX dimension / Vector2.getY dimension
+
                 averagedDeltaX =
-                    sign deltaX * averagedDelta
+                    sign deltaX * averagedDelta * ratioOfXOverY
 
                 averagedDeltaY =
                     sign
@@ -2305,9 +2308,11 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
         constraint dimension position contents =
             let
                 tightPosition =
-                        Vector2.sub position tightDimension.position
+                    Vector2.sub position tightDimension.position
+
                 xFactor =
                     100 / Vector2.getX tightDimension.dimension
+
                 yFactor =
                     100 / Vector2.getY tightDimension.dimension
             in
