@@ -737,13 +737,10 @@ onDragBy delta ({ dragDelta, isSnapToGrid, activeComponentId, activeScale, boxUn
 
                 else
                     oldDeltaY + deltaY
-
-            newDragDelta =
-                Vector2.vec2 newDeltaX newDeltaY
         in
         if abs newDeltaX >= unitSize || abs newDeltaY >= unitSize then
             updateOnDrag factor
-                newDragDelta
+                (Vector2.vec2 (roundToUnitSize unitSize newDeltaX) (roundToUnitSize unitSize newDeltaY))
                 { model
                     | dragDelta =
                         Vector2.vec2 0 0
@@ -752,7 +749,7 @@ onDragBy delta ({ dragDelta, isSnapToGrid, activeComponentId, activeScale, boxUn
         else
             { model
                 | dragDelta =
-                    newDragDelta
+                    Vector2.vec2 newDeltaX newDeltaY
             }
 
       else
@@ -761,8 +758,13 @@ onDragBy delta ({ dragDelta, isSnapToGrid, activeComponentId, activeScale, boxUn
     )
 
 
+roundToUnitSize : Float -> Float -> Float
+roundToUnitSize unitSize n =
+    unitSize * (toFloat <| round (n / unitSize))
+
+
 updateOnDrag : Float -> Vec2 -> Model -> Model
-updateOnDrag factor delta ({ dragDelta, isSnapToGrid, activeComponentId, activeScale, boxUnits, borderUnits, unitSize, chars, isAspectRatioLocked } as model) =
+updateOnDrag factor delta ({ dragDelta, activeComponentId, activeScale, boxUnits, borderUnits, unitSize, chars, isAspectRatioLocked } as model) =
     { model
         | chars =
             case model.selectedChar of
