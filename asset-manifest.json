@@ -1,7 +1,7 @@
 {
   "main.css": "/buyan-studio/static/css/main.0af5c45f.chunk.css",
-  "main.js": "/buyan-studio/static/js/main.a4051c4d.chunk.js",
-  "main.js.map": "/buyan-studio/static/js/main.a4051c4d.chunk.js.map",
+  "main.js": "/buyan-studio/static/js/main.7c6522ed.chunk.js",
+  "main.js.map": "/buyan-studio/static/js/main.7c6522ed.chunk.js.map",
   "runtime~main.js": "/buyan-studio/static/js/runtime~main.0512f9e5.js",
   "runtime~main.js.map": "/buyan-studio/static/js/runtime~main.0512f9e5.js.map",
   "vendors~main.js": "/buyan-studio/static/js/vendors~main.1a0713ce.chunk.js",
@@ -44,7 +44,7 @@
   "favicon.ico": "/buyan-studio/favicon.ico",
   "index.html": "/buyan-studio/index.html",
   "mstile-150x150.png": "/buyan-studio/mstile-150x150.png",
-  "precache-manifest.f0e38ea87e8179cfb72ea9c42a99c165.js": "/buyan-studio/precache-manifest.f0e38ea87e8179cfb72ea9c42a99c165.js",
+  "precache-manifest.eab9fd626e488acc8d96cc9991db90e1.js": "/buyan-studio/precache-manifest.eab9fd626e488acc8d96cc9991db90e1.js",
   "safari-pinned-tab.svg": "/buyan-studio/safari-pinned-tab.svg",
   "site.webmanifest": "/buyan-studio/site.webmanifest"
 }
