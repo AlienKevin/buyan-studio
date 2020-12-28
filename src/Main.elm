@@ -77,6 +77,7 @@ type alias Model =
     , dragDropChar : DragDrop.Model Char ()
     , dragDropCharData : { char : Char }
     , drag : Draggable.State ( Id, Scale )
+    , dragDelta : Vec2
     , activeComponentId : Maybe Id
     , activeScale : Scale
     , isAspectRatioLocked : Bool
@@ -170,6 +171,7 @@ init _ =
       , dragDropChar = DragDrop.init
       , dragDropCharData = { char = '?' }
       , drag = Draggable.init
+      , dragDelta = Vector2.vec2 0 0
       , activeComponentId = Nothing
       , activeScale = NoScale
       , isAspectRatioLocked = True
@@ -670,6 +672,8 @@ stopDragging model =
     ( { model
         | activeComponentId =
             Nothing
+        , dragDelta =
+            Vector2.vec2 0 0
       }
     , Cmd.none
     )
@@ -682,6 +686,8 @@ startDragging ( id, scale ) model =
             Just id
         , activeScale =
             scale
+        , dragDelta =
+            Vector2.vec2 0 0
       }
     , Cmd.none
     )
@@ -693,70 +699,88 @@ type OffsetType
 
 
 onDragBy : Vec2 -> Model -> ( Model, Cmd Msg )
-onDragBy delta ({ activeComponentId, activeScale, boxUnits, borderUnits, unitSize, chars, isAspectRatioLocked } as model) =
-    ( { model
+onDragBy delta ({ dragDelta, isSnapToGrid, activeComponentId, activeScale, boxUnits, borderUnits, unitSize, chars, isAspectRatioLocked } as model) =
+    let
+        factor =
+            100 / (toFloat boxUnits * unitSize)
+    in
+    ( if isSnapToGrid then
+        let
+            oldDeltaX =
+                Vector2.getX dragDelta
+
+            oldDeltaY =
+                Vector2.getY dragDelta
+
+            -- _ =
+            --     Debug.log "newDragDelta" newDragDelta
+
+            -- _ =
+            --     Debug.log "deltaX" deltaX
+            
+            -- _ =
+            --     Debug.log "deltaY" deltaY
+
+            deltaX =
+                Vector2.getX delta
+
+            deltaY =
+                Vector2.getY delta
+
+            newDeltaX =
+                if sign oldDeltaX /= 0 && sign deltaX /= 0 && sign oldDeltaX /= sign deltaX then
+                    deltaX
+
+                else
+                    oldDeltaX + deltaX
+
+            newDeltaY =
+                if sign oldDeltaY /= 0 && sign deltaY /= 0 && sign oldDeltaY /= sign deltaY then
+                    deltaY
+
+                else
+                    oldDeltaY + deltaY
+
+            newDragDelta =
+                Vector2.vec2 newDeltaX newDeltaY
+        in
+        if abs newDeltaX >= unitSize || abs newDeltaY >= unitSize then
+            updateOnDrag factor
+                newDragDelta
+                { model
+                    | dragDelta =
+                        Vector2.vec2 0 0
+                }
+
+        else
+            { model
+                | dragDelta =
+                    newDragDelta
+            }
+
+      else
+        updateOnDrag factor delta model
+    , Cmd.none
+    )
+
+
+updateOnDrag : Float -> Vec2 -> Model -> Model
+updateOnDrag factor delta ({ dragDelta, isSnapToGrid, activeComponentId, activeScale, boxUnits, borderUnits, unitSize, chars, isAspectRatioLocked } as model) =
+    { model
         | chars =
             case model.selectedChar of
                 Just selectedChar ->
+                    let
+                        offsetDimension xDir yDir =
+                            offsetDrag DimensionOffset isAspectRatioLocked factor xDir yDir delta
+
+                        offsetPosition xDir yDir =
+                            offsetDrag PositionOffset isAspectRatioLocked factor xDir yDir delta
+                    in
                     Dict.update
                         selectedChar
                         (Maybe.map
                             (updateMyCharComponent <|
-                                let
-                                    factor =
-                                        100 / (toFloat boxUnits * unitSize)
-
-                                    deltaX =
-                                        Vector2.getX delta
-
-                                    deltaY =
-                                        Vector2.getY delta
-
-                                    offsetDimension xDir yDir =
-                                        offset DimensionOffset xDir yDir
-
-                                    offsetPosition xDir yDir =
-                                        offset PositionOffset xDir yDir
-
-                                    offset offsetType xDir yDir =
-                                        Vector2.scale factor <|
-                                            if isAspectRatioLocked then
-                                                let
-                                                    averagedDelta =
-                                                        (abs deltaX + abs deltaY) / 2
-
-                                                    averagedDeltaX =
-                                                        sign deltaX * averagedDelta
-
-                                                    averagedDeltaY =
-                                                        sign
-                                                            (case offsetType of
-                                                                DimensionOffset ->
-                                                                    deltaX
-
-                                                                PositionOffset ->
-                                                                    deltaY
-                                                            )
-                                                            * averagedDelta
-                                                in
-                                                Vector2.vec2 (xDir * averagedDeltaX)
-                                                    ((case offsetType of
-                                                        DimensionOffset ->
-                                                            xDir
-
-                                                        PositionOffset ->
-                                                            yDir
-                                                     )
-                                                        * averagedDeltaY
-                                                    )
-
-                                            else
-                                                -- let
-                                                --     _ = Debug.log "deltaX" <| xDir * deltaX * factor
-                                                --     _ = Debug.log "deltaY" <| yDir * deltaY * factor
-                                                -- in
-                                                Vector2.vec2 (xDir * deltaX) (yDir * deltaY)
-                                in
                                 List.Extra.updateAt
                                     -- impossible
                                     (Maybe.withDefault -1 activeComponentId)
@@ -787,9 +811,55 @@ onDragBy delta ({ activeComponentId, activeScale, boxUnits, borderUnits, unitSiz
 
                 Nothing ->
                     chars
-      }
-    , Cmd.none
-    )
+    }
+
+
+offsetDrag : OffsetType -> Bool -> Float -> Float -> Float -> Vec2 -> Vec2
+offsetDrag offsetType isAspectRatioLocked factor xDir yDir delta =
+    let
+        deltaX =
+            Vector2.getX delta
+
+        deltaY =
+            Vector2.getY delta
+    in
+    Vector2.scale factor <|
+        if isAspectRatioLocked then
+            let
+                averagedDelta =
+                    (abs deltaX + abs deltaY) / 2
+
+                averagedDeltaX =
+                    sign deltaX * averagedDelta
+
+                averagedDeltaY =
+                    sign
+                        (case offsetType of
+                            DimensionOffset ->
+                                deltaX
+
+                            PositionOffset ->
+                                deltaY
+                        )
+                        * averagedDelta
+            in
+            Vector2.vec2 (xDir * averagedDeltaX)
+                ((case offsetType of
+                    DimensionOffset ->
+                        xDir
+
+                    PositionOffset ->
+                        yDir
+                 )
+                    * averagedDeltaY
+                )
+
+        else
+            -- let
+            --     _ = Debug.log "deltaX" <| xDir * deltaX * factor
+            --     _ = Debug.log "deltaY" <| yDir * deltaY * factor
+            -- in
+            Vector2.vec2 (xDir * deltaX) (yDir * deltaY)
 
 
 sign : number -> number
@@ -797,8 +867,11 @@ sign n =
     if n < 0 then
         -1
 
-    else
+    else if n > 0 then
         1
+
+    else
+        0
 
 
 dragDropChar : DragDrop.Msg Char () -> Model -> ( Model, Cmd Msg )
@@ -1138,20 +1211,6 @@ updateMyCharRefPosition func myCharRef =
         | position =
             func myCharRef.position
     }
-
-
-snapToGrid : Int -> Int -> Vec2 -> Vec2
-snapToGrid boxUnits borderUnits position =
-    let
-        unitPercent =
-            100 / toFloat (boxUnits - borderUnits * 2)
-
-        roundToGrid pos =
-            (*) unitPercent <| toFloat <| round <| pos / unitPercent
-    in
-    Vector2.vec2
-        (roundToGrid <| Vector2.getX position)
-        (roundToGrid <| Vector2.getY position)
 
 
 updateMyCharDimension : (Vec2 -> Vec2) -> MyChar -> MyChar
@@ -2246,32 +2305,17 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
         constraint dimension position contents =
             let
                 tightPosition =
-                    (if isSnapToGrid then
-                        snapToGrid boxUnits 1
-
-                     else
-                        identity
-                    )
-                    <|
                         Vector2.sub position tightDimension.position
-
-                snappedTightDimension =
-                    (if isSnapToGrid then
-                        snapToGrid boxUnits 1
-
-                     else
-                        identity
-                    )
-                    <|
-                        Vector2.vec2
-                            (100 / Vector2.getX tightDimension.dimension * Vector2.getX dimension)
-                            (100 / Vector2.getY tightDimension.dimension * Vector2.getY dimension)
+                xFactor =
+                    100 / Vector2.getX tightDimension.dimension
+                yFactor =
+                    100 / Vector2.getY tightDimension.dimension
             in
             Svg.svg
-                ([ SvgAttributes.x <| SvgTypes.Percent <| 100 / Vector2.getX tightDimension.dimension * Vector2.getX tightPosition
-                 , SvgAttributes.y <| SvgTypes.Percent <| 100 / Vector2.getY tightDimension.dimension * Vector2.getY tightPosition
-                 , SvgAttributes.width <| SvgTypes.Percent <| Vector2.getX snappedTightDimension
-                 , SvgAttributes.height <| SvgTypes.Percent <| Vector2.getY snappedTightDimension
+                ([ SvgAttributes.x <| SvgTypes.Percent <| xFactor * Vector2.getX tightPosition
+                 , SvgAttributes.y <| SvgTypes.Percent <| yFactor * Vector2.getY tightPosition
+                 , SvgAttributes.width <| SvgTypes.Percent <| xFactor * Vector2.getX dimension
+                 , SvgAttributes.height <| SvgTypes.Percent <| yFactor * Vector2.getY dimension
                  ]
                     ++ dragTrigger isDraggable ( levelwiseId, NoScale )
                 )
