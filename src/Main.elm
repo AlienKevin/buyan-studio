@@ -699,10 +699,10 @@ type OffsetType
 
 
 onDragBy : Vec2 -> Model -> ( Model, Cmd Msg )
-onDragBy delta ({ dragDelta, isSnapToGrid, activeComponentId, activeScale, boxUnits, borderUnits, unitSize, chars, isAspectRatioLocked } as model) =
+onDragBy delta ({ dragDelta, isSnapToGrid, activeComponentId, activeScale, boxUnits, borderUnits, unitSize, chars, isAspectRatioLocked, strokeWidth } as model) =
     let
         factor =
-            100 / (toFloat boxUnits * unitSize)
+            100 / (toFloat (boxUnits - 2 * borderUnits) * unitSize - strokeWidth)
     in
     ( if isSnapToGrid then
         let
