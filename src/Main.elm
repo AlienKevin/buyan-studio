@@ -2280,7 +2280,6 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLi
     Svg.svg
         ([ SvgAttributes.width <| SvgTypes.px <| toFloat boxUnits * unitSize
          , SvgAttributes.height <| SvgTypes.px <| toFloat boxUnits * unitSize
-         , SvgAttributes.class [ charClassName ]
          ]
             ++ (if isThumbnail then
                     [ SvgAttributes.id ("char-" ++ String.fromChar (charFromMyChar myChar)) ]
@@ -2313,24 +2312,6 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLi
                         stroke-linejoin: round !important;
                         vector-effect: non-scaling-stroke;
                     }
-                    #active-component-border {
-                        stroke-width: 2px !important;
-                        stroke: """
-                        ++ (Color.toCssString <| toColor palette.darkFg)
-                        ++ """;
-                    }
-                    #active-component-buttons * {
-                        stroke-width: 2px !important;
-                        stroke: """
-                        ++ (Color.toCssString <| Color.white)
-                        ++ """;
-                    }
-                    .scale-handle, .active-component-buttons-bg {
-                        fill: """
-                        ++ (Color.toCssString <| toColor palette.darkFg)
-                        ++ """;
-                        stroke: none !important;
-                    }
                     svg {
                         overflow: visible;
                     }
@@ -2344,7 +2325,8 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLi
             , SvgAttributes.y <| SvgTypes.px offset
             ]
             [ renderCharHelper
-                { unitSize = unitSize
+                { charClassName = charClassName
+                , unitSize = unitSize
                 , boxUnits = boxUnits
                 , chars = chars
                 , simpleCharSvgs = simpleCharSvgs
@@ -2370,7 +2352,8 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLi
 
 
 renderCharHelper :
-    { unitSize : Float
+    { charClassName : String
+    , unitSize : Float
     , boxUnits : Int
     , chars : Dict Char MyChar
     , simpleCharSvgs : SimpleCharSvgs
@@ -2383,7 +2366,7 @@ renderCharHelper :
     -> Int
     -> MyChar
     -> Svg Msg
-renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId, isThumbnail, isAspectRatioLocked, isSnapToGrid, tightDimension } level myChar =
+renderCharHelper { charClassName, unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId, isThumbnail, isAspectRatioLocked, isSnapToGrid, tightDimension } level myChar =
     let
         id =
             getId myChar
@@ -2397,7 +2380,7 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
         isDraggable =
             not (isThumbnail || level > 1)
 
-        constraint dimension position contents =
+        constraint charType dimension position contents =
             let
                 tightPosition =
                     Vector2.sub position tightDimension.position
@@ -2407,6 +2390,17 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
 
                 yFactor =
                     100 / Vector2.getY tightDimension.dimension
+
+                styledContents =
+                    case charType of
+                        SimpleCharType ->
+                            [ Svg.g
+                                [ SvgAttributes.class [ charClassName ] ]
+                                contents
+                            ]
+
+                        CompoundCharType ->
+                            contents
             in
             Svg.svg
                 ([ SvgAttributes.x <| SvgTypes.Percent <| xFactor * Vector2.getX tightPosition
@@ -2422,13 +2416,13 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
                 )
             <|
                 if Just levelwiseId == activeComponentId && not isThumbnail then
-                    contents
+                    styledContents
                         ++ [ Svg.rect
-                                [ SvgAttributes.id "active-component-border"
-                                , SvgAttributes.width <| SvgTypes.Percent 100
+                                [ SvgAttributes.width <| SvgTypes.Percent 100
                                 , SvgAttributes.height <| SvgTypes.Percent 100
                                 , SvgAttributes.fill <| SvgTypes.PaintNone
-                                , SvgAttributes.stroke <| SvgTypes.Paint <| toColor palette.lightFg
+                                , SvgAttributes.strokeWidth <| SvgTypes.px 2
+                                , SvgAttributes.stroke <| SvgTypes.Paint <| toColor palette.darkFg
                                 ]
                                 []
                            , activeComponentButtons isAspectRatioLocked
@@ -2471,23 +2465,24 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
                            ]
 
                 else
-                    contents
+                    styledContents
     in
     case myChar of
         SimpleChar { dimension, position } ->
             case Dict.get char simpleCharSvgs of
                 Just ( svg, _ ) ->
-                    constraint dimension position [ svg ]
+                    constraint SimpleCharType dimension position [ svg ]
 
                 Nothing ->
                     -- impossible
                     TypedSvg.Core.text <| "Error rendering " ++ String.fromChar char
 
         CompoundChar ({ dimension, position } as compoundChar) components ->
-            constraint dimension position <|
+            constraint CompoundCharType dimension position <|
                 List.map
                     (renderCharHelper
-                        { unitSize = unitSize
+                        { charClassName = charClassName
+                        , unitSize = unitSize
                         , boxUnits = boxUnits
                         , chars = chars
                         , simpleCharSvgs = simpleCharSvgs
@@ -2512,8 +2507,9 @@ activeComponentButtons : Bool -> Svg Msg
 activeComponentButtons isAspectRatioLocked =
     Svg.svg
         [ SvgAttributes.x <| SvgTypes.px -35
-        , SvgAttributes.y <| SvgTypes.percent 40
-        , SvgAttributes.id "active-component-buttons"
+        , SvgAttributes.y <| SvgTypes.percent 50
+        , SvgAttributes.strokeWidth <| SvgTypes.px 2
+        , SvgAttributes.color <| toColor palette.white
         ]
         [ scaleAspectRatioLock isAspectRatioLocked
         , copyActiveComponentButton
@@ -2523,31 +2519,32 @@ activeComponentButtons isAspectRatioLocked =
 
 scaleAspectRatioLock : Bool -> Svg Msg
 scaleAspectRatioLock isAspectRatioLocked =
-    activeComponentButton 0
+    activeComponentButton (-1.5 * fontSize.large - spacing.small)
         (if isAspectRatioLocked then
             FeatherIcons.lock
 
          else
             FeatherIcons.unlock
         )
+        palette.darkFg
         ToggleIsAspectRatioLocked
 
 
 copyActiveComponentButton : Svg Msg
 copyActiveComponentButton =
-    activeComponentButton 1 FeatherIcons.copy CopyActiveComponent
+    activeComponentButton (-0.5 * fontSize.large) FeatherIcons.copy palette.lightFg CopyActiveComponent
 
 
 deleteActiveComponentButton : Svg Msg
 deleteActiveComponentButton =
-    activeComponentButton 2 FeatherIcons.trash2 DeleteActiveComponent
+    activeComponentButton (0.5 * fontSize.large + spacing.small) FeatherIcons.trash2 palette.danger DeleteActiveComponent
 
 
-activeComponentButton : Int -> FeatherIcons.Icon -> Msg -> Svg Msg
-activeComponentButton index icon onClick =
+activeComponentButton : Float -> FeatherIcons.Icon -> E.Color -> Msg -> Svg Msg
+activeComponentButton y icon backgroundColor onClick =
     Svg.svg
         [ SvgAttributes.x <| SvgTypes.px 0
-        , SvgAttributes.y <| SvgTypes.px <| toFloat index * (fontSize.large + spacing.small)
+        , SvgAttributes.y <| SvgTypes.px <| y
         , SvgAttributes.width <| SvgTypes.px fontSize.large
         , SvgAttributes.height <| SvgTypes.px fontSize.large
         ]
@@ -2556,14 +2553,20 @@ activeComponentButton index icon onClick =
             , SvgAttributes.height <| SvgTypes.percent 100
             , SvgAttributes.rx <| SvgTypes.percent 20
             , SvgAttributes.ry <| SvgTypes.percent 20
-            , SvgAttributes.class [ "active-component-buttons-bg" ]
+            , SvgAttributes.fill <| SvgTypes.Paint <| toColor backgroundColor
             , TypedSvg.Events.onClick onClick
             ]
             []
-        , icon
-            |> FeatherIcons.withSize 100
+        , Svg.svg
+            [ SvgAttributes.x <| SvgTypes.Percent 7.5
+            , SvgAttributes.y <| SvgTypes.Percent 7.5
+            , SvgAttributes.pointerEvents "none"
+            ]
+            [icon
+            |> FeatherIcons.withSize 85
             |> FeatherIcons.withSizeUnit "%"
             |> FeatherIcons.toHtml []
+            ]
         ]
 
 
@@ -2573,7 +2576,7 @@ scaleHandle data x y size isDraggable =
         ([ SvgAttributes.cx (SvgTypes.percent x)
          , SvgAttributes.cy (SvgTypes.percent y)
          , SvgAttributes.r (SvgTypes.px <| size / 2)
-         , SvgAttributes.class [ "scale-handle" ]
+         , SvgAttributes.fill <| SvgTypes.Paint <| toColor palette.darkFg
          ]
             ++ dragTrigger isDraggable data
         )
