@@ -680,15 +680,17 @@ stopDragging model =
 
 
 startDragging : ( Id, Scale ) -> Model -> ( Model, Cmd Msg )
-startDragging ( id, scale ) model =
-    ( { model
-        | activeComponentId =
-            Just id
-        , activeScale =
-            scale
-        , dragDelta =
-            Vector2.vec2 0 0
-      }
+startDragging ( id, scale ) ({ boxUnits, borderUnits } as model) =
+    ( updateActiveComponent
+        (updateMyCharRefPosition (snapToGrid boxUnits borderUnits))
+        { model
+            | activeComponentId =
+                Just id
+            , activeScale =
+                scale
+            , dragDelta =
+                Vector2.vec2 0 0
+        }
     , Cmd.none
     )
 
@@ -884,6 +886,20 @@ sign n =
 
     else
         0
+
+
+snapToGrid : Int -> Int -> Vec2 -> Vec2
+snapToGrid boxUnits borderUnits position =
+    let
+        unitPercent =
+            100 / (toFloat (boxUnits - 2 * borderUnits))
+        
+        roundToGrid pos =
+            (*) unitPercent <| toFloat <| round <| pos / unitPercent
+    in
+    Vector2.vec2
+        (roundToGrid <| Vector2.getX position)
+        (roundToGrid <| Vector2.getY position)
 
 
 dragDropChar : DragDrop.Msg Char () -> Model -> ( Model, Cmd Msg )
