@@ -76,9 +76,10 @@ type alias Model =
     , isInputErrorShown : Bool
     , dragDropChar : DragDrop.Model Char ()
     , dragDropCharData : { char : Char }
-    , drag : Draggable.State ( Id, Scale )
+    , drag : Draggable.State DragData
     , dragDelta : Vec2
     , activeComponentId : Maybe Id
+    , activeComponentChar : Maybe Char
     , activeScale : Scale
     , isAspectRatioLocked : Bool
     , isSnapToGrid : Bool
@@ -173,6 +174,7 @@ init _ =
       , drag = Draggable.init
       , dragDelta = Vector2.vec2 0 0
       , activeComponentId = Nothing
+      , activeComponentChar = Nothing
       , activeScale = NoScale
       , isAspectRatioLocked = True
       , isSnapToGrid = True
@@ -201,10 +203,11 @@ type Msg
     | ClosePopUp
     | DragDropChar (DragDrop.Msg Char ())
     | OnDragBy Vec2
-    | StartDragging ( Id, Scale )
+    | StartDragging DragData
     | StopDragging
-    | DragMsg (Draggable.Msg ( Id, Scale ))
-    | SetActiveComponentId Id
+    | DragMsg (Draggable.Msg DragData)
+    | SetActiveComponent { id : Id, char : Char }
+    | CopyActiveComponent
     | GotModel Value
     | SaveModel ()
     | UpdateStrokeWidth Float
@@ -216,12 +219,19 @@ type Msg
     | DownloadSelectedChar
 
 
-dragConfig : Draggable.Config ( Id, Scale ) Msg
+type alias DragData =
+    { id : Id
+    , char : Char
+    , scale : Scale
+    }
+
+
+dragConfig : Draggable.Config DragData Msg
 dragConfig =
     Draggable.customConfig
         [ Draggable.Events.onDragBy (\( dx, dy ) -> Vector2.vec2 dx dy |> OnDragBy)
         , Draggable.Events.onDragStart StartDragging
-        , Draggable.Events.onClick (\( id, _ ) -> SetActiveComponentId id)
+        , Draggable.Events.onClick (\{ id, char } -> SetActiveComponent { id = id, char = char })
         ]
 
 
@@ -276,8 +286,11 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as mod
         StopDragging ->
             stopDragging model
 
-        SetActiveComponentId id ->
-            setActiveComponentId id model
+        SetActiveComponent record ->
+            setActiveComponent record model
+
+        CopyActiveComponent ->
+            copyActiveComponent model
 
         DragMsg msg_ ->
             dragMsg msg_ model
@@ -308,6 +321,26 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as mod
 
         DownloadSelectedChar ->
             downloadSelectedChar model
+
+
+copyActiveComponent : Model -> ( Model, Cmd Msg )
+copyActiveComponent ({ activeComponentChar } as model) =
+    ( { model
+        | chars =
+            Maybe.map
+                (\selectedChar ->
+                    Dict.update
+                        selectedChar
+                        (Maybe.map <|
+                            addComponentToMyChar model.chars (Maybe.withDefault '?' activeComponentChar)
+                        )
+                        model.chars
+                )
+                model.selectedChar
+                |> Maybe.withDefault model.chars
+      }
+    , Cmd.none
+    )
 
 
 requestClearChars : MyCharType -> Model -> ( Model, Cmd Msg )
@@ -652,16 +685,18 @@ decodeId =
     Decode.int
 
 
-dragMsg : Draggable.Msg ( Id, Scale ) -> Model -> ( Model, Cmd Msg )
+dragMsg : Draggable.Msg DragData -> Model -> ( Model, Cmd Msg )
 dragMsg msg model =
     Draggable.update dragConfig msg model
 
 
-setActiveComponentId : Id -> Model -> ( Model, Cmd Msg )
-setActiveComponentId id model =
+setActiveComponent : { id : Id, char : Char } -> Model -> ( Model, Cmd Msg )
+setActiveComponent { id, char } model =
     ( { model
         | activeComponentId =
             Just id
+        , activeComponentChar =
+            Just char
       }
     , Cmd.none
     )
@@ -679,8 +714,8 @@ stopDragging model =
     )
 
 
-startDragging : ( Id, Scale ) -> Model -> ( Model, Cmd Msg )
-startDragging ( id, scale ) ({ boxUnits, borderUnits } as model) =
+startDragging : DragData -> Model -> ( Model, Cmd Msg )
+startDragging { id, scale } ({ boxUnits, borderUnits } as model) =
     ( updateActiveComponent
         (updateMyCharRefPosition (snapToGrid boxUnits borderUnits))
         { model
@@ -892,8 +927,8 @@ snapToGrid : Int -> Int -> Vec2 -> Vec2
 snapToGrid boxUnits borderUnits position =
     let
         unitPercent =
-            100 / (toFloat (boxUnits - 2 * borderUnits))
-        
+            100 / toFloat (boxUnits - 2 * borderUnits)
+
         roundToGrid pos =
             (*) unitPercent <| toFloat <| round <| pos / unitPercent
     in
@@ -2255,17 +2290,17 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLi
                         ++ (Color.toCssString <| toColor palette.darkFg)
                         ++ """;
                     }
-                    #aspect-ratio-lock * {
+                    #active-component-buttons * {
                         stroke-width: 2px !important;
                         stroke: """
                         ++ (Color.toCssString <| Color.white)
                         ++ """;
                     }
-                    .scale-handle, #aspect-ratio-lock-bg {
+                    .scale-handle, .active-component-buttons-bg {
                         fill: """
                         ++ (Color.toCssString <| toColor palette.darkFg)
                         ++ """;
-                        stroke: none;
+                        stroke: none !important;
                     }
                     svg {
                         overflow: visible;
@@ -2324,6 +2359,9 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
         id =
             getId myChar
 
+        char =
+            charFromMyChar myChar
+
         levelwiseId =
             id + (level - 1) * 10
 
@@ -2347,7 +2385,11 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
                  , SvgAttributes.width <| SvgTypes.Percent <| xFactor * Vector2.getX dimension
                  , SvgAttributes.height <| SvgTypes.Percent <| yFactor * Vector2.getY dimension
                  ]
-                    ++ dragTrigger isDraggable ( levelwiseId, NoScale )
+                    ++ dragTrigger isDraggable
+                        { id = levelwiseId
+                        , char = char
+                        , scale = NoScale
+                        }
                 )
             <|
                 if Just levelwiseId == activeComponentId && not isThumbnail then
@@ -2360,18 +2402,50 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
                                 , SvgAttributes.stroke <| SvgTypes.Paint <| toColor palette.lightFg
                                 ]
                                 []
-                           , scaleAspectRatioLock isAspectRatioLocked
-                           , scaleHandle ( levelwiseId, ScaleTopLeft ) 0 0 unitSize isDraggable
-                           , scaleHandle ( levelwiseId, ScaleTopRight ) 100 0 unitSize isDraggable
-                           , scaleHandle ( levelwiseId, ScaleBottomLeft ) 0 100 unitSize isDraggable
-                           , scaleHandle ( levelwiseId, ScaleBottomRight ) 100 100 unitSize isDraggable
+                           , activeComponentButtons isAspectRatioLocked
+                           , scaleHandle
+                                { id = levelwiseId
+                                , char = char
+                                , scale = ScaleTopLeft
+                                }
+                                0
+                                0
+                                unitSize
+                                isDraggable
+                           , scaleHandle
+                                { id = levelwiseId
+                                , char = char
+                                , scale = ScaleTopRight
+                                }
+                                100
+                                0
+                                unitSize
+                                isDraggable
+                           , scaleHandle
+                                { id = levelwiseId
+                                , char = char
+                                , scale = ScaleBottomLeft
+                                }
+                                0
+                                100
+                                unitSize
+                                isDraggable
+                           , scaleHandle
+                                { id = levelwiseId
+                                , char = char
+                                , scale = ScaleBottomRight
+                                }
+                                100
+                                100
+                                unitSize
+                                isDraggable
                            ]
 
                 else
                     contents
     in
     case myChar of
-        SimpleChar { char, dimension, position } ->
+        SimpleChar { dimension, position } ->
             case Dict.get char simpleCharSvgs of
                 Just ( svg, _ ) ->
                     constraint dimension position [ svg ]
@@ -2380,7 +2454,7 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
                     -- impossible
                     TypedSvg.Core.text <| "Error rendering " ++ String.fromChar char
 
-        CompoundChar ({ char, dimension, position } as compoundChar) components ->
+        CompoundChar ({ dimension, position } as compoundChar) components ->
             constraint dimension position <|
                 List.map
                     (renderCharHelper
@@ -2405,12 +2479,23 @@ renderCharHelper { unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId,
                     components
 
 
+activeComponentButtons : Bool -> Svg Msg
+activeComponentButtons isAspectRatioLocked =
+    Svg.svg
+        [ SvgAttributes.x <| SvgTypes.px -35
+        , SvgAttributes.y <| SvgTypes.percent 40
+        , SvgAttributes.id "active-component-buttons"
+        ]
+        [ scaleAspectRatioLock isAspectRatioLocked
+        , copyActiveComponentButton
+        ]
+
+
 scaleAspectRatioLock : Bool -> Svg Msg
 scaleAspectRatioLock isAspectRatioLocked =
     Svg.svg
-        [ SvgAttributes.id "aspect-ratio-lock"
-        , SvgAttributes.x <| SvgTypes.px -35
-        , SvgAttributes.y <| SvgTypes.percent 50
+        [ SvgAttributes.x <| SvgTypes.px 0
+        , SvgAttributes.y <| SvgTypes.percent 0
         , SvgAttributes.width <| SvgTypes.px fontSize.large
         , SvgAttributes.height <| SvgTypes.px fontSize.large
         ]
@@ -2419,7 +2504,7 @@ scaleAspectRatioLock isAspectRatioLocked =
             , SvgAttributes.height <| SvgTypes.percent 100
             , SvgAttributes.rx <| SvgTypes.percent 20
             , SvgAttributes.ry <| SvgTypes.percent 20
-            , SvgAttributes.id "aspect-ratio-lock-bg"
+            , SvgAttributes.class [ "active-component-buttons-bg" ]
             , TypedSvg.Events.onClick ToggleIsAspectRatioLocked
             ]
             []
@@ -2435,23 +2520,47 @@ scaleAspectRatioLock isAspectRatioLocked =
         ]
 
 
-scaleHandle : ( Id, Scale ) -> Float -> Float -> Float -> Bool -> Svg Msg
-scaleHandle ( id, scale ) x y size isDraggable =
+copyActiveComponentButton : Svg Msg
+copyActiveComponentButton =
+    Svg.svg
+        [ SvgAttributes.x <| SvgTypes.px 0
+        , SvgAttributes.y <| SvgTypes.px <| fontSize.large + spacing.small
+        , SvgAttributes.width <| SvgTypes.px fontSize.large
+        , SvgAttributes.height <| SvgTypes.px fontSize.large
+        ]
+        [ Svg.rect
+            [ SvgAttributes.width <| SvgTypes.percent 100
+            , SvgAttributes.height <| SvgTypes.percent 100
+            , SvgAttributes.rx <| SvgTypes.percent 20
+            , SvgAttributes.ry <| SvgTypes.percent 20
+            , SvgAttributes.class [ "active-component-buttons-bg" ]
+            , TypedSvg.Events.onClick CopyActiveComponent
+            ]
+            []
+        , FeatherIcons.copy
+            |> FeatherIcons.withSize 100
+            |> FeatherIcons.withSizeUnit "%"
+            |> FeatherIcons.toHtml []
+        ]
+
+
+scaleHandle : DragData -> Float -> Float -> Float -> Bool -> Svg Msg
+scaleHandle data x y size isDraggable =
     Svg.circle
         ([ SvgAttributes.cx (SvgTypes.percent x)
          , SvgAttributes.cy (SvgTypes.percent y)
          , SvgAttributes.r (SvgTypes.px <| size / 2)
          , SvgAttributes.class [ "scale-handle" ]
          ]
-            ++ dragTrigger isDraggable ( id, scale )
+            ++ dragTrigger isDraggable data
         )
         []
 
 
-dragTrigger : Bool -> ( Id, Scale ) -> List (Html.Attribute Msg)
-dragTrigger isDraggable ( id, scale ) =
+dragTrigger : Bool -> DragData -> List (Html.Attribute Msg)
+dragTrigger isDraggable data =
     if isDraggable then
-        [ Draggable.mouseTrigger ( id, scale ) DragMsg ]
+        [ Draggable.mouseTrigger data DragMsg ]
 
     else
         []
