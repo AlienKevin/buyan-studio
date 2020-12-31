@@ -208,6 +208,7 @@ type Msg
     | DragMsg (Draggable.Msg DragData)
     | SetActiveComponent { id : Id, char : Char }
     | CopyActiveComponent
+    | DeleteActiveComponent
     | GotModel Value
     | SaveModel ()
     | UpdateStrokeWidth Float
@@ -292,6 +293,9 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as mod
         CopyActiveComponent ->
             copyActiveComponent model
 
+        DeleteActiveComponent ->
+            deleteActiveComponent model
+
         DragMsg msg_ ->
             dragMsg msg_ model
 
@@ -321,6 +325,31 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as mod
 
         DownloadSelectedChar ->
             downloadSelectedChar model
+
+
+deleteActiveComponent : Model -> ( Model, Cmd Msg )
+deleteActiveComponent ({ activeComponentId } as model) =
+    ( { model
+        | chars =
+            Maybe.map
+                (\selectedChar ->
+                    Dict.update
+                        selectedChar
+                        (Maybe.map <|
+                            updateMyCharComponents
+                                (List.filter (\x -> Just x.id /= activeComponentId))
+                        )
+                        model.chars
+                )
+                model.selectedChar
+                |> Maybe.withDefault model.chars
+        , activeComponentId =
+            Nothing
+        , activeComponentChar =
+            Nothing
+      }
+    , Cmd.none
+    )
 
 
 copyActiveComponent : Model -> ( Model, Cmd Msg )
@@ -846,7 +875,7 @@ updateActiveComponent func ({ activeComponentId } as model) =
                     Dict.update
                         selectedChar
                         (Maybe.map
-                            (updateMyCharComponent <|
+                            (updateMyCharComponents <|
                                 List.Extra.updateAt
                                     -- impossible
                                     (Maybe.withDefault -1 activeComponentId)
@@ -1258,8 +1287,8 @@ addChar myCharType model =
             )
 
 
-updateMyCharComponent : (List MyCharRef -> List MyCharRef) -> MyChar -> MyChar
-updateMyCharComponent func myChar =
+updateMyCharComponents : (List MyCharRef -> List MyCharRef) -> MyChar -> MyChar
+updateMyCharComponents func myChar =
     case myChar of
         SimpleChar _ ->
             myChar
@@ -2488,43 +2517,37 @@ activeComponentButtons isAspectRatioLocked =
         ]
         [ scaleAspectRatioLock isAspectRatioLocked
         , copyActiveComponentButton
+        , deleteActiveComponentButton
         ]
 
 
 scaleAspectRatioLock : Bool -> Svg Msg
 scaleAspectRatioLock isAspectRatioLocked =
-    Svg.svg
-        [ SvgAttributes.x <| SvgTypes.px 0
-        , SvgAttributes.y <| SvgTypes.percent 0
-        , SvgAttributes.width <| SvgTypes.px fontSize.large
-        , SvgAttributes.height <| SvgTypes.px fontSize.large
-        ]
-        [ Svg.rect
-            [ SvgAttributes.width <| SvgTypes.percent 100
-            , SvgAttributes.height <| SvgTypes.percent 100
-            , SvgAttributes.rx <| SvgTypes.percent 20
-            , SvgAttributes.ry <| SvgTypes.percent 20
-            , SvgAttributes.class [ "active-component-buttons-bg" ]
-            , TypedSvg.Events.onClick ToggleIsAspectRatioLocked
-            ]
-            []
-        , (if isAspectRatioLocked then
+    activeComponentButton 0
+        (if isAspectRatioLocked then
             FeatherIcons.lock
 
-           else
+         else
             FeatherIcons.unlock
-          )
-            |> FeatherIcons.withSize 100
-            |> FeatherIcons.withSizeUnit "%"
-            |> FeatherIcons.toHtml []
-        ]
+        )
+        ToggleIsAspectRatioLocked
 
 
 copyActiveComponentButton : Svg Msg
 copyActiveComponentButton =
+    activeComponentButton 1 FeatherIcons.copy CopyActiveComponent
+
+
+deleteActiveComponentButton : Svg Msg
+deleteActiveComponentButton =
+    activeComponentButton 2 FeatherIcons.trash2 DeleteActiveComponent
+
+
+activeComponentButton : Int -> FeatherIcons.Icon -> Msg -> Svg Msg
+activeComponentButton index icon onClick =
     Svg.svg
         [ SvgAttributes.x <| SvgTypes.px 0
-        , SvgAttributes.y <| SvgTypes.px <| fontSize.large + spacing.small
+        , SvgAttributes.y <| SvgTypes.px <| toFloat index * (fontSize.large + spacing.small)
         , SvgAttributes.width <| SvgTypes.px fontSize.large
         , SvgAttributes.height <| SvgTypes.px fontSize.large
         ]
@@ -2534,10 +2557,10 @@ copyActiveComponentButton =
             , SvgAttributes.rx <| SvgTypes.percent 20
             , SvgAttributes.ry <| SvgTypes.percent 20
             , SvgAttributes.class [ "active-component-buttons-bg" ]
-            , TypedSvg.Events.onClick CopyActiveComponent
+            , TypedSvg.Events.onClick onClick
             ]
             []
-        , FeatherIcons.copy
+        , icon
             |> FeatherIcons.withSize 100
             |> FeatherIcons.withSizeUnit "%"
             |> FeatherIcons.toHtml []
