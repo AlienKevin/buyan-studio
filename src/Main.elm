@@ -174,7 +174,7 @@ init _ =
       , dragDelta = Vector2.vec2 0 0
       , activeComponentId = Nothing
       , activeScale = NoScale
-      , isAspectRatioLocked = True
+      , isAspectRatioLocked = False
       , isSnapToGrid = True
       , paragraphForPreview = ""
       }
@@ -214,7 +214,7 @@ type Msg
     | ToggleIsAspectRatioLocked
     | PreviewInParagraph
     | UpdateParagraphForPreview String
-    | ToggleSnapToGrid
+    | ToggleIsSnapToGrid
     | DownloadSelectedChar
 
 
@@ -318,8 +318,8 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as mod
         UpdateParagraphForPreview paragraph ->
             updateParagraphForPreview paragraph model
 
-        ToggleSnapToGrid ->
-            toggleSnapToGrid model
+        ToggleIsSnapToGrid ->
+            toggleIsSnapToGrid model
 
         DownloadSelectedChar ->
             downloadSelectedChar model
@@ -472,11 +472,20 @@ downloadSelectedChar model =
     )
 
 
-toggleSnapToGrid : Model -> ( Model, Cmd Msg )
-toggleSnapToGrid model =
+toggleIsSnapToGrid : Model -> ( Model, Cmd Msg )
+toggleIsSnapToGrid model =
+    let
+        newIsSnapToGrid =
+            not model.isSnapToGrid
+    in
     ( { model
         | isSnapToGrid =
-            not model.isSnapToGrid
+            newIsSnapToGrid
+        , isAspectRatioLocked =
+            if newIsSnapToGrid then
+                False
+            else
+                model.isAspectRatioLocked
       }
     , Cmd.none
     )
@@ -778,15 +787,13 @@ stopDragging model =
 
 
 startDragging : DragData -> Model -> ( Model, Cmd Msg )
-startDragging { id, scale } ({ isAspectRatioLocked, boxUnits, borderUnits, strokeWidth, unitSize } as model) =
+startDragging { id, scale } ({ isSnapToGrid, boxUnits, borderUnits, strokeWidth, unitSize } as model) =
     ( updateActiveComponent
-        ((if isAspectRatioLocked then
-            identity
-        else
-            updateMyCharRefDimension (snapToGrid boxUnits borderUnits)
-        )
-        <<
+        (if isSnapToGrid then
+            updateMyCharRefDimension (snapToGrid boxUnits borderUnits) <<
             updateMyCharRefPosition (snapToGrid boxUnits borderUnits)
+        else
+            identity
         )
         { model
             | activeComponentId =
@@ -1847,7 +1854,7 @@ preferences model =
                 ]
             }
         , Input.checkbox []
-            { onChange = \_ -> ToggleSnapToGrid
+            { onChange = \_ -> ToggleIsSnapToGrid
             , icon = checkbox
             , checked = model.isSnapToGrid
             , label =
@@ -2466,7 +2473,7 @@ renderCharHelper { charClassName, unitSize, boxUnits, chars, simpleCharSvgs, act
                                 , SvgAttributes.stroke <| SvgTypes.Paint <| toColor palette.darkFg
                                 ]
                                 []
-                           , activeComponentButtons isAspectRatioLocked
+                           , activeComponentButtons isSnapToGrid isAspectRatioLocked
                            , scaleHandle
                                 { id = levelwiseId
                                 , char = char
@@ -2544,31 +2551,34 @@ renderCharHelper { charClassName, unitSize, boxUnits, chars, simpleCharSvgs, act
                     components
 
 
-activeComponentButtons : Bool -> Svg Msg
-activeComponentButtons isAspectRatioLocked =
+activeComponentButtons : Bool -> Bool -> Svg Msg
+activeComponentButtons isSnapToGrid isAspectRatioLocked =
     Svg.svg
         [ SvgAttributes.x <| SvgTypes.px -35
         , SvgAttributes.y <| SvgTypes.percent 50
         , SvgAttributes.strokeWidth <| SvgTypes.px 2
         , SvgAttributes.color <| toColor palette.white
         ]
-        [ scaleAspectRatioLock isAspectRatioLocked
+        [ aspectRatioLockButton isSnapToGrid isAspectRatioLocked
         , copyActiveComponentButton
         , deleteActiveComponentButton
         ]
 
 
-scaleAspectRatioLock : Bool -> Svg Msg
-scaleAspectRatioLock isAspectRatioLocked =
-    activeComponentButton (-1.5 * fontSize.large - spacing.small)
-        (if isAspectRatioLocked then
-            FeatherIcons.lock
+aspectRatioLockButton : Bool -> Bool -> Svg Msg
+aspectRatioLockButton isSnapToGrid isAspectRatioLocked =
+    if isSnapToGrid then
+        Svg.g [] []
+    else
+        activeComponentButton (-1.5 * fontSize.large - spacing.small)
+            (if isAspectRatioLocked then
+                FeatherIcons.lock
 
-         else
-            FeatherIcons.unlock
-        )
-        palette.darkFg
-        ToggleIsAspectRatioLocked
+            else
+                FeatherIcons.unlock
+            )
+            palette.darkFg
+            ToggleIsAspectRatioLocked
 
 
 copyActiveComponentButton : Svg Msg
