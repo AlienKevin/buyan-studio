@@ -79,7 +79,6 @@ type alias Model =
     , drag : Draggable.State DragData
     , dragDelta : Vec2
     , activeComponentId : Maybe Id
-    , activeComponentChar : Maybe Char
     , activeScale : Scale
     , isAspectRatioLocked : Bool
     , isSnapToGrid : Bool
@@ -174,7 +173,6 @@ init _ =
       , drag = Draggable.init
       , dragDelta = Vector2.vec2 0 0
       , activeComponentId = Nothing
-      , activeComponentChar = Nothing
       , activeScale = NoScale
       , isAspectRatioLocked = True
       , isSnapToGrid = True
@@ -345,15 +343,13 @@ deleteActiveComponent ({ activeComponentId } as model) =
                 |> Maybe.withDefault model.chars
         , activeComponentId =
             Nothing
-        , activeComponentChar =
-            Nothing
       }
     , Cmd.none
     )
 
 
 copyActiveComponent : Model -> ( Model, Cmd Msg )
-copyActiveComponent ({ activeComponentChar } as model) =
+copyActiveComponent ({ activeComponentId, isSnapToGrid, boxUnits, borderUnits } as model) =
     ( { model
         | chars =
             Maybe.map
@@ -361,7 +357,47 @@ copyActiveComponent ({ activeComponentChar } as model) =
                     Dict.update
                         selectedChar
                         (Maybe.map <|
-                            addComponentToMyChar model.chars (Maybe.withDefault '?' activeComponentChar)
+                            \myChar ->
+                                case myChar of
+                                    SimpleChar _ ->
+                                        myChar
+
+                                    CompoundChar c components ->
+                                        let
+                                            activeComponent =
+                                                Maybe.andThen
+                                                    (\id ->
+                                                        Array.get id <| Array.fromList components
+                                                    )
+                                                    activeComponentId
+                                        in
+                                        case activeComponent of
+                                            Just component ->
+                                                let
+                                                    delta =
+                                                        5
+                                                    
+                                                    copiedPosition =
+                                                        (if isSnapToGrid then
+                                                            snapToGrid boxUnits borderUnits
+
+                                                         else
+                                                            identity
+                                                        )
+                                                        <|
+                                                        Vector2.add (Vector2.vec2 delta delta) component.position
+
+                                                    copiedComponent =
+                                                        { char = component.char
+                                                        , id = List.length components
+                                                        , dimension = component.dimension
+                                                        , position = copiedPosition
+                                                        }
+                                                in
+                                                CompoundChar c (components ++ [ copiedComponent ])
+
+                                            Nothing ->
+                                                myChar
                         )
                         model.chars
                 )
@@ -724,8 +760,6 @@ setActiveComponent { id, char } model =
     ( { model
         | activeComponentId =
             Just id
-        , activeComponentChar =
-            Just char
       }
     , Cmd.none
     )
@@ -2562,10 +2596,10 @@ activeComponentButton y icon backgroundColor onClick =
             , SvgAttributes.y <| SvgTypes.Percent 7.5
             , SvgAttributes.pointerEvents "none"
             ]
-            [icon
-            |> FeatherIcons.withSize 85
-            |> FeatherIcons.withSizeUnit "%"
-            |> FeatherIcons.toHtml []
+            [ icon
+                |> FeatherIcons.withSize 85
+                |> FeatherIcons.withSizeUnit "%"
+                |> FeatherIcons.toHtml []
             ]
         ]
 
