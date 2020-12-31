@@ -778,9 +778,16 @@ stopDragging model =
 
 
 startDragging : DragData -> Model -> ( Model, Cmd Msg )
-startDragging { id, scale } ({ boxUnits, borderUnits } as model) =
+startDragging { id, scale } ({ isAspectRatioLocked, boxUnits, borderUnits, strokeWidth, unitSize } as model) =
     ( updateActiveComponent
-        (updateMyCharRefPosition (snapToGrid boxUnits borderUnits))
+        ((if isAspectRatioLocked then
+            identity
+        else
+            updateMyCharRefDimension (snapToGrid boxUnits borderUnits)
+        )
+        <<
+            updateMyCharRefPosition (snapToGrid boxUnits borderUnits)
+        )
         { model
             | activeComponentId =
                 Just id
@@ -802,7 +809,7 @@ onDragBy : Vec2 -> Model -> ( Model, Cmd Msg )
 onDragBy delta ({ dragDelta, isSnapToGrid, activeComponentId, activeScale, boxUnits, borderUnits, unitSize, chars, isAspectRatioLocked, strokeWidth } as model) =
     let
         factor =
-            100 / (toFloat (boxUnits - 2 * borderUnits) * unitSize - strokeWidth)
+            100 / (toFloat (boxUnits - 2 * borderUnits) * unitSize)
     in
     ( if isSnapToGrid then
         let
@@ -2303,10 +2310,10 @@ renderChar :
 renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, chars, simpleCharSvgs, activeComponentId, isAspectRatioLocked, isSnapToGrid } myChar =
     let
         size =
-            (toFloat (boxUnits - 2 * borderUnits) * unitSize) - strokeWidth
+            (toFloat (boxUnits - 2 * borderUnits) * unitSize)
 
         offset =
-            (toFloat borderUnits * unitSize) + strokeWidth / 2
+            (toFloat borderUnits * unitSize)
 
         charClassName =
             "char-with-size-" ++ (String.fromInt <| round strokeWidth)
