@@ -764,11 +764,48 @@ roundToUnitSize unitSize n =
 
 
 updateOnDrag : Float -> Vec2 -> Model -> Model
-updateOnDrag factor delta ({ dragDelta, activeComponentId, activeScale, boxUnits, borderUnits, unitSize, chars, isAspectRatioLocked } as model) =
-    { model
-        | chars =
-            case model.selectedChar of
-                Just selectedChar ->
+updateOnDrag factor delta ({ dragDelta, activeScale, boxUnits, borderUnits, unitSize, chars, isAspectRatioLocked } as model) =
+    updateActiveComponent
+        (\char ->
+            let
+                offsetDimension xDir yDir =
+                    offsetDrag DimensionOffset isAspectRatioLocked char.dimension factor xDir yDir delta
+
+                offsetPosition xDir yDir =
+                    offsetDrag PositionOffset isAspectRatioLocked char.dimension factor xDir yDir delta
+            in
+            (case activeScale of
+                NoScale ->
+                    updateMyCharRefPosition
+                        (Vector2.add <| Vector2.scale factor delta)
+
+                ScaleTopLeft ->
+                    updateMyCharRefDimension (Vector2.add (offsetDimension -1 -1))
+                        << updateMyCharRefPosition (Vector2.add (offsetPosition 1 1))
+
+                ScaleTopRight ->
+                    updateMyCharRefDimension (Vector2.add (offsetDimension 1 -1))
+                        << updateMyCharRefPosition (Vector2.add (offsetPosition 0 1))
+
+                ScaleBottomLeft ->
+                    updateMyCharRefDimension (Vector2.add (offsetDimension -1 1))
+                        << updateMyCharRefPosition (Vector2.add (offsetPosition 1 0))
+
+                ScaleBottomRight ->
+                    updateMyCharRefDimension (Vector2.add (offsetDimension 1 1))
+                        << updateMyCharRefPosition (Vector2.add (offsetPosition 0 0))
+            )
+                char
+        )
+        model
+
+
+updateActiveComponent : (MyCharRef -> MyCharRef) -> Model -> Model
+updateActiveComponent func ({ activeComponentId } as model) =
+    case model.selectedChar of
+        Just selectedChar ->
+            { model
+                | chars =
                     Dict.update
                         selectedChar
                         (Maybe.map
@@ -776,44 +813,14 @@ updateOnDrag factor delta ({ dragDelta, activeComponentId, activeScale, boxUnits
                                 List.Extra.updateAt
                                     -- impossible
                                     (Maybe.withDefault -1 activeComponentId)
-                                    (\char ->
-                                        let
-                                            offsetDimension xDir yDir =
-                                                offsetDrag DimensionOffset isAspectRatioLocked char.dimension factor xDir yDir delta
-
-                                            offsetPosition xDir yDir =
-                                                offsetDrag PositionOffset isAspectRatioLocked char.dimension factor xDir yDir delta
-                                        in
-                                        (case activeScale of
-                                            NoScale ->
-                                                updateMyCharRefPosition
-                                                    (Vector2.add <| Vector2.scale factor delta)
-
-                                            ScaleTopLeft ->
-                                                updateMyCharRefDimension (Vector2.add (offsetDimension -1 -1))
-                                                    << updateMyCharRefPosition (Vector2.add (offsetPosition 1 1))
-
-                                            ScaleTopRight ->
-                                                updateMyCharRefDimension (Vector2.add (offsetDimension 1 -1))
-                                                    << updateMyCharRefPosition (Vector2.add (offsetPosition 0 1))
-
-                                            ScaleBottomLeft ->
-                                                updateMyCharRefDimension (Vector2.add (offsetDimension -1 1))
-                                                    << updateMyCharRefPosition (Vector2.add (offsetPosition 1 0))
-
-                                            ScaleBottomRight ->
-                                                updateMyCharRefDimension (Vector2.add (offsetDimension 1 1))
-                                                    << updateMyCharRefPosition (Vector2.add (offsetPosition 0 0))
-                                        )
-                                            char
-                                    )
+                                    func
                             )
                         )
-                        chars
+                        model.chars
+            }
 
-                Nothing ->
-                    chars
-    }
+        Nothing ->
+            model
 
 
 offsetDrag : OffsetType -> Bool -> Vec2 -> Float -> Float -> Float -> Vec2 -> Vec2
