@@ -97,6 +97,7 @@ type alias SavedModel =
     { chars : Dict Char MyChar
     , strokeWidth : Float
     , strokeLineCap : StrokeLineCap
+    , language : Language
     }
 
 
@@ -210,15 +211,11 @@ init flags =
             , language = LanguageEn
             }
     in
-    case Decode.decodeValue I18Next.translationsDecoder flags of
-        Ok trs ->
-            ( { model | trs = trs }, Cmd.none )
+    case Decode.decodeValue decodeLanguage flags of
+        Ok language ->
+            updateLanguage language model
 
         Err err ->
-            let
-                _ =
-                    Debug.log "translation error" err
-            in
             ( model, Cmd.none )
 
 
@@ -668,12 +665,26 @@ saveModel model =
 
 
 encodeModel : Model -> Value
-encodeModel { chars, simpleCharSvgs, strokeWidth, strokeLineCap } =
+encodeModel { chars, simpleCharSvgs, strokeWidth, strokeLineCap, language } =
     Encode.object
         [ ( "chars", Encode.dict String.fromChar encodeMyChar chars )
         , ( "strokeWidth", Encode.float strokeWidth )
         , ( "strokeLineCap", encodeStrokeLineCap strokeLineCap )
+        , ( "language", encodeLanguage language )
         ]
+
+
+encodeLanguage language =
+    Encode.string <|
+        case language of
+            LanguageEn ->
+                "LanguageEn"
+
+            LanguageZhHans ->
+                "LanguageZhHans"
+
+            LanguageZhHant ->
+                "LanguageZhHant"
 
 
 encodeStrokeLineCap : StrokeLineCap -> Value
@@ -728,30 +739,34 @@ encodeVec2 vec =
 
 gotModel : Value -> Model -> ( Model, Cmd Msg )
 gotModel savedModelJson model =
-    ( case Decode.decodeValue decodeSavedModel savedModelJson of
-        Ok { chars, strokeWidth, strokeLineCap } ->
-            { model
-                | chars =
-                    chars
-                , strokeWidth =
-                    strokeWidth
-                , strokeLineCap =
-                    strokeLineCap
-            }
+    case Decode.decodeValue decodeSavedModel savedModelJson of
+        Ok { chars, strokeWidth, strokeLineCap, language } ->
+            let
+                newModel =
+                    { model
+                        | chars =
+                            chars
+                        , strokeWidth =
+                            strokeWidth
+                        , strokeLineCap =
+                            strokeLineCap
+                        , language =
+                            language
+                    }
+            in
+            updateLanguage language newModel
 
         Err err ->
             -- let
             -- _ =
             --     Debug.log "err" err
             -- in
-            model
-    , Cmd.none
-    )
+            ( model, Cmd.none )
 
 
 decodeSavedModel : Decoder SavedModel
 decodeSavedModel =
-    Decode.map3 SavedModel
+    Decode.map4 SavedModel
         (Decode.field "chars"
             (Decode.map (Dict.Extra.mapKeys charFromString) <|
                 Decode.dict decodeMyChar
@@ -759,6 +774,30 @@ decodeSavedModel =
         )
         (Decode.field "strokeWidth" Decode.float)
         (Decode.field "strokeLineCap" decodeStrokeLineCap)
+        (Decode.field "language" decodeLanguage)
+
+
+decodeLanguage : Decoder Language
+decodeLanguage =
+    Decode.string
+        |> Decode.andThen
+            (\language ->
+                case language of
+                    "LanguageEn" ->
+                        Decode.succeed LanguageEn
+
+                    "LanguageZhHans" ->
+                        Decode.succeed LanguageZhHans
+
+                    "LanguageZhHant" ->
+                        Decode.succeed LanguageZhHant
+
+                    _ ->
+                        Decode.fail <|
+                            "Trying to decode Language, but "
+                                ++ language
+                                ++ " is not supported."
+            )
 
 
 decodeStrokeLineCap : Decoder StrokeLineCap
@@ -1901,10 +1940,10 @@ preferences model =
             [ E.spacing spacing.small
             ]
             [ E.text <|
-                    Translations.strokeWidth model.trs
+                Translations.strokeWidth model.trs
             , E.el
-                    [ E.paddingEach { top = 0, bottom = fontSize.medium, left = 0, right = 0 } ]
-                    (E.text <| Translations.strokeLineCap model.trs)
+                [ E.paddingEach { top = 0, bottom = fontSize.medium, left = 0, right = 0 } ]
+                (E.text <| Translations.strokeLineCap model.trs)
             , E.text (Translations.snapToGrid model.trs)
             ]
         , E.column
