@@ -154,13 +154,21 @@ type PopUp
     | NoPopUp
 
 
+minStrokeWidth : Float
+minStrokeWidth = 10
+
+
+maxStrokeWidth : Float
+maxStrokeWidth = 70
+
+
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { chars = Dict.empty
       , selectedChar = Nothing
       , simpleCharSvgs = Dict.empty
       , boxUnits = 34
-      , borderUnits = 1
+      , borderUnits = 3
       , unitSize = 20
       , thumbnailUnitSize = 4
       , strokeWidth = 10
@@ -570,6 +578,8 @@ updateStrokeWidth newStrokeWidth model =
     ( { model
         | strokeWidth =
             newStrokeWidth
+        , borderUnits =
+            round <| lerp minStrokeWidth maxStrokeWidth 2 3 newStrokeWidth
       }
     , Cmd.none
     )
@@ -1833,8 +1843,8 @@ preferences model =
             , label =
                 Input.labelLeft []
                     (E.text <| "Stroke width is " ++ String.fromInt (round model.strokeWidth))
-            , min = 10
-            , max = 70
+            , min = minStrokeWidth
+            , max = maxStrokeWidth
             , step = Just 1
             , value = model.strokeWidth
             , thumb = Input.defaultThumb
@@ -2052,29 +2062,29 @@ gridBackground { boxUnits, borderUnits, unitSize } =
             ++ List.map
                 (\units ->
                     Svg.g
-                        (if units == (round <| toFloat (boxUnits - 4) / 2) then
+                        (if units == (round <| toFloat (boxUnits - borderUnits * 2) / 2) then
                             [ SvgAttributes.strokeWidth <| SvgTypes.px strokeWidth.thick ]
 
                          else
                             []
                         )
                         [ Svg.line
-                            [ SvgAttributes.x1 <| SvgTypes.px <| toFloat (2 + units) * unitSize
-                            , SvgAttributes.y1 <| SvgTypes.px <| unitSize
-                            , SvgAttributes.x2 <| SvgTypes.px <| toFloat (2 + units) * unitSize
-                            , SvgAttributes.y2 <| SvgTypes.px <| toFloat (boxUnits - 1) * unitSize
+                            [ SvgAttributes.x1 <| SvgTypes.px <| toFloat (borderUnits + units) * unitSize
+                            , SvgAttributes.y1 <| SvgTypes.px <| toFloat borderUnits * unitSize
+                            , SvgAttributes.x2 <| SvgTypes.px <| toFloat (borderUnits + units) * unitSize
+                            , SvgAttributes.y2 <| SvgTypes.px <| toFloat (boxUnits - borderUnits) * unitSize
                             ]
                             []
                         , Svg.line
-                            [ SvgAttributes.x1 <| SvgTypes.px <| unitSize
-                            , SvgAttributes.y1 <| SvgTypes.px <| toFloat (2 + units) * unitSize
-                            , SvgAttributes.x2 <| SvgTypes.px <| toFloat (boxUnits - 1) * unitSize
-                            , SvgAttributes.y2 <| SvgTypes.px <| toFloat (2 + units) * unitSize
+                            [ SvgAttributes.x1 <| SvgTypes.px <| toFloat borderUnits * unitSize
+                            , SvgAttributes.y1 <| SvgTypes.px <| toFloat (borderUnits + units) * unitSize
+                            , SvgAttributes.x2 <| SvgTypes.px <| toFloat (boxUnits - borderUnits) * unitSize
+                            , SvgAttributes.y2 <| SvgTypes.px <| toFloat (borderUnits + units) * unitSize
                             ]
                             []
                         ]
                 )
-                (List.range 0 (boxUnits - 4))
+                (List.range 0 (boxUnits - borderUnits * 2))
 
 
 gridOutline : { x : Float, y : Float, strokeWidth : Float, size : Float } -> Svg Msg
