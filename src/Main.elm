@@ -224,7 +224,7 @@ type Msg
     | StartDragging DragData
     | StopDragging
     | DragMsg (Draggable.Msg DragData)
-    | SetActiveComponent { id : Id, char : Char }
+    | SetActiveComponent (Maybe Id)
     | CopyActiveComponent
     | DeleteActiveComponent
     | GotModel Value
@@ -240,7 +240,6 @@ type Msg
 
 type alias DragData =
     { id : Id
-    , char : Char
     , scale : Scale
     }
 
@@ -250,7 +249,7 @@ dragConfig =
     Draggable.customConfig
         [ Draggable.Events.onDragBy (\( dx, dy ) -> Vector2.vec2 dx dy |> OnDragBy)
         , Draggable.Events.onDragStart StartDragging
-        , Draggable.Events.onClick (\{ id, char } -> SetActiveComponent { id = id, char = char })
+        , Draggable.Events.onClick (\{ id } -> SetActiveComponent (Just id))
         ]
 
 
@@ -305,8 +304,8 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as mod
         StopDragging ->
             stopDragging model
 
-        SetActiveComponent record ->
-            setActiveComponent record model
+        SetActiveComponent id ->
+            setActiveComponent id model
 
         CopyActiveComponent ->
             copyActiveComponent model
@@ -787,11 +786,11 @@ dragMsg msg model =
     Draggable.update dragConfig msg model
 
 
-setActiveComponent : { id : Id, char : Char } -> Model -> ( Model, Cmd Msg )
-setActiveComponent { id, char } model =
+setActiveComponent : Maybe Id -> Model -> ( Model, Cmd Msg )
+setActiveComponent id model =
     ( { model
         | activeComponentId =
-            Just id
+            id
       }
     , Cmd.none
     )
@@ -2217,7 +2216,7 @@ charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, bord
     let
         char =
             charFromMyChar myChar
-        
+
         outerBoxSize =
             (toFloat boxUnits + 2 * minBorderUnits) * thumbnailUnitSize
     in
@@ -2519,7 +2518,6 @@ renderCharHelper { charClassName, unitSize, boxUnits, chars, simpleCharSvgs, act
                  ]
                     ++ dragTrigger isDraggable
                         { id = levelwiseId
-                        , char = char
                         , scale = NoScale
                         }
                 )
@@ -2537,7 +2535,6 @@ renderCharHelper { charClassName, unitSize, boxUnits, chars, simpleCharSvgs, act
                            , activeComponentButtons isSnapToGrid isAspectRatioLocked
                            , scaleHandle
                                 { id = levelwiseId
-                                , char = char
                                 , scale = ScaleTopLeft
                                 }
                                 0
@@ -2546,7 +2543,6 @@ renderCharHelper { charClassName, unitSize, boxUnits, chars, simpleCharSvgs, act
                                 isDraggable
                            , scaleHandle
                                 { id = levelwiseId
-                                , char = char
                                 , scale = ScaleTopRight
                                 }
                                 100
@@ -2555,7 +2551,6 @@ renderCharHelper { charClassName, unitSize, boxUnits, chars, simpleCharSvgs, act
                                 isDraggable
                            , scaleHandle
                                 { id = levelwiseId
-                                , char = char
                                 , scale = ScaleBottomLeft
                                 }
                                 0
@@ -2564,7 +2559,6 @@ renderCharHelper { charClassName, unitSize, boxUnits, chars, simpleCharSvgs, act
                                 isDraggable
                            , scaleHandle
                                 { id = levelwiseId
-                                , char = char
                                 , scale = ScaleBottomRight
                                 }
                                 100
