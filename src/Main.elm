@@ -2067,7 +2067,15 @@ gridBackground { boxUnits, borderUnits, unitSize } =
         , SvgAttributes.stroke <| SvgTypes.Paint <| Color.lightBlue
         ]
     <|
-        [ gridOutline
+        [ Svg.rect
+            [ SvgAttributes.width <| SvgTypes.Percent 100
+            , SvgAttributes.height <| SvgTypes.Percent 100
+            , SvgAttributes.fill <| SvgTypes.Paint <| toColor palette.white
+            , SvgAttributes.pointerEvents "fill"
+            , TypedSvg.Events.onClick <| SetActiveComponent Nothing
+            ]
+            []
+        , gridOutline
             { x = 0
             , y = 0
             , strokeWidth =
@@ -2388,6 +2396,7 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLi
     Svg.svg
         ([ SvgAttributes.width <| SvgTypes.px <| outerBoxSize
          , SvgAttributes.height <| SvgTypes.px <| outerBoxSize
+         , Html.Attributes.style "pointer-events" "none"
          ]
             ++ (if isThumbnail then
                     [ SvgAttributes.id ("char-" ++ String.fromChar (charFromMyChar myChar)) ]
@@ -2431,6 +2440,7 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLi
             , SvgAttributes.height <| SvgTypes.px scaledBoxSize
             , SvgAttributes.x <| SvgTypes.px offset
             , SvgAttributes.y <| SvgTypes.px offset
+            , Html.Attributes.style "pointer-events" "none"
             ]
             [ renderCharHelper
                 { charClassName = charClassName
@@ -2515,6 +2525,7 @@ renderCharHelper { charClassName, unitSize, boxUnits, chars, simpleCharSvgs, act
                  , SvgAttributes.y <| SvgTypes.Percent <| yFactor * Vector2.getY tightPosition
                  , SvgAttributes.width <| SvgTypes.Percent <| xFactor * Vector2.getX dimension
                  , SvgAttributes.height <| SvgTypes.Percent <| yFactor * Vector2.getY dimension
+                 , Html.Attributes.style "pointer-events" "auto"
                  ]
                     ++ dragTrigger isDraggable
                         { id = levelwiseId
