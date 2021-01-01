@@ -32,6 +32,11 @@ previewInParagraph translations =
     t translations "previewInParagraph"
 
 
+language : Translations -> String
+language translations =
+    t translations "language"
+
+
 writeTextHereToPreview : Translations -> String
 writeTextHereToPreview translations =
     t translations "writeTextHereToPreview"

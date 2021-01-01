@@ -19,6 +19,7 @@ import Html exposing (Html)
 import Html.Attributes
 import Html.Events
 import Html5.DragDrop as DragDrop
+import Http
 import I18Next
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode exposing (Value)
@@ -88,6 +89,7 @@ type alias Model =
     , isSnapToGrid : Bool
     , paragraphForPreview : String
     , trs : I18Next.Translations
+    , language : Language
     }
 
 
@@ -101,6 +103,12 @@ type alias SavedModel =
 type StrokeLineCap
     = StrokeLineCapRound
     | StrokeLineCapSquare
+
+
+type Language
+    = LanguageEn
+    | LanguageZhHans
+    | LanguageZhHant
 
 
 type Scale
@@ -199,6 +207,7 @@ init flags =
             , isSnapToGrid = True
             , paragraphForPreview = ""
             , trs = I18Next.initialTranslations
+            , language = LanguageEn
             }
     in
     case Decode.decodeValue I18Next.translationsDecoder flags of
@@ -247,6 +256,8 @@ type Msg
     | UpdateParagraphForPreview String
     | ToggleIsSnapToGrid
     | DownloadSelectedChar
+    | UpdateLanguage Language
+    | GotTranslations (Result Http.Error I18Next.Translations)
 
 
 type alias DragData =
@@ -353,6 +364,50 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentIndex } as 
 
         DownloadSelectedChar ->
             downloadSelectedChar model
+
+        UpdateLanguage language ->
+            updateLanguage language model
+
+        GotTranslations trs ->
+            gotTranslations trs model
+
+
+gotTranslations : Result Http.Error I18Next.Translations -> Model -> ( Model, Cmd Msg )
+gotTranslations trs model =
+    ( { model
+        | trs =
+            Result.withDefault model.trs trs
+      }
+    , Cmd.none
+    )
+
+
+updateLanguage : Language -> Model -> ( Model, Cmd Msg )
+updateLanguage language model =
+    ( { model
+        | language =
+            language
+      }
+    , Http.get
+        { url =
+            "/translations/translations." ++ languageTagFromLanguage language ++ ".json"
+        , expect =
+            Http.expectJson GotTranslations I18Next.translationsDecoder
+        }
+    )
+
+
+languageTagFromLanguage : Language -> String
+languageTagFromLanguage language =
+    case language of
+        LanguageEn ->
+            "en"
+
+        LanguageZhHans ->
+            "zh-Hans"
+
+        LanguageZhHant ->
+            "zh-Hant"
 
 
 deleteActiveComponent : Model -> ( Model, Cmd Msg )
@@ -1440,7 +1495,11 @@ view model =
                     , E.height E.fill
                     , E.spacing spacing.medium
                     ]
-                    [ E.column [ E.spacing spacing.medium ]
+                    [ E.column
+                        [ E.spacing spacing.medium
+                        , E.width E.fill
+                        , E.height E.fill
+                        ]
                         [ title <| Translations.preferences model.trs
                         , preferences model
                         , textButton (Translations.previewInParagraph model.trs) (Just PreviewInParagraph)
@@ -1833,61 +1892,88 @@ title text =
 
 preferences : Model -> E.Element Msg
 preferences model =
-    E.column
-        [ E.spacing spacing.small
+    E.row
+        [ E.spacing spacing.medium
+        , E.width E.fill
+        , E.height E.fill
         ]
-        [ Input.slider
-            [ E.height (E.px fontSize.small)
-            , E.width (E.px <| fontSize.small * 7)
-            , E.behindContent
-                (E.el
-                    [ E.width E.fill
-                    , E.height (E.px <| fontSize.small // 3)
-                    , E.centerY
-                    , Background.color palette.darkFg
-                    , Border.rounded (fontSize.small // 3)
-                    ]
-                    E.none
-                )
+        [ E.column
+            [ E.spacing spacing.small
+            , E.width E.fill
             ]
-            { onChange = UpdateStrokeWidth
-            , label =
-                Input.labelLeft []
-                    (E.row
-                        [ E.spacing spacing.small ]
-                        [ E.text <| Translations.strokeWidth model.trs
-                        , E.text <| String.fromInt (round model.strokeWidth)
+            [ Input.slider
+                [ E.height (E.px fontSize.small)
+                , E.width (E.px <| fontSize.small * 7)
+                , E.behindContent
+                    (E.el
+                        [ E.width E.fill
+                        , E.height (E.px <| fontSize.small // 3)
+                        , E.centerY
+                        , Background.color palette.darkFg
+                        , Border.rounded (fontSize.small // 3)
                         ]
+                        E.none
                     )
-            , min = minStrokeWidth
-            , max = maxStrokeWidth
-            , step = Just 1
-            , value = model.strokeWidth
-            , thumb = Input.defaultThumb
-            }
-        , Input.radio
-            [ E.spacing spacing.tiny
-            , E.padding spacing.small
-            ]
-            { onChange = UpdateStrokeLineCap
-            , selected = Just model.strokeLineCap
-            , label = Input.labelLeft [] (E.text (Translations.strokeLineCap model.trs))
-            , options =
-                [ Input.optionWith StrokeLineCapRound
-                    (radioOption (E.text (Translations.StrokeLineCapType.round model.trs)))
-                , Input.optionWith StrokeLineCapSquare
-                    (radioOption (E.text (Translations.StrokeLineCapType.square model.trs)))
                 ]
-            }
-        , Input.checkbox
-            [ E.spacing spacing.small ]
-            { onChange = \_ -> ToggleIsSnapToGrid
-            , icon = checkbox
-            , checked = model.isSnapToGrid
-            , label =
-                Input.labelLeft []
-                    (E.text (Translations.snapToGrid model.trs))
-            }
+                { onChange = UpdateStrokeWidth
+                , label =
+                    Input.labelLeft []
+                        (E.row
+                            [ E.spacing spacing.small ]
+                            [ E.text <| Translations.strokeWidth model.trs
+                            , E.text <| String.fromInt (round model.strokeWidth)
+                            ]
+                        )
+                , min = minStrokeWidth
+                , max = maxStrokeWidth
+                , step = Just 1
+                , value = model.strokeWidth
+                , thumb = Input.defaultThumb
+                }
+            , Input.radio
+                [ E.spacing spacing.tiny
+                , E.padding spacing.small
+                ]
+                { onChange = UpdateStrokeLineCap
+                , selected = Just model.strokeLineCap
+                , label = Input.labelLeft [] (E.text (Translations.strokeLineCap model.trs))
+                , options =
+                    [ Input.optionWith StrokeLineCapRound
+                        (radioOption (E.text (Translations.StrokeLineCapType.round model.trs)))
+                    , Input.optionWith StrokeLineCapSquare
+                        (radioOption (E.text (Translations.StrokeLineCapType.square model.trs)))
+                    ]
+                }
+            , Input.checkbox
+                [ E.spacing spacing.small ]
+                { onChange = \_ -> ToggleIsSnapToGrid
+                , icon = checkbox
+                , checked = model.isSnapToGrid
+                , label =
+                    Input.labelLeft []
+                        (E.text (Translations.snapToGrid model.trs))
+                }
+            ]
+        , E.column
+            [ E.alignTop
+            , E.width E.fill
+            ]
+            [ Input.radio
+                [ E.spacing spacing.tiny
+                ]
+                { onChange = UpdateLanguage
+                , selected = Just model.language
+                , label = Input.labelLeft [] (E.text (Translations.language model.trs))
+                , options =
+                    [ Input.optionWith LanguageEn
+                        (radioOption (E.text "English"))
+                    , Input.optionWith LanguageZhHans
+                        (radioOption (E.text "中文（简体）"))
+                    , Input.optionWith LanguageZhHant
+                        (radioOption (E.text "中文（繁體）"))
+                    ]
+                }
+            ]
         ]
 
 
