@@ -12,7 +12,9 @@
     "localforage": "^1.9.0",
     "regenerator-runtime": "^0.13.7"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "elm-i18next-gen": "^1.1.0"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

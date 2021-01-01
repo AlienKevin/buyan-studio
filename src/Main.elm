@@ -19,6 +19,7 @@ import Html exposing (Html)
 import Html.Attributes
 import Html.Events
 import Html5.DragDrop as DragDrop
+import I18Next
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode exposing (Value)
 import List.Extra
@@ -26,6 +27,9 @@ import Math.Vector2 as Vector2 exposing (Vec2)
 import String.Extra
 import SvgParser
 import Task
+import Translations
+import Translations.CharType
+import Translations.StrokeLineCapType
 import TypedSvg as Svg
 import TypedSvg.Attributes as SvgAttributes
 import TypedSvg.Core exposing (Svg)
@@ -83,6 +87,7 @@ type alias Model =
     , isAspectRatioLocked : Bool
     , isSnapToGrid : Bool
     , paragraphForPreview : String
+    , trs : I18Next.Translations
     }
 
 
@@ -168,32 +173,44 @@ maxBorderUnits =
     3.5
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
-    ( { chars = Dict.empty
-      , selectedChar = Nothing
-      , simpleCharSvgs = Dict.empty
-      , boxUnits = 32
-      , borderUnits = 3
-      , unitSize = 18
-      , thumbnailUnitSize = 4
-      , strokeWidth = 10
-      , strokeLineCap = StrokeLineCapRound
-      , popUp = NoPopUp
-      , newCompoundChar = ""
-      , isInputErrorShown = False
-      , dragDropChar = DragDrop.init
-      , dragDropCharData = { char = '?' }
-      , drag = Draggable.init
-      , dragDelta = Vector2.vec2 0 0
-      , activeComponentIndex = Nothing
-      , activeScale = NoScale
-      , isAspectRatioLocked = False
-      , isSnapToGrid = True
-      , paragraphForPreview = ""
-      }
-    , Cmd.none
-    )
+init : Value -> ( Model, Cmd Msg )
+init flags =
+    let
+        model =
+            { chars = Dict.empty
+            , selectedChar = Nothing
+            , simpleCharSvgs = Dict.empty
+            , boxUnits = 32
+            , borderUnits = 3
+            , unitSize = 18
+            , thumbnailUnitSize = 4
+            , strokeWidth = 10
+            , strokeLineCap = StrokeLineCapRound
+            , popUp = NoPopUp
+            , newCompoundChar = ""
+            , isInputErrorShown = False
+            , dragDropChar = DragDrop.init
+            , dragDropCharData = { char = '?' }
+            , drag = Draggable.init
+            , dragDelta = Vector2.vec2 0 0
+            , activeComponentIndex = Nothing
+            , activeScale = NoScale
+            , isAspectRatioLocked = False
+            , isSnapToGrid = True
+            , paragraphForPreview = ""
+            , trs = I18Next.initialTranslations
+            }
+    in
+    case Decode.decodeValue I18Next.translationsDecoder flags of
+        Ok trs ->
+            ( { model | trs = trs }, Cmd.none )
+
+        Err err ->
+            let
+                _ =
+                    Debug.log "translation error" err
+            in
+            ( model, Cmd.none )
 
 
 
@@ -1424,9 +1441,9 @@ view model =
                     , E.spacing spacing.medium
                     ]
                     [ E.column [ E.spacing spacing.medium ]
-                        [ title "Preferences"
+                        [ title <| Translations.preferences model.trs
                         , preferences model
-                        , textButton "Preview in Paragraph" (Just PreviewInParagraph)
+                        , textButton (Translations.previewInParagraph model.trs) (Just PreviewInParagraph)
                         ]
                     ]
                 ]
@@ -1453,18 +1470,16 @@ popUp model =
 
 
 confirmClearCharsPopUp : MyCharType -> Model -> E.Element Msg
-confirmClearCharsPopUp myCharType ({ boxUnits, thumbnailUnitSize } as model) =
-    confirmDeletePopUpTemplate boxUnits
+confirmClearCharsPopUp myCharType ({ trs, boxUnits, thumbnailUnitSize } as model) =
+    confirmDeletePopUpTemplate trs
+        boxUnits
         thumbnailUnitSize
-        ("all "
-            ++ stringFromMyCharType myCharType
-            ++ " characters"
-        )
+        (Translations.allCharsOfAType trs (stringFromMyCharType trs myCharType))
         (ClearChars myCharType)
 
 
-confirmDeletePopUpTemplate : Int -> Float -> String -> Msg -> E.Element Msg
-confirmDeletePopUpTemplate boxUnits thumbnailUnitSize targetName onConfirm =
+confirmDeletePopUpTemplate : I18Next.Translations -> Int -> Float -> String -> Msg -> E.Element Msg
+confirmDeletePopUpTemplate trs boxUnits thumbnailUnitSize targetName onConfirm =
     let
         borderWidth =
             6
@@ -1491,11 +1506,13 @@ confirmDeletePopUpTemplate boxUnits thumbnailUnitSize targetName onConfirm =
             (E.column
                 [ E.spacing spacing.medium ]
                 [ E.paragraph []
-                    [ E.text "Do you want to delete "
-                    , E.el [ Font.bold, Font.size fontSize.large ] (E.text targetName)
+                    [ E.text (Translations.doYouWantToDelete trs)
+                    , E.el [ Font.bold ] (E.text targetName)
                     , E.text " ?"
                     ]
-                , E.el [ Font.size fontSize.small ] (E.text "This can't be undone.")
+                , E.paragraph [ Font.size fontSize.small ]
+                    [ E.text (Translations.thisCannotBeUndone trs)
+                    ]
                 ]
             )
         , E.row
@@ -1568,7 +1585,7 @@ previewInParagraphPopUp model =
         ]
         [ E.el
             [ E.centerX ]
-            (title "Preview in Paragraph")
+            (title (Translations.previewInParagraph model.trs))
         , E.row
             [ E.height E.fill
             , E.width
@@ -1598,9 +1615,9 @@ previewInParagraphPopUp model =
                         , text =
                             model.paragraphForPreview
                         , placeholder =
-                            Just <| Input.placeholder [ E.alignLeft ] (E.text "Write text here to preview")
+                            Just <| Input.placeholder [ E.alignLeft ] (E.text <| Translations.writeTextHereToPreview model.trs)
                         , label =
-                            Input.labelHidden "Write text here to preview"
+                            Input.labelHidden <| Translations.writeTextHereToPreview model.trs
                         , spellcheck =
                             False
                         }
@@ -1669,15 +1686,16 @@ renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize
 
 
 confirmDeleteSelectedCharPopUp : Model -> E.Element Msg
-confirmDeleteSelectedCharPopUp { activeComponentIndex, boxUnits, thumbnailUnitSize, selectedChar } =
-    confirmDeletePopUpTemplate boxUnits
+confirmDeleteSelectedCharPopUp { trs, activeComponentIndex, boxUnits, thumbnailUnitSize, selectedChar } =
+    confirmDeletePopUpTemplate trs
+        boxUnits
         thumbnailUnitSize
         (String.fromChar (Maybe.withDefault '?' selectedChar))
         DeleteSelectedChar
 
 
 addCompoundCharPopUp : Model -> E.Element Msg
-addCompoundCharPopUp { activeComponentIndex, boxUnits, thumbnailUnitSize, newCompoundChar, isInputErrorShown } =
+addCompoundCharPopUp { trs, activeComponentIndex, boxUnits, thumbnailUnitSize, newCompoundChar, isInputErrorShown } =
     let
         inputLength =
             String.length newCompoundChar
@@ -1687,13 +1705,16 @@ addCompoundCharPopUp { activeComponentIndex, boxUnits, thumbnailUnitSize, newCom
 
         borderWidth =
             6
+
+        width =
+            toFloat boxUnits * thumbnailUnitSize + 10 * borderWidth
     in
     E.column
         ([ E.centerX
          , E.centerY
          , Background.color palette.lightBg
-         , E.width <| E.px <| round <| toFloat boxUnits * thumbnailUnitSize + 3 * borderWidth
-         , E.height <| E.px <| round <| toFloat boxUnits * thumbnailUnitSize + fontSize.title + 3 * borderWidth
+         , E.width <| E.px <| round <| width
+         , E.height <| E.px <| round <| width + fontSize.title
          , E.spacing spacing.small
          , Font.size fontSize.medium
          , E.inFront <|
@@ -1735,18 +1756,20 @@ addCompoundCharPopUp { activeComponentIndex, boxUnits, thumbnailUnitSize, newCom
             , label =
                 Input.labelAbove
                     [ E.paddingEach { top = spacing.medium, bottom = 0, left = 0, right = 0 } ]
-                    (E.text "Character")
+                    (E.text (Translations.character trs))
             }
         , E.el
             ([ E.centerX
              , E.below <|
                 if isInputErrorShown then
-                    E.el
+                    E.paragraph
                         [ E.centerX
                         , Font.size fontSize.small
+                        , E.width <| E.px <| round width
+                        , E.padding spacing.small
                         ]
-                    <|
-                        E.text "Accept only\n 1 character"
+                        [ E.text (Translations.acceptOnlyOneCharacter trs)
+                        ]
 
                 else
                     E.none
@@ -1830,7 +1853,12 @@ preferences model =
             { onChange = UpdateStrokeWidth
             , label =
                 Input.labelLeft []
-                    (E.text <| "Stroke width is " ++ String.fromInt (round model.strokeWidth))
+                    (E.row
+                        [ E.spacing spacing.small ]
+                        [ E.text <| Translations.strokeWidth model.trs
+                        , E.text <| String.fromInt (round model.strokeWidth)
+                        ]
+                    )
             , min = minStrokeWidth
             , max = maxStrokeWidth
             , step = Just 1
@@ -1843,21 +1871,22 @@ preferences model =
             ]
             { onChange = UpdateStrokeLineCap
             , selected = Just model.strokeLineCap
-            , label = Input.labelLeft [] (E.text "Stroke linecap is ")
+            , label = Input.labelLeft [] (E.text (Translations.strokeLineCap model.trs))
             , options =
                 [ Input.optionWith StrokeLineCapRound
-                    (radioOption (E.text "Round"))
+                    (radioOption (E.text (Translations.StrokeLineCapType.round model.trs)))
                 , Input.optionWith StrokeLineCapSquare
-                    (radioOption (E.text "Square"))
+                    (radioOption (E.text (Translations.StrokeLineCapType.square model.trs)))
                 ]
             }
-        , Input.checkbox []
+        , Input.checkbox
+            [ E.spacing spacing.small ]
             { onChange = \_ -> ToggleIsSnapToGrid
             , icon = checkbox
             , checked = model.isSnapToGrid
             , label =
                 Input.labelLeft []
-                    (E.text "Snap to grid")
+                    (E.text (Translations.snapToGrid model.trs))
             }
         ]
 
@@ -2128,7 +2157,7 @@ charPanels model =
 
 
 charPanel : MyCharType -> Model -> E.Element Msg
-charPanel myCharType ({ boxUnits, thumbnailUnitSize } as model) =
+charPanel myCharType ({ trs, boxUnits, thumbnailUnitSize } as model) =
     let
         cards =
             List.filterMap
@@ -2151,8 +2180,7 @@ charPanel myCharType ({ boxUnits, thumbnailUnitSize } as model) =
             , Font.size fontSize.title
             ]
             [ E.text <|
-                (String.Extra.toSentenceCase <| stringFromMyCharType myCharType)
-                    ++ " Characters"
+                (String.Extra.toSentenceCase <| stringFromMyCharType trs myCharType)
             , E.el [ Font.color palette.lightFg ] <|
                 iconButton
                     { icon =
@@ -2184,14 +2212,14 @@ charPanel myCharType ({ boxUnits, thumbnailUnitSize } as model) =
         ]
 
 
-stringFromMyCharType : MyCharType -> String
-stringFromMyCharType myCharType =
+stringFromMyCharType : I18Next.Translations -> MyCharType -> String
+stringFromMyCharType trs myCharType =
     case myCharType of
         SimpleCharType ->
-            "simple"
+            Translations.CharType.simple trs
 
         CompoundCharType ->
-            "compound"
+            Translations.CharType.compound trs
 
 
 charCard : Model -> MyChar -> E.Element Msg
@@ -2570,25 +2598,25 @@ renderCharHelper { charClassName, index, unitSize, boxUnits, chars, simpleCharSv
                 List.indexedMap
                     (\componentIndex ->
                         renderCharHelper
-                        { charClassName = charClassName
-                        , index = componentIndex
-                        , unitSize = unitSize
-                        , boxUnits = boxUnits
-                        , chars = chars
-                        , simpleCharSvgs = simpleCharSvgs
-                        , activeComponentIndex = activeComponentIndex
-                        , isThumbnail = isThumbnail
-                        , isAspectRatioLocked = isAspectRatioLocked
-                        , isSnapToGrid = isSnapToGrid
-                        , tightDimension =
-                            if level >= 1 then
-                                calculateMyCharDimension myChar
+                            { charClassName = charClassName
+                            , index = componentIndex
+                            , unitSize = unitSize
+                            , boxUnits = boxUnits
+                            , chars = chars
+                            , simpleCharSvgs = simpleCharSvgs
+                            , activeComponentIndex = activeComponentIndex
+                            , isThumbnail = isThumbnail
+                            , isAspectRatioLocked = isAspectRatioLocked
+                            , isSnapToGrid = isSnapToGrid
+                            , tightDimension =
+                                if level >= 1 then
+                                    calculateMyCharDimension myChar
 
-                            else
-                                { position = Vector2.vec2 0 0, dimension = Vector2.vec2 100 100 }
-                        }
-                        (level + 1)
-                        << myCharFromMyCharRef chars
+                                else
+                                    { position = Vector2.vec2 0 0, dimension = Vector2.vec2 100 100 }
+                            }
+                            (level + 1)
+                            << myCharFromMyCharRef chars
                     )
                     components
 
@@ -2832,7 +2860,7 @@ decodeSimpleCharSvg =
 ---- PROGRAM ----
 
 
-main : Program () Model Msg
+main : Program Value Model Msg
 main =
     Browser.element
         { view = view

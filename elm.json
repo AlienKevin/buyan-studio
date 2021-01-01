@@ -6,6 +6,7 @@
     "elm-version": "0.19.1",
     "dependencies": {
         "direct": {
+            "ChristophP/elm-i18next": "4.2.0",
             "Garados007/elm-svg-parser": "1.0.0",
             "avh4/elm-color": "1.0.0",
             "elm/browser": "1.0.2",
