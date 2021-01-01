@@ -78,7 +78,7 @@ type alias Model =
     , dragDropCharData : { char : Char }
     , drag : Draggable.State DragData
     , dragDelta : Vec2
-    , activeComponentId : Maybe Id
+    , activeComponentIndex : Maybe Int
     , activeScale : Scale
     , isAspectRatioLocked : Bool
     , isSnapToGrid : Bool
@@ -98,10 +98,6 @@ type StrokeLineCap
     | StrokeLineCapSquare
 
 
-type alias Id =
-    Int
-
-
 type Scale
     = ScaleTopLeft
     | ScaleTopRight
@@ -117,7 +113,6 @@ type MyChar
 
 type alias MyCharRef =
     { char : Char
-    , id : Id
     , dimension : Vec2
     , position : Vec2
     }
@@ -127,7 +122,6 @@ emptyMyChar : MyChar
 emptyMyChar =
     SimpleChar
         { char = '?'
-        , id = -1
         , dimension = Vector2.vec2 0 0
         , position = Vector2.vec2 0 0
         }
@@ -192,7 +186,7 @@ init _ =
       , dragDropCharData = { char = '?' }
       , drag = Draggable.init
       , dragDelta = Vector2.vec2 0 0
-      , activeComponentId = Nothing
+      , activeComponentIndex = Nothing
       , activeScale = NoScale
       , isAspectRatioLocked = False
       , isSnapToGrid = True
@@ -224,7 +218,7 @@ type Msg
     | StartDragging DragData
     | StopDragging
     | DragMsg (Draggable.Msg DragData)
-    | SetActiveComponent (Maybe Id)
+    | SetActiveComponent (Maybe Int)
     | CopyActiveComponent
     | DeleteActiveComponent
     | GotModel Value
@@ -239,7 +233,7 @@ type Msg
 
 
 type alias DragData =
-    { id : Id
+    { index : Int
     , scale : Scale
     }
 
@@ -249,12 +243,12 @@ dragConfig =
     Draggable.customConfig
         [ Draggable.Events.onDragBy (\( dx, dy ) -> Vector2.vec2 dx dy |> OnDragBy)
         , Draggable.Events.onDragStart StartDragging
-        , Draggable.Events.onClick (\{ id } -> SetActiveComponent (Just id))
+        , Draggable.Events.onClick (\{ index } -> SetActiveComponent (Just index))
         ]
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as model) =
+update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentIndex } as model) =
     case msg of
         AddChar myCharType ->
             addChar myCharType model
@@ -304,8 +298,8 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as mod
         StopDragging ->
             stopDragging model
 
-        SetActiveComponent id ->
-            setActiveComponent id model
+        SetActiveComponent index ->
+            setActiveComponent index model
 
         CopyActiveComponent ->
             copyActiveComponent model
@@ -345,7 +339,7 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentId } as mod
 
 
 deleteActiveComponent : Model -> ( Model, Cmd Msg )
-deleteActiveComponent ({ activeComponentId } as model) =
+deleteActiveComponent ({ activeComponentIndex } as model) =
     ( { model
         | chars =
             Maybe.map
@@ -354,13 +348,13 @@ deleteActiveComponent ({ activeComponentId } as model) =
                         selectedChar
                         (Maybe.map <|
                             updateMyCharComponents
-                                (List.filter (\x -> Just x.id /= activeComponentId))
+                                (List.Extra.removeAt (Maybe.withDefault -1 activeComponentIndex))
                         )
                         model.chars
                 )
                 model.selectedChar
                 |> Maybe.withDefault model.chars
-        , activeComponentId =
+        , activeComponentIndex =
             Nothing
       }
     , Cmd.none
@@ -368,7 +362,7 @@ deleteActiveComponent ({ activeComponentId } as model) =
 
 
 copyActiveComponent : Model -> ( Model, Cmd Msg )
-copyActiveComponent ({ activeComponentId, isSnapToGrid, boxUnits, borderUnits } as model) =
+copyActiveComponent ({ activeComponentIndex, isSnapToGrid, boxUnits, borderUnits } as model) =
     ( { model
         | chars =
             Maybe.map
@@ -385,10 +379,10 @@ copyActiveComponent ({ activeComponentId, isSnapToGrid, boxUnits, borderUnits } 
                                         let
                                             activeComponent =
                                                 Maybe.andThen
-                                                    (\id ->
-                                                        Array.get id <| Array.fromList components
+                                                    (\index ->
+                                                        Array.get index <| Array.fromList components
                                                     )
-                                                    activeComponentId
+                                                    activeComponentIndex
                                         in
                                         case activeComponent of
                                             Just component ->
@@ -408,7 +402,6 @@ copyActiveComponent ({ activeComponentId, isSnapToGrid, boxUnits, borderUnits } 
 
                                                     copiedComponent =
                                                         { char = component.char
-                                                        , id = List.length components
                                                         , dimension = component.dimension
                                                         , position = copiedPosition
                                                         }
@@ -645,10 +638,9 @@ encodeMyChar myChar =
 
 
 encodeMyCharRef : MyCharRef -> Value
-encodeMyCharRef { char, id, dimension, position } =
+encodeMyCharRef { char, dimension, position } =
     Encode.object
         [ ( "char", encodeChar char )
-        , ( "id", encodeId id )
         , ( "dimension", encodeVec2 dimension )
         , ( "position", encodeVec2 position )
         ]
@@ -660,11 +652,6 @@ encodeVec2 vec =
         [ ( "x", Encode.float <| Vector2.getX vec )
         , ( "y", Encode.float <| Vector2.getY vec )
         ]
-
-
-encodeId : Id -> Value
-encodeId =
-    Encode.int
 
 
 gotModel : Value -> Model -> ( Model, Cmd Msg )
@@ -762,9 +749,8 @@ decodeMyChar =
 
 decodeMyCharRef : Decoder MyCharRef
 decodeMyCharRef =
-    Decode.map4 MyCharRef
+    Decode.map3 MyCharRef
         (Decode.field "char" decodeChar)
-        (Decode.field "id" decodeId)
         (Decode.field "dimension" decodeVec2)
         (Decode.field "position" decodeVec2)
 
@@ -776,21 +762,16 @@ decodeVec2 =
         (Decode.field "y" Decode.float)
 
 
-decodeId : Decoder Id
-decodeId =
-    Decode.int
-
-
 dragMsg : Draggable.Msg DragData -> Model -> ( Model, Cmd Msg )
 dragMsg msg model =
     Draggable.update dragConfig msg model
 
 
-setActiveComponent : Maybe Id -> Model -> ( Model, Cmd Msg )
-setActiveComponent id model =
+setActiveComponent : Maybe Int -> Model -> ( Model, Cmd Msg )
+setActiveComponent index model =
     ( { model
-        | activeComponentId =
-            id
+        | activeComponentIndex =
+            index
       }
     , Cmd.none
     )
@@ -799,7 +780,7 @@ setActiveComponent id model =
 stopDragging : Model -> ( Model, Cmd Msg )
 stopDragging model =
     ( { model
-        | activeComponentId =
+        | activeComponentIndex =
             Nothing
         , dragDelta =
             Vector2.vec2 0 0
@@ -809,7 +790,7 @@ stopDragging model =
 
 
 startDragging : DragData -> Model -> ( Model, Cmd Msg )
-startDragging { id, scale } ({ isSnapToGrid, boxUnits, strokeWidth, unitSize } as model) =
+startDragging { index, scale } ({ isSnapToGrid, boxUnits, strokeWidth, unitSize } as model) =
     ( updateActiveComponent
         (if isSnapToGrid then
             updateMyCharRefDimension (snapToGrid boxUnits)
@@ -819,8 +800,8 @@ startDragging { id, scale } ({ isSnapToGrid, boxUnits, strokeWidth, unitSize } a
             identity
         )
         { model
-            | activeComponentId =
-                Just id
+            | activeComponentIndex =
+                Just index
             , activeScale =
                 scale
             , dragDelta =
@@ -836,7 +817,7 @@ type OffsetType
 
 
 onDragBy : Vec2 -> Model -> ( Model, Cmd Msg )
-onDragBy delta ({ dragDelta, isSnapToGrid, activeComponentId, activeScale, boxUnits, unitSize, chars, isAspectRatioLocked, strokeWidth } as model) =
+onDragBy delta ({ dragDelta, isSnapToGrid, activeComponentIndex, activeScale, boxUnits, unitSize, chars, isAspectRatioLocked, strokeWidth } as model) =
     let
         factor =
             100 / (toFloat boxUnits * unitSize)
@@ -938,7 +919,7 @@ updateOnDrag factor delta ({ dragDelta, activeScale, boxUnits, unitSize, chars, 
 
 
 updateActiveComponent : (MyCharRef -> MyCharRef) -> Model -> Model
-updateActiveComponent func ({ activeComponentId } as model) =
+updateActiveComponent func ({ activeComponentIndex } as model) =
     case model.selectedChar of
         Just selectedChar ->
             { model
@@ -949,7 +930,7 @@ updateActiveComponent func ({ activeComponentId } as model) =
                             (updateMyCharComponents <|
                                 List.Extra.updateAt
                                     -- impossible
-                                    (Maybe.withDefault -1 activeComponentId)
+                                    (Maybe.withDefault -1 activeComponentIndex)
                                     func
                             )
                         )
@@ -1103,12 +1084,8 @@ addComponentToMyChar chars componentChar myChar =
                     position =
                         calculateCenterPosition dimension
 
-                    id =
-                        List.length components
-
                     newComponent =
                         { char = componentChar
-                        , id = id
                         , dimension = dimension
                         , position = position
                         }
@@ -1229,7 +1206,6 @@ addPendingCompoundChar model =
         newCompoundChar =
             CompoundChar
                 { char = newChar
-                , id = -1
                 , dimension = Vector2.vec2 100 100
                 , position = Vector2.vec2 0 0
                 }
@@ -1262,7 +1238,7 @@ selectChar myChar model =
     ( { model
         | selectedChar =
             Just <| charFromMyChar myChar
-        , activeComponentId =
+        , activeComponentIndex =
             Nothing
       }
     , Cmd.none
@@ -1310,7 +1286,6 @@ getSimpleChars svgsJson model =
                                 char
                                 (SimpleChar
                                     { char = char
-                                    , id = -1
                                     , dimension = dimension
                                     , position = position
                                     }
@@ -1644,7 +1619,7 @@ previewInParagraphPopUp model =
 
 
 renderPreviewInParagraph : Float -> Model -> E.Element Msg
-renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, simpleCharSvgs, activeComponentId, isAspectRatioLocked, isSnapToGrid } as model) =
+renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, simpleCharSvgs, activeComponentIndex, isAspectRatioLocked, isSnapToGrid } as model) =
     let
         lines =
             String.split "\n" paragraphForPreview
@@ -1669,7 +1644,7 @@ renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize
                                         , borderUnits = borderUnits
                                         , chars = chars
                                         , simpleCharSvgs = simpleCharSvgs
-                                        , activeComponentId = activeComponentId
+                                        , activeComponentIndex = activeComponentIndex
                                         , strokeWidth = strokeWidth * displayFontSize / (toFloat boxUnits * unitSize)
                                         , strokeLineCap = strokeLineCap
                                         , isThumbnail = True
@@ -1694,7 +1669,7 @@ renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize
 
 
 confirmDeleteSelectedCharPopUp : Model -> E.Element Msg
-confirmDeleteSelectedCharPopUp { activeComponentId, boxUnits, thumbnailUnitSize, selectedChar } =
+confirmDeleteSelectedCharPopUp { activeComponentIndex, boxUnits, thumbnailUnitSize, selectedChar } =
     confirmDeletePopUpTemplate boxUnits
         thumbnailUnitSize
         (String.fromChar (Maybe.withDefault '?' selectedChar))
@@ -1702,7 +1677,7 @@ confirmDeleteSelectedCharPopUp { activeComponentId, boxUnits, thumbnailUnitSize,
 
 
 addCompoundCharPopUp : Model -> E.Element Msg
-addCompoundCharPopUp { activeComponentId, boxUnits, thumbnailUnitSize, newCompoundChar, isInputErrorShown } =
+addCompoundCharPopUp { activeComponentIndex, boxUnits, thumbnailUnitSize, newCompoundChar, isInputErrorShown } =
     let
         inputLength =
             String.length newCompoundChar
@@ -1973,7 +1948,7 @@ radioOption optionLabel status =
 
 
 editor : Model -> E.Element Msg
-editor ({ activeComponentId, selectedChar, chars, simpleCharSvgs, boxUnits, borderUnits, unitSize, strokeWidth, strokeLineCap, isAspectRatioLocked, isSnapToGrid } as model) =
+editor ({ activeComponentIndex, selectedChar, chars, simpleCharSvgs, boxUnits, borderUnits, unitSize, strokeWidth, strokeLineCap, isAspectRatioLocked, isSnapToGrid } as model) =
     let
         dropId =
             DragDrop.getDropId model.dragDropChar
@@ -2005,7 +1980,7 @@ editor ({ activeComponentId, selectedChar, chars, simpleCharSvgs, boxUnits, bord
                             , borderUnits = borderUnits
                             , chars = chars
                             , simpleCharSvgs = simpleCharSvgs
-                            , activeComponentId = activeComponentId
+                            , activeComponentIndex = activeComponentIndex
                             , strokeWidth = strokeWidth
                             , strokeLineCap = strokeLineCap
                             , isThumbnail = False
@@ -2220,7 +2195,7 @@ stringFromMyCharType myCharType =
 
 
 charCard : Model -> MyChar -> E.Element Msg
-charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, simpleCharSvgs, selectedChar, isAspectRatioLocked, isSnapToGrid } myChar =
+charCard { chars, activeComponentIndex, unitSize, thumbnailUnitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, simpleCharSvgs, selectedChar, isAspectRatioLocked, isSnapToGrid } myChar =
     let
         char =
             charFromMyChar myChar
@@ -2311,11 +2286,11 @@ charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, bord
                 , strokeLineCap = strokeLineCap
                 , chars = chars
                 , simpleCharSvgs = simpleCharSvgs
-                , activeComponentId =
+                , activeComponentIndex =
                     Maybe.andThen
                         (\selected ->
                             if selected == char then
-                                activeComponentId
+                                activeComponentIndex
 
                             else
                                 Nothing
@@ -2361,13 +2336,13 @@ renderChar :
     , strokeLineCap : StrokeLineCap
     , chars : Dict Char MyChar
     , simpleCharSvgs : SimpleCharSvgs
-    , activeComponentId : Maybe Id
+    , activeComponentIndex : Maybe Int
     , isAspectRatioLocked : Bool
     , isSnapToGrid : Bool
     }
     -> MyChar
     -> Svg Msg
-renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, chars, simpleCharSvgs, activeComponentId, isAspectRatioLocked, isSnapToGrid } myChar =
+renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, chars, simpleCharSvgs, activeComponentIndex, isAspectRatioLocked, isSnapToGrid } myChar =
     let
         boxSize =
             toFloat boxUnits * unitSize
@@ -2444,11 +2419,12 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLi
             ]
             [ renderCharHelper
                 { charClassName = charClassName
+                , index = -1
                 , unitSize = scaledUnitSize
                 , boxUnits = boxUnits
                 , chars = chars
                 , simpleCharSvgs = simpleCharSvgs
-                , activeComponentId = activeComponentId
+                , activeComponentIndex = activeComponentIndex
                 , isThumbnail = isThumbnail
                 , isAspectRatioLocked = isAspectRatioLocked
                 , isSnapToGrid =
@@ -2471,11 +2447,12 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLi
 
 renderCharHelper :
     { charClassName : String
+    , index : Int
     , unitSize : Float
     , boxUnits : Int
     , chars : Dict Char MyChar
     , simpleCharSvgs : SimpleCharSvgs
-    , activeComponentId : Maybe Id
+    , activeComponentIndex : Maybe Int
     , isThumbnail : Bool
     , isAspectRatioLocked : Bool
     , isSnapToGrid : Bool
@@ -2484,16 +2461,13 @@ renderCharHelper :
     -> Int
     -> MyChar
     -> Svg Msg
-renderCharHelper { charClassName, unitSize, boxUnits, chars, simpleCharSvgs, activeComponentId, isThumbnail, isAspectRatioLocked, isSnapToGrid, tightDimension } level myChar =
+renderCharHelper { charClassName, index, unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIndex, isThumbnail, isAspectRatioLocked, isSnapToGrid, tightDimension } level myChar =
     let
-        id =
-            getId myChar
-
         char =
             charFromMyChar myChar
 
-        levelwiseId =
-            id + (level - 1) * 10
+        levelwiseIndex =
+            index + (level - 1) * 10
 
         isDraggable =
             not (isThumbnail || level > 1)
@@ -2528,12 +2502,12 @@ renderCharHelper { charClassName, unitSize, boxUnits, chars, simpleCharSvgs, act
                  , Html.Attributes.style "pointer-events" "auto"
                  ]
                     ++ dragTrigger isDraggable
-                        { id = levelwiseId
+                        { index = levelwiseIndex
                         , scale = NoScale
                         }
                 )
             <|
-                if Just levelwiseId == activeComponentId && not isThumbnail then
+                if Just levelwiseIndex == activeComponentIndex && not isThumbnail then
                     styledContents
                         ++ [ Svg.rect
                                 [ SvgAttributes.width <| SvgTypes.Percent 100
@@ -2545,7 +2519,7 @@ renderCharHelper { charClassName, unitSize, boxUnits, chars, simpleCharSvgs, act
                                 []
                            , activeComponentButtons isSnapToGrid isAspectRatioLocked
                            , scaleHandle
-                                { id = levelwiseId
+                                { index = levelwiseIndex
                                 , scale = ScaleTopLeft
                                 }
                                 0
@@ -2553,7 +2527,7 @@ renderCharHelper { charClassName, unitSize, boxUnits, chars, simpleCharSvgs, act
                                 unitSize
                                 isDraggable
                            , scaleHandle
-                                { id = levelwiseId
+                                { index = levelwiseIndex
                                 , scale = ScaleTopRight
                                 }
                                 100
@@ -2561,7 +2535,7 @@ renderCharHelper { charClassName, unitSize, boxUnits, chars, simpleCharSvgs, act
                                 unitSize
                                 isDraggable
                            , scaleHandle
-                                { id = levelwiseId
+                                { index = levelwiseIndex
                                 , scale = ScaleBottomLeft
                                 }
                                 0
@@ -2569,7 +2543,7 @@ renderCharHelper { charClassName, unitSize, boxUnits, chars, simpleCharSvgs, act
                                 unitSize
                                 isDraggable
                            , scaleHandle
-                                { id = levelwiseId
+                                { index = levelwiseIndex
                                 , scale = ScaleBottomRight
                                 }
                                 100
@@ -2593,14 +2567,16 @@ renderCharHelper { charClassName, unitSize, boxUnits, chars, simpleCharSvgs, act
 
         CompoundChar ({ dimension, position } as compoundChar) components ->
             constraint CompoundCharType dimension position <|
-                List.map
-                    (renderCharHelper
+                List.indexedMap
+                    (\componentIndex ->
+                        renderCharHelper
                         { charClassName = charClassName
+                        , index = componentIndex
                         , unitSize = unitSize
                         , boxUnits = boxUnits
                         , chars = chars
                         , simpleCharSvgs = simpleCharSvgs
-                        , activeComponentId = activeComponentId
+                        , activeComponentIndex = activeComponentIndex
                         , isThumbnail = isThumbnail
                         , isAspectRatioLocked = isAspectRatioLocked
                         , isSnapToGrid = isSnapToGrid
@@ -2720,8 +2696,7 @@ myCharFromMyCharRef chars ref =
 
         updateAttributes r =
             { r
-                | id = ref.id
-                , dimension = ref.dimension
+                | dimension = ref.dimension
                 , position = ref.position
             }
     in
@@ -2731,16 +2706,6 @@ myCharFromMyCharRef chars ref =
 
         CompoundChar r components ->
             CompoundChar (updateAttributes r) components
-
-
-getId : MyChar -> Id
-getId myChar =
-    case myChar of
-        SimpleChar { id } ->
-            id
-
-        CompoundChar { id } _ ->
-            id
 
 
 iconButton : { icon : FeatherIcons.Icon, size : Float, onPress : Maybe Msg } -> E.Element Msg
