@@ -1893,14 +1893,22 @@ title text =
 preferences : Model -> E.Element Msg
 preferences model =
     E.row
-        [ E.spacing spacing.medium
+        [ E.spacing spacing.small
         , E.width E.fill
         , E.height E.fill
         ]
         [ E.column
             [ E.spacing spacing.small
-            , E.width E.fill
             ]
+            [ E.text <|
+                    Translations.strokeWidth model.trs
+            , E.el
+                    [ E.paddingEach { top = 0, bottom = fontSize.medium, left = 0, right = 0 } ]
+                    (E.text <| Translations.strokeLineCap model.trs)
+            , E.text (Translations.snapToGrid model.trs)
+            ]
+        , E.column
+            [ E.width E.fill ]
             [ Input.slider
                 [ E.height (E.px fontSize.small)
                 , E.width (E.px <| fontSize.small * 7)
@@ -1918,12 +1926,7 @@ preferences model =
                 { onChange = UpdateStrokeWidth
                 , label =
                     Input.labelLeft []
-                        (E.row
-                            [ E.spacing spacing.small ]
-                            [ E.text <| Translations.strokeWidth model.trs
-                            , E.text <| String.fromInt (round model.strokeWidth)
-                            ]
-                        )
+                        (E.text <| String.fromInt (round model.strokeWidth))
                 , min = minStrokeWidth
                 , max = maxStrokeWidth
                 , step = Just 1
@@ -1932,11 +1935,11 @@ preferences model =
                 }
             , Input.radio
                 [ E.spacing spacing.tiny
-                , E.padding spacing.small
+                , E.paddingXY 0 spacing.small
                 ]
                 { onChange = UpdateStrokeLineCap
                 , selected = Just model.strokeLineCap
-                , label = Input.labelLeft [] (E.text (Translations.strokeLineCap model.trs))
+                , label = Input.labelHidden (Translations.strokeLineCap model.trs)
                 , options =
                     [ Input.optionWith StrokeLineCapRound
                         (radioOption (E.text (Translations.StrokeLineCapType.round model.trs)))
@@ -1950,10 +1953,14 @@ preferences model =
                 , icon = checkbox
                 , checked = model.isSnapToGrid
                 , label =
-                    Input.labelLeft []
-                        (E.text (Translations.snapToGrid model.trs))
+                    Input.labelHidden (Translations.snapToGrid model.trs)
                 }
             ]
+        , E.column
+            [ E.alignTop
+            , E.paddingEach { top = 0, bottom = 0, left = spacing.large, right = 0 }
+            ]
+            [ E.el [ E.alignRight ] <| E.text <| Translations.language model.trs ]
         , E.column
             [ E.alignTop
             , E.width E.fill
@@ -1963,7 +1970,7 @@ preferences model =
                 ]
                 { onChange = UpdateLanguage
                 , selected = Just model.language
-                , label = Input.labelLeft [] (E.text (Translations.language model.trs))
+                , label = Input.labelHidden (Translations.language model.trs)
                 , options =
                     [ Input.optionWith LanguageEn
                         (radioOption (E.text "English"))
