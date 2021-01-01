@@ -66,7 +66,7 @@ type alias Model =
     , selectedChar : Maybe Char
     , simpleCharSvgs : SimpleCharSvgs
     , boxUnits : Int
-    , borderUnits : Int
+    , borderUnits : Float
     , unitSize : Float
     , thumbnailUnitSize : Float
     , strokeWidth : Float
@@ -155,11 +155,23 @@ type PopUp
 
 
 minStrokeWidth : Float
-minStrokeWidth = 10
+minStrokeWidth =
+    10
 
 
 maxStrokeWidth : Float
-maxStrokeWidth = 70
+maxStrokeWidth =
+    70
+
+
+minBorderUnits : Float
+minBorderUnits =
+    2
+
+
+maxBorderUnits : Float
+maxBorderUnits =
+    3.5
 
 
 init : () -> ( Model, Cmd Msg )
@@ -167,9 +179,9 @@ init _ =
     ( { chars = Dict.empty
       , selectedChar = Nothing
       , simpleCharSvgs = Dict.empty
-      , boxUnits = 34
+      , boxUnits = 32
       , borderUnits = 3
-      , unitSize = 20
+      , unitSize = 18
       , thumbnailUnitSize = 4
       , strokeWidth = 10
       , strokeLineCap = StrokeLineCapRound
@@ -384,16 +396,16 @@ copyActiveComponent ({ activeComponentId, isSnapToGrid, boxUnits, borderUnits } 
                                                 let
                                                     delta =
                                                         5
-                                                    
+
                                                     copiedPosition =
                                                         (if isSnapToGrid then
-                                                            snapToGrid boxUnits borderUnits
+                                                            snapToGrid boxUnits
 
                                                          else
                                                             identity
                                                         )
                                                         <|
-                                                        Vector2.add (Vector2.vec2 delta delta) component.position
+                                                            Vector2.add (Vector2.vec2 delta delta) component.position
 
                                                     copiedComponent =
                                                         { char = component.char
@@ -492,6 +504,7 @@ toggleIsSnapToGrid model =
         , isAspectRatioLocked =
             if newIsSnapToGrid then
                 False
+
             else
                 model.isAspectRatioLocked
       }
@@ -579,7 +592,7 @@ updateStrokeWidth newStrokeWidth model =
         | strokeWidth =
             newStrokeWidth
         , borderUnits =
-            round <| lerp minStrokeWidth maxStrokeWidth 2 3 newStrokeWidth
+            lerp minStrokeWidth maxStrokeWidth minBorderUnits maxBorderUnits newStrokeWidth
       }
     , Cmd.none
     )
@@ -797,12 +810,13 @@ stopDragging model =
 
 
 startDragging : DragData -> Model -> ( Model, Cmd Msg )
-startDragging { id, scale } ({ isSnapToGrid, boxUnits, borderUnits, strokeWidth, unitSize } as model) =
+startDragging { id, scale } ({ isSnapToGrid, boxUnits, strokeWidth, unitSize } as model) =
     ( updateActiveComponent
         (if isSnapToGrid then
-            updateMyCharRefDimension (snapToGrid boxUnits borderUnits) <<
-            updateMyCharRefPosition (snapToGrid boxUnits borderUnits)
-        else
+            updateMyCharRefDimension (snapToGrid boxUnits)
+                << updateMyCharRefPosition (snapToGrid boxUnits)
+
+         else
             identity
         )
         { model
@@ -823,10 +837,10 @@ type OffsetType
 
 
 onDragBy : Vec2 -> Model -> ( Model, Cmd Msg )
-onDragBy delta ({ dragDelta, isSnapToGrid, activeComponentId, activeScale, boxUnits, borderUnits, unitSize, chars, isAspectRatioLocked, strokeWidth } as model) =
+onDragBy delta ({ dragDelta, isSnapToGrid, activeComponentId, activeScale, boxUnits, unitSize, chars, isAspectRatioLocked, strokeWidth } as model) =
     let
         factor =
-            100 / (toFloat (boxUnits - 2 * borderUnits) * unitSize)
+            100 / (toFloat boxUnits * unitSize)
     in
     ( if isSnapToGrid then
         let
@@ -888,7 +902,7 @@ roundToUnitSize unitSize n =
 
 
 updateOnDrag : Float -> Vec2 -> Model -> Model
-updateOnDrag factor delta ({ dragDelta, activeScale, boxUnits, borderUnits, unitSize, chars, isAspectRatioLocked } as model) =
+updateOnDrag factor delta ({ dragDelta, activeScale, boxUnits, unitSize, chars, isAspectRatioLocked } as model) =
     updateActiveComponent
         (\char ->
             let
@@ -1010,11 +1024,11 @@ sign n =
         0
 
 
-snapToGrid : Int -> Int -> Vec2 -> Vec2
-snapToGrid boxUnits borderUnits position =
+snapToGrid : Int -> Vec2 -> Vec2
+snapToGrid boxUnits position =
     let
         unitPercent =
-            100 / toFloat (boxUnits - 2 * borderUnits)
+            100 / toFloat boxUnits
 
         roundToGrid pos =
             (*) unitPercent <| toFloat <| round <| pos / unitPercent
@@ -1960,7 +1974,7 @@ radioOption optionLabel status =
 
 
 editor : Model -> E.Element Msg
-editor ({ activeComponentId, selectedChar, chars, simpleCharSvgs, boxUnits, unitSize, borderUnits, strokeWidth, strokeLineCap, isAspectRatioLocked, isSnapToGrid } as model) =
+editor ({ activeComponentId, selectedChar, chars, simpleCharSvgs, boxUnits, borderUnits, unitSize, strokeWidth, strokeLineCap, isAspectRatioLocked, isSnapToGrid } as model) =
     let
         dropId =
             DragDrop.getDropId model.dragDropChar
@@ -2017,7 +2031,7 @@ editor ({ activeComponentId, selectedChar, chars, simpleCharSvgs, boxUnits, unit
 
 gridBackground :
     { boxUnits : Int
-    , borderUnits : Int
+    , borderUnits : Float
     , unitSize : Float
     }
     -> Svg Msg
@@ -2026,8 +2040,20 @@ gridBackground { boxUnits, borderUnits, unitSize } =
         boxSize =
             toFloat boxUnits * unitSize
 
+        minBorderSize =
+            minBorderUnits * unitSize
+
+        outerBoxSize =
+            boxSize + 2 * minBorderSize
+
         borderSize =
-            toFloat borderUnits * unitSize
+            borderUnits * unitSize
+
+        scaledBoxSize =
+            outerBoxSize - 2 * borderSize
+
+        scaledUnitSize =
+            scaledBoxSize / boxSize * unitSize
 
         strokeWidth =
             { normal =
@@ -2037,18 +2063,18 @@ gridBackground { boxUnits, borderUnits, unitSize } =
             }
     in
     Svg.svg
-        [ SvgAttributes.width <| SvgTypes.px <| boxSize
-        , SvgAttributes.height <| SvgTypes.px <| boxSize
+        [ SvgAttributes.width <| SvgTypes.px <| outerBoxSize
+        , SvgAttributes.height <| SvgTypes.px <| outerBoxSize
         , SvgAttributes.stroke <| SvgTypes.Paint <| Color.lightBlue
         ]
     <|
         [ gridOutline
-            { x = strokeWidth.thick
-            , y = strokeWidth.thick
+            { x = 0
+            , y = 0
             , strokeWidth =
                 strokeWidth.thick
             , size =
-                boxSize - strokeWidth.thick * 2
+                outerBoxSize
             }
         , gridOutline
             { x = borderSize
@@ -2056,35 +2082,42 @@ gridBackground { boxUnits, borderUnits, unitSize } =
             , strokeWidth =
                 strokeWidth.thick
             , size =
-                boxSize - borderSize * 2
+                scaledBoxSize
             }
-        ]
-            ++ List.map
+        , Svg.svg
+            [ SvgAttributes.x <| SvgTypes.px <| borderSize
+            , SvgAttributes.y <| SvgTypes.px <| borderSize
+            , SvgAttributes.width <| SvgTypes.px <| scaledBoxSize
+            , SvgAttributes.height <| SvgTypes.px <| scaledBoxSize
+            ]
+          <|
+            List.map
                 (\units ->
                     Svg.g
-                        (if units == (round <| toFloat (boxUnits - borderUnits * 2) / 2) then
+                        (if units == (round <| toFloat boxUnits / 2) then
                             [ SvgAttributes.strokeWidth <| SvgTypes.px strokeWidth.thick ]
 
                          else
                             []
                         )
                         [ Svg.line
-                            [ SvgAttributes.x1 <| SvgTypes.px <| toFloat (borderUnits + units) * unitSize
-                            , SvgAttributes.y1 <| SvgTypes.px <| toFloat borderUnits * unitSize
-                            , SvgAttributes.x2 <| SvgTypes.px <| toFloat (borderUnits + units) * unitSize
-                            , SvgAttributes.y2 <| SvgTypes.px <| toFloat (boxUnits - borderUnits) * unitSize
+                            [ SvgAttributes.x1 <| SvgTypes.px <| toFloat units * scaledUnitSize
+                            , SvgAttributes.y1 <| SvgTypes.px <| 0
+                            , SvgAttributes.x2 <| SvgTypes.px <| toFloat units * scaledUnitSize
+                            , SvgAttributes.y2 <| SvgTypes.px <| toFloat boxUnits * scaledUnitSize
                             ]
                             []
                         , Svg.line
-                            [ SvgAttributes.x1 <| SvgTypes.px <| toFloat borderUnits * unitSize
-                            , SvgAttributes.y1 <| SvgTypes.px <| toFloat (borderUnits + units) * unitSize
-                            , SvgAttributes.x2 <| SvgTypes.px <| toFloat (boxUnits - borderUnits) * unitSize
-                            , SvgAttributes.y2 <| SvgTypes.px <| toFloat (borderUnits + units) * unitSize
+                            [ SvgAttributes.x1 <| SvgTypes.px <| 0
+                            , SvgAttributes.y1 <| SvgTypes.px <| toFloat units * scaledUnitSize
+                            , SvgAttributes.x2 <| SvgTypes.px <| toFloat boxUnits * scaledUnitSize
+                            , SvgAttributes.y2 <| SvgTypes.px <| toFloat units * scaledUnitSize
                             ]
                             []
                         ]
                 )
-                (List.range 0 (boxUnits - borderUnits * 2))
+                (List.range 0 boxUnits)
+        ]
 
 
 gridOutline : { x : Float, y : Float, strokeWidth : Float, size : Float } -> Svg Msg
@@ -2184,9 +2217,12 @@ charCard { chars, activeComponentId, unitSize, thumbnailUnitSize, boxUnits, bord
     let
         char =
             charFromMyChar myChar
+        
+        outerBoxSize =
+            (toFloat boxUnits + 2 * minBorderUnits) * thumbnailUnitSize
     in
     E.column
-        (([ E.width <| E.px <| round <| toFloat boxUnits * thumbnailUnitSize
+        (([ E.width <| E.px <| round outerBoxSize
           , Background.color palette.lightBg
           , Border.rounded spacing.medium
           , Events.onClick <| SelectChar myChar
@@ -2313,7 +2349,7 @@ renderChar :
     { isThumbnail : Bool
     , unitSize : Float
     , boxUnits : Int
-    , borderUnits : Int
+    , borderUnits : Float
     , strokeWidth : Float
     , strokeLineCap : StrokeLineCap
     , chars : Dict Char MyChar
@@ -2326,18 +2362,33 @@ renderChar :
     -> Svg Msg
 renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, chars, simpleCharSvgs, activeComponentId, isAspectRatioLocked, isSnapToGrid } myChar =
     let
-        size =
-            (toFloat (boxUnits - 2 * borderUnits) * unitSize)
+        boxSize =
+            toFloat boxUnits * unitSize
+
+        minBorderSize =
+            minBorderUnits * unitSize
+
+        outerBoxSize =
+            boxSize + 2 * minBorderSize
+
+        borderSize =
+            borderUnits * unitSize
+
+        scaledBoxSize =
+            outerBoxSize - 2 * borderSize
+
+        scaledUnitSize =
+            scaledBoxSize / boxSize * unitSize
 
         offset =
-            (toFloat borderUnits * unitSize)
+            borderUnits * unitSize
 
         charClassName =
             "char-with-size-" ++ (String.fromInt <| round strokeWidth)
     in
     Svg.svg
-        ([ SvgAttributes.width <| SvgTypes.px <| toFloat boxUnits * unitSize
-         , SvgAttributes.height <| SvgTypes.px <| toFloat boxUnits * unitSize
+        ([ SvgAttributes.width <| SvgTypes.px <| outerBoxSize
+         , SvgAttributes.height <| SvgTypes.px <| outerBoxSize
          ]
             ++ (if isThumbnail then
                     [ SvgAttributes.id ("char-" ++ String.fromChar (charFromMyChar myChar)) ]
@@ -2377,14 +2428,14 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLi
                 ]
             ]
         , Svg.svg
-            [ SvgAttributes.width <| SvgTypes.px size
-            , SvgAttributes.height <| SvgTypes.px size
+            [ SvgAttributes.width <| SvgTypes.px scaledBoxSize
+            , SvgAttributes.height <| SvgTypes.px scaledBoxSize
             , SvgAttributes.x <| SvgTypes.px offset
             , SvgAttributes.y <| SvgTypes.px offset
             ]
             [ renderCharHelper
                 { charClassName = charClassName
-                , unitSize = unitSize
+                , unitSize = scaledUnitSize
                 , boxUnits = boxUnits
                 , chars = chars
                 , simpleCharSvgs = simpleCharSvgs
@@ -2579,12 +2630,13 @@ aspectRatioLockButton : Bool -> Bool -> Svg Msg
 aspectRatioLockButton isSnapToGrid isAspectRatioLocked =
     if isSnapToGrid then
         Svg.g [] []
+
     else
         activeComponentButton (-1.5 * fontSize.large - spacing.small)
             (if isAspectRatioLocked then
                 FeatherIcons.lock
 
-            else
+             else
                 FeatherIcons.unlock
             )
             palette.darkFg
