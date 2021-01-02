@@ -6,6 +6,7 @@ import "regenerator-runtime/runtime.js";
 // The imported methods will use the File System
 // Access API or a fallback implementation.
 import { fileOpen } from 'browser-nativefs';
+import 'drag-drop-touch';
 
 var baseStorageKey = 'buyan-studio-';
 var modelStorageKey = baseStorageKey + 'model';

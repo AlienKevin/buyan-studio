@@ -28,6 +28,7 @@ import Math.Vector2 as Vector2 exposing (Vec2)
 import String.Extra
 import SvgParser
 import Task
+import Time
 import Translations
 import Translations.CharType
 import Translations.StrokeLineCapType
@@ -36,7 +37,6 @@ import TypedSvg.Attributes as SvgAttributes
 import TypedSvg.Core exposing (Svg)
 import TypedSvg.Events
 import TypedSvg.Types as SvgTypes
-import Time
 
 
 port addSimpleCharsPort : () -> Cmd msg
@@ -2116,26 +2116,32 @@ radioOption optionLabel status =
 
 
 editor : Model -> E.Element Msg
-editor ({ activeComponentIndex, selectedChar, chars, simpleCharSvgs, boxUnits, borderUnits, unitSize, strokeWidth, strokeLineCap, isAspectRatioLocked, isSnapToGrid } as model) =
+editor ({ activeComponentIndex, selectedChar, dragDropCharData, chars, simpleCharSvgs, boxUnits, borderUnits, unitSize, strokeWidth, strokeLineCap, isAspectRatioLocked, isSnapToGrid } as model) =
     let
+        draggedChar =
+            DragDrop.getDragId model.dragDropChar
+
         dropId =
             DragDrop.getDropId model.dragDropChar
 
         droppablePosition =
             DragDrop.getDroppablePosition model.dragDropChar
 
-        highlight =
+        droppable =
+            List.map E.htmlAttribute <| DragDrop.droppable DragDropChar ()
+
+        isHighlightBackground =
             case dropId of
                 Just _ ->
                     case droppablePosition of
                         Nothing ->
-                            []
+                            False
 
                         Just _ ->
-                            [ Background.color palette.lightBg ]
+                            True
 
                 Nothing ->
-                    []
+                    False
     in
     E.el
         ([ E.inFront <|
@@ -2155,29 +2161,73 @@ editor ({ activeComponentIndex, selectedChar, chars, simpleCharSvgs, boxUnits, b
                             , isAspectRatioLocked = isAspectRatioLocked
                             , isSnapToGrid = isSnapToGrid
                             }
-                            (Maybe.withDefault emptyMyChar <|
-                                -- impossible
-                                Dict.get char chars
-                            )
+                            (myCharFromChar chars char)
 
                 Nothing ->
                     E.none
          ]
-            ++ highlight
-            ++ (List.map E.htmlAttribute <| DragDrop.droppable DragDropChar ())
+            ++ (case selectedChar of
+                    Just char ->
+                        let
+                            myChar =
+                                myCharFromChar chars char
+                        in
+                        if isMyCharType SimpleCharType myChar then
+                            []
+
+                        else
+                            case draggedChar of
+                                Just dragged ->
+                                    let
+                                        myDraggedChar =
+                                            myCharFromChar chars dragged
+                                    in
+                                    if isCharPartOfMyChar chars char myDraggedChar then
+                                        []
+
+                                    else
+                                        droppable
+
+                                Nothing ->
+                                    droppable
+
+                    Nothing ->
+                        []
+               )
         )
     <|
         E.html <|
-            gridBackground { boxUnits = boxUnits, unitSize = unitSize, borderUnits = borderUnits }
+            gridBackground
+                { boxUnits = boxUnits
+                , unitSize = unitSize
+                , borderUnits = borderUnits
+                , isHighlightBackground = isHighlightBackground
+                }
+
+
+isCharPartOfMyChar : Dict Char MyChar -> Char -> MyChar -> Bool
+isCharPartOfMyChar chars char myChar =
+    case myChar of
+        SimpleChar ref ->
+            ref.char == char
+
+        CompoundChar ref components ->
+            (ref.char == char)
+                || List.any
+                    (\component ->
+                        isCharPartOfMyChar chars char (myCharFromMyCharRef chars component)
+                    )
+                    components
 
 
 gridBackground :
     { boxUnits : Int
     , borderUnits : Float
     , unitSize : Float
+    , isHighlightBackground : Bool
     }
     -> Svg Msg
-gridBackground { boxUnits, borderUnits, unitSize } =
+gridBackground { boxUnits, borderUnits, unitSize, isHighlightBackground } =
     let
         boxSize =
             toFloat boxUnits * unitSize
@@ -2213,7 +2263,14 @@ gridBackground { boxUnits, borderUnits, unitSize } =
         [ Svg.rect
             [ SvgAttributes.width <| SvgTypes.Percent 100
             , SvgAttributes.height <| SvgTypes.Percent 100
-            , SvgAttributes.fill <| SvgTypes.Paint <| toColor palette.white
+            , SvgAttributes.fill <|
+                SvgTypes.Paint <|
+                    toColor <|
+                        if isHighlightBackground then
+                            palette.lightBg
+
+                        else
+                            palette.white
             , SvgAttributes.pointerEvents "fill"
             , TypedSvg.Events.onClick <| SetActiveComponent Nothing
             ]
@@ -2847,19 +2904,25 @@ scaleHandle data x y size isDraggable =
 dragTrigger : Bool -> DragData -> List (Html.Attribute Msg)
 dragTrigger isDraggable data =
     if isDraggable then
-        [ Draggable.mouseTrigger data DragMsg ]
+        Draggable.mouseTrigger data DragMsg
+            :: Draggable.touchTriggers data DragMsg
 
     else
         []
+
+
+myCharFromChar : Dict Char MyChar -> Char -> MyChar
+myCharFromChar chars char =
+    -- impossible
+    Maybe.withDefault emptyMyChar <|
+        Dict.get char chars
 
 
 myCharFromMyCharRef : Dict Char MyChar -> MyCharRef -> MyChar
 myCharFromMyCharRef chars ref =
     let
         myChar =
-            -- impossible
-            Maybe.withDefault emptyMyChar <|
-                Dict.get ref.char chars
+            myCharFromChar chars ref.char
 
         updateAttributes r =
             { r
