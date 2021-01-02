@@ -2,6 +2,7 @@ port module Main exposing (..)
 
 import Array
 import Browser
+import Browser.Events
 import Color
 import Dict exposing (Dict, size)
 import Dict.Extra
@@ -88,6 +89,7 @@ type alias Model =
     , paragraphForPreview : String
     , trs : I18Next.Translations
     , language : Language
+    , device : E.Device
     }
 
 
@@ -207,25 +209,64 @@ init flags =
             , paragraphForPreview = ""
             , trs = I18Next.initialTranslations
             , language = LanguageEn
+            , device =
+                { class = E.Desktop
+                , orientation = E.Landscape
+                }
             }
     in
     case
         Decode.decodeValue
-            (Decode.map2
-                (\language translations ->
-                    { language = language, translations = translations }
+            (Decode.map4
+                (\language translations windowWidth windowHeight ->
+                    { language = language
+                    , translations = translations
+                    , windowWidth = windowWidth
+                    , windowHeight = windowHeight
+                    }
                 )
                 (Decode.field "language" decodeLanguage)
                 (Decode.field "translations" I18Next.translationsDecoder)
+                (Decode.field "windowWidth" Decode.int)
+                (Decode.field "windowHeight" Decode.int)
             )
             flags
     of
-        Ok { language, translations } ->
+        Ok { language, translations, windowWidth, windowHeight } ->
+            let
+                device =
+                    E.classifyDevice
+                        { width = windowWidth
+                        , height = windowHeight
+                        }
+            in
             ( { model
                 | language =
                     language
                 , trs =
                     translations
+                , device =
+                    device
+                , unitSize =
+                    case device.class of
+                        E.Phone ->
+                            10
+
+                        E.Tablet ->
+                            12
+
+                        _ ->
+                            18
+                , thumbnailUnitSize =
+                    case device.class of
+                        E.Phone ->
+                            2
+
+                        E.Tablet ->
+                            2.5
+
+                        _ ->
+                            4
               }
             , Cmd.none
             )
@@ -270,6 +311,7 @@ type Msg
     | DownloadSelectedChar
     | UpdateLanguage Language
     | GotTranslations (Result Http.Error I18Next.Translations)
+    | UpdateDevice Int Int
 
 
 type alias DragData =
@@ -382,6 +424,22 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentIndex } as 
 
         GotTranslations trs ->
             gotTranslations trs model
+
+        UpdateDevice width height ->
+            updateDevice width height model
+
+
+updateDevice : Int -> Int -> Model -> ( Model, Cmd Msg )
+updateDevice width height model =
+    ( { model
+        | device =
+            E.classifyDevice
+                { width = width
+                , height = height
+                }
+      }
+    , Cmd.none
+    )
 
 
 gotTranslations : Result Http.Error I18Next.Translations -> Model -> ( Model, Cmd Msg )
@@ -1525,6 +1583,8 @@ view model =
     E.layout
         [ E.padding spacing.large
         , E.inFront <| popUp model
+        , E.width E.fill
+        , E.height E.fill
         ]
     <|
         E.row
@@ -2369,6 +2429,7 @@ charPanel myCharType ({ trs, boxUnits, thumbnailUnitSize } as model) =
     E.column
         [ E.spacing spacing.medium
         , E.height E.fill
+        , E.width E.fill
         , E.centerY
         ]
         [ E.row
@@ -2400,6 +2461,11 @@ charPanel myCharType ({ trs, boxUnits, thumbnailUnitSize } as model) =
             [ E.width E.fill
             , E.height E.fill
             , E.htmlAttribute <| Html.Attributes.style "overflow-y" "auto"
+            , E.htmlAttribute <|
+                Html.Attributes.style "height" <|
+                    "calc(50vh - "
+                        ++ String.fromFloat (fontSize.title + spacing.large * 4)
+                        ++ "px)"
             , E.htmlAttribute <| Html.Attributes.style "overflow-x" "hidden"
             , E.spacing spacing.medium
             ]
@@ -3000,6 +3066,7 @@ subscriptions ({ drag } as model) =
         , getModelPort GotModel
         , getSimpleCharsPort GetSimpleChars
         , Time.every 1000 (\_ -> SaveModel ())
+        , Browser.Events.onResize UpdateDevice
         ]
 
 

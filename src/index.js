@@ -38,7 +38,12 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
     .then(function (translations) {
       var app = Elm.Main.init({
         node: document.getElementById('root'),
-        flags: { language: preferredLanguage, translations: translations },
+        flags: {
+          language: preferredLanguage,
+          translations: translations,
+          windowWidth: window.innerWidth,
+          windowHeight: window.innerHeight,
+        },
       });
 
       app.ports.getModelPort.send(savedModelJson);
