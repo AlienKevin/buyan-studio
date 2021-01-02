@@ -27,9 +27,6 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
   }
 
   var preferredLanguage = savedModelJson === null ? browserLanguage : savedModelJson.language;
-  console.log("savedModelJson", savedModelJson);
-  console.log("preferredLanguage", preferredLanguage);
-
   // console.log("Getting saved model: ", savedModelJson);
   fetch(`/translations/${preferredLanguage}.json`)
     .then(function (response) {
@@ -136,12 +133,12 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
       });
 
       app.ports.saveModelPort.subscribe(function (model) {
-        console.log("Saving model: ", model);
+        // console.log("Saving model: ", model);
         localforage.setItem(modelStorageKey, model, function (error) {
           if (error !== null) {
             console.error("error saving model: ", error);
           } else {
-            console.log("Successfully saved model!");
+            // console.log("Successfully saved model!");
           }
         });
       });
@@ -159,7 +156,7 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
                 return r.text()
               })
               .then(function (svg) {
-                console.log("Loaded default SimpleCharSvg " + char);
+                // console.log("Loaded default SimpleCharSvg " + char);
                 simpleCharSvgs[char] = svg;
                 if (Object.keys(simpleCharSvgs).length === defaultChars.length) {
                   app.ports.getSimpleCharsPort.send(simpleCharSvgs);
