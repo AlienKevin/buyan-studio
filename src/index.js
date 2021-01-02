@@ -33,6 +33,9 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
     .then(function (response) {
       return response.json();
     })
+    .catch(function () {
+      console.log("Error getting translations");
+    })
     .then(function (translations) {
       var app = Elm.Main.init({
         node: document.getElementById('root'),

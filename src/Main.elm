@@ -404,24 +404,11 @@ updateLanguage language model =
       }
     , Http.get
         { url =
-            "/translations/translations." ++ languageTagFromLanguage language ++ ".json"
+            "/translations/" ++ stringFromLanguage language ++ ".json"
         , expect =
             Http.expectJson GotTranslations I18Next.translationsDecoder
         }
     )
-
-
-languageTagFromLanguage : Language -> String
-languageTagFromLanguage language =
-    case language of
-        LanguageEn ->
-            "en"
-
-        LanguageZhHans ->
-            "zh-Hans"
-
-        LanguageZhHant ->
-            "zh-Hant"
 
 
 deleteActiveComponent : Model -> ( Model, Cmd Msg )
@@ -691,17 +678,22 @@ encodeModel { chars, simpleCharSvgs, strokeWidth, strokeLineCap, language } =
         ]
 
 
-encodeLanguage language =
-    Encode.string <|
-        case language of
-            LanguageEn ->
-                "LanguageEn"
+encodeLanguage : Language -> Value
+encodeLanguage =
+    Encode.string << stringFromLanguage
 
-            LanguageZhHans ->
-                "LanguageZhHans"
 
-            LanguageZhHant ->
-                "LanguageZhHant"
+stringFromLanguage : Language -> String
+stringFromLanguage language =
+    case language of
+        LanguageEn ->
+            "LanguageEn"
+
+        LanguageZhHans ->
+            "LanguageZhHans"
+
+        LanguageZhHant ->
+            "LanguageZhHant"
 
 
 encodeStrokeLineCap : StrokeLineCap -> Value
