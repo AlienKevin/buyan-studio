@@ -25,8 +25,9 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
     console.error("Error getting saved model: ", error);
   }
 
-  var savedPreferredLanguage = savedModelJson.language;
-  var preferredLanguage = savedPreferredLanguage === null ? browserLanguage : savedPreferredLanguage;
+  var preferredLanguage = savedModelJson === null ? browserLanguage : savedModelJson.language;
+  console.log("savedModelJson", savedModelJson);
+  console.log("preferredLanguage", preferredLanguage);
 
   // console.log("Getting saved model: ", savedModelJson);
   fetch(`/translations/${preferredLanguage}.json`)
@@ -134,12 +135,12 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
       });
 
       app.ports.saveModelPort.subscribe(function (model) {
-        // console.log("Saving model: ", model);
+        console.log("Saving model: ", model);
         localforage.setItem(modelStorageKey, model, function (error) {
           if (error !== null) {
             console.error("error saving model: ", error);
           } else {
-            // console.log("Successfully saved model!");
+            console.log("Successfully saved model!");
           }
         });
       });
@@ -172,10 +173,6 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
         }
         // console.log("Getting saved simpleCharSvgs: ", savedSimpleCharSvgs);
         app.ports.getSimpleCharsPort.send(savedSimpleCharSvgs);
-      });
-
-      window.addEventListener("beforeunload", function () {
-        app.ports.pageUnloadingPort.send(null);
       });
     });
 });
