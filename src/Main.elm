@@ -36,6 +36,7 @@ import TypedSvg.Attributes as SvgAttributes
 import TypedSvg.Core exposing (Svg)
 import TypedSvg.Events
 import TypedSvg.Types as SvgTypes
+import Time
 
 
 port addSimpleCharsPort : () -> Cmd msg
@@ -57,9 +58,6 @@ port deleteSimpleCharPort : String -> Cmd msg
 
 
 port clearSimpleCharsPort : () -> Cmd msg
-
-
-port pageUnloadingPort : (() -> msg) -> Sub msg
 
 
 
@@ -2937,8 +2935,8 @@ subscriptions ({ drag } as model) =
     Sub.batch
         [ Draggable.subscriptions DragMsg drag
         , getModelPort GotModel
-        , pageUnloadingPort SaveModel
         , getSimpleCharsPort GetSimpleChars
+        , Time.every 1000 (\_ -> SaveModel ())
         ]
 
 
