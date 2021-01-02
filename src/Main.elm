@@ -211,9 +211,26 @@ init flags =
             , language = LanguageEn
             }
     in
-    case Decode.decodeValue decodeLanguage flags of
-        Ok language ->
-            updateLanguage language model
+    case
+        Decode.decodeValue
+            (Decode.map2
+                (\language translations ->
+                    { language = language, translations = translations }
+                )
+                (Decode.field "language" decodeLanguage)
+                (Decode.field "translations" I18Next.translationsDecoder)
+            )
+            flags
+    of
+        Ok { language, translations } ->
+            ( { model
+                | language =
+                    language
+                , trs =
+                    translations
+              }
+            , Cmd.none
+            )
 
         Err err ->
             ( model, Cmd.none )
