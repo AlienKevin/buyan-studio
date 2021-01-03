@@ -2172,7 +2172,7 @@ preferences ({ palette, spacing, fontSize } as model) =
                 , max = maxStrokeWidth
                 , step = Just 1
                 , value = model.strokeWidth
-                , thumb = Input.defaultThumb
+                , thumb = sliderThumb palette fontSize
                 }
             , Input.radio
                 [ E.spacing spacing.tiny
@@ -2183,15 +2183,15 @@ preferences ({ palette, spacing, fontSize } as model) =
                 , label = Input.labelHidden (Translations.strokeLineCap model.trs)
                 , options =
                     [ Input.optionWith StrokeLineCapRound
-                        (radioOption palette (E.text (Translations.StrokeLineCapType.round model.trs)))
+                        (radioOption palette fontSize (E.text (Translations.StrokeLineCapType.round model.trs)))
                     , Input.optionWith StrokeLineCapSquare
-                        (radioOption palette (E.text (Translations.StrokeLineCapType.square model.trs)))
+                        (radioOption palette fontSize (E.text (Translations.StrokeLineCapType.square model.trs)))
                     ]
                 }
             , Input.checkbox
                 [ E.spacing spacing.small ]
                 { onChange = \_ -> ToggleIsSnapToGrid
-                , icon = checkbox palette
+                , icon = checkbox palette fontSize
                 , checked = model.isSnapToGrid
                 , label =
                     Input.labelHidden (Translations.snapToGrid model.trs)
@@ -2214,23 +2214,34 @@ preferences ({ palette, spacing, fontSize } as model) =
                 , label = Input.labelHidden (Translations.language model.trs)
                 , options =
                     [ Input.optionWith LanguageEn
-                        (radioOption palette (E.text "English"))
+                        (radioOption palette fontSize (E.text "English"))
                     , Input.optionWith LanguageZhHans
-                        (radioOption palette (E.text "中文（简体）"))
+                        (radioOption palette fontSize (E.text "中文（简体）"))
                     , Input.optionWith LanguageZhHant
-                        (radioOption palette (E.text "中文（繁體）"))
+                        (radioOption palette fontSize (E.text "中文（繁體）"))
                     ]
                 }
             ]
         ]
 
 
-checkbox : Palette -> Bool -> E.Element msg
-checkbox palette checked =
+sliderThumb : Palette -> FontSize -> Input.Thumb
+sliderThumb palette fontSize =
+    Input.thumb
+        [ E.width (E.px fontSize.large)
+        , E.height (E.px fontSize.large)
+        , Border.rounded (round <| toFloat fontSize.large / 2)
+        , Border.width 2
+        , Border.color palette.darkFg
+        , Background.color palette.white
+        ]
+
+
+checkbox : Palette -> FontSize -> Bool -> E.Element msg
+checkbox palette fontSize checked =
     E.el
-        [ E.width
-            (E.px 14)
-        , E.height (E.px 14)
+        [ E.width (E.px fontSize.large)
+        , E.height (E.px fontSize.large)
         , Font.color palette.white
         , E.centerY
         , Font.size 9
@@ -2250,39 +2261,35 @@ checkbox palette checked =
             else
                 2
         , E.inFront
-            (E.el
-                [ Border.color palette.white
-                , E.height (E.px 6)
-                , E.width (E.px 9)
-                , E.rotate (degrees -45)
-                , E.centerX
-                , E.centerY
-                , E.moveUp 1
-                , E.transparent (not checked)
-                , Border.widthEach
-                    { top = 0
-                    , left = 2
-                    , bottom = 2
-                    , right = 0
-                    }
-                ]
+            (if checked then
+                E.html
+                    (FeatherIcons.check
+                        |> FeatherIcons.withSize (toFloat fontSize.large)
+                        |> FeatherIcons.toHtml []
+                    )
+
+             else
                 E.none
             )
         ]
         E.none
 
 
-radioOption : Palette -> E.Element msg -> Input.OptionState -> E.Element msg
-radioOption palette optionLabel status =
+radioOption : Palette -> FontSize -> E.Element msg -> Input.OptionState -> E.Element msg
+radioOption palette fontSize optionLabel status =
+    let
+        radius =
+            round <| toFloat fontSize.large / 2
+    in
     E.row
         [ E.spacing 10
         , E.alignLeft
         , E.width E.shrink
         ]
         [ E.el
-            [ E.width (E.px 14)
-            , E.height (E.px 14)
-            , Border.rounded 7
+            [ E.width (E.px fontSize.large)
+            , E.height (E.px fontSize.large)
+            , Border.rounded radius
             , Border.width <|
                 case status of
                     Input.Idle ->
@@ -2292,7 +2299,7 @@ radioOption palette optionLabel status =
                         2
 
                     Input.Selected ->
-                        5
+                        radius
             , Border.color <|
                 case status of
                     Input.Idle ->
