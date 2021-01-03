@@ -1930,7 +1930,7 @@ previewInParagraphPopUp ({ palette, spacing, fontSize } as model) =
                         }
                     )
                 ]
-            , E.el [ E.width <| E.fillPortion 2, E.height E.fill ] <| preferences model
+            , E.el [ E.width <| E.fillPortion 2, E.height E.fill, E.paddingXY 0 spacing.small ] <| preferences model
             ]
         , E.el
             [ E.width E.fill
@@ -2139,7 +2139,8 @@ preferences ({ palette, spacing, fontSize } as model) =
         , E.height E.fill
         ]
         [ E.column
-            [ E.spacing spacing.small
+            [ E.alignTop
+            , E.spacing spacing.small
             , E.width E.fill
             ]
             [ Input.slider
@@ -2172,12 +2173,13 @@ preferences ({ palette, spacing, fontSize } as model) =
                 , thumb = sliderThumb palette fontSize
                 }
             , Input.radio
-                [ E.spacing spacing.tiny
+                [ E.spacing spacing.small
                 , E.padding spacing.small
                 ]
                 { onChange = UpdateStrokeLineCap
                 , selected = Just model.strokeLineCap
-                , label = Input.labelLeft [] (E.text (Translations.strokeLineCap model.trs))
+                , label = Input.labelLeft [ E.alignTop, E.paddingXY 0 spacing.small ]
+                    (E.text (Translations.strokeLineCap model.trs))
                 , options =
                     [ Input.optionWith StrokeLineCapRound
                         (radioOption palette fontSize (E.text (Translations.StrokeLineCapType.round model.trs)))
@@ -2200,11 +2202,12 @@ preferences ({ palette, spacing, fontSize } as model) =
             , E.width E.fill
             ]
             [ Input.radio
-                [ E.spacing spacing.tiny
+                [ E.spacing spacing.small
                 ]
                 { onChange = UpdateLanguage
                 , selected = Just model.language
-                , label = Input.labelLeft [] (E.text (Translations.language model.trs))
+                , label = Input.labelLeft [ E.alignTop, E.paddingXY spacing.small 0 ]
+                    (E.text (Translations.language model.trs))
                 , options =
                     [ Input.optionWith LanguageEn
                         (radioOption palette fontSize (E.text "English"))
