@@ -1,0 +1,22 @@
+{
+    "preferences": "偏好",
+    "strokeWidth": "笔画宽度",
+    "strokeLineCap": "笔画线帽",
+    "strokeLineCapType": {
+        "round": "圆头",
+        "square": "方头"
+    },
+    "snapToGrid": "对齐网格",
+    "previewInParagraph": "在段落中预览",
+    "language": "语言",
+    "writeTextHereToPreview": "在此处写文字进行预览",
+    "doYouWantToDelete": "您确定要删除",
+    "thisCannotBeUndone": "这不能被撤消。",
+    "allCharsOfAType": "所有{{charType}}",
+    "character": "字符",
+    "charType": {
+        "simple": "独体字",
+        "compound": "合体字"
+    },
+    "acceptOnlyOneCharacter": "仅接受1个字符"
+}

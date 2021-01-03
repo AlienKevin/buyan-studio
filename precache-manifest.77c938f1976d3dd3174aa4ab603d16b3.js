@@ -68,7 +68,7 @@ self.__precacheManifest = (self.__precacheManifest || []).concat([
     "url": "/buyan-studio/favicon.ico"
   },
   {
-    "revision": "c09a4614ac9d3aeb33590200d814e042",
+    "revision": "f2fb659c73dea5c0cf1091471ad17663",
     "url": "/buyan-studio/index.html"
   },
   {
@@ -84,55 +84,67 @@ self.__precacheManifest = (self.__precacheManifest || []).concat([
     "url": "/buyan-studio/site.webmanifest"
   },
   {
-    "revision": "7c6522eddd8039960cb5",
+    "revision": "35264fd00fb2d0920fb4",
     "url": "/buyan-studio/static/css/main.0af5c45f.chunk.css"
   },
   {
-    "revision": "83ce96882a354c1efdce",
-    "url": "/buyan-studio/static/js/10.83ce9688.chunk.js"
+    "revision": "3adf89b485868d70d0f2",
+    "url": "/buyan-studio/static/js/10.3adf89b4.chunk.js"
   },
   {
-    "revision": "23f9058fd6d62c2a7640",
-    "url": "/buyan-studio/static/js/11.23f9058f.chunk.js"
+    "revision": "9c487c5771acbf529c17",
+    "url": "/buyan-studio/static/js/11.9c487c57.chunk.js"
   },
   {
-    "revision": "c67e653d2521989f757d",
-    "url": "/buyan-studio/static/js/3.c67e653d.chunk.js"
+    "revision": "cf05efa4e739628946f1",
+    "url": "/buyan-studio/static/js/3.cf05efa4.chunk.js"
   },
   {
-    "revision": "5293c0d7a00ded7ef24e",
-    "url": "/buyan-studio/static/js/4.5293c0d7.chunk.js"
+    "revision": "c5eef4d63f9569794bc5",
+    "url": "/buyan-studio/static/js/4.c5eef4d6.chunk.js"
   },
   {
-    "revision": "27990d51a0fd833f475b",
-    "url": "/buyan-studio/static/js/5.27990d51.chunk.js"
+    "revision": "6e59a768e14b93705bda",
+    "url": "/buyan-studio/static/js/5.6e59a768.chunk.js"
   },
   {
-    "revision": "aaf17e7aed55e431a8f7",
-    "url": "/buyan-studio/static/js/6.aaf17e7a.chunk.js"
+    "revision": "33d6ededa22ee492cf72",
+    "url": "/buyan-studio/static/js/6.33d6eded.chunk.js"
   },
   {
-    "revision": "d226168d419ee00aaf21",
-    "url": "/buyan-studio/static/js/7.d226168d.chunk.js"
+    "revision": "3709239f8a9f268859f7",
+    "url": "/buyan-studio/static/js/7.3709239f.chunk.js"
   },
   {
-    "revision": "a69c89721e4cdb99381a",
-    "url": "/buyan-studio/static/js/8.a69c8972.chunk.js"
+    "revision": "1ade19b898ec40a3e157",
+    "url": "/buyan-studio/static/js/8.1ade19b8.chunk.js"
   },
   {
-    "revision": "714c512807b4641acab0",
-    "url": "/buyan-studio/static/js/9.714c5128.chunk.js"
+    "revision": "a74c791a30fed32981a2",
+    "url": "/buyan-studio/static/js/9.a74c791a.chunk.js"
   },
   {
-    "revision": "7c6522eddd8039960cb5",
-    "url": "/buyan-studio/static/js/main.7c6522ed.chunk.js"
+    "revision": "35264fd00fb2d0920fb4",
+    "url": "/buyan-studio/static/js/main.35264fd0.chunk.js"
   },
   {
-    "revision": "0512f9e59f3dbc204535",
-    "url": "/buyan-studio/static/js/runtime~main.0512f9e5.js"
+    "revision": "12c03931ab93a08cae23",
+    "url": "/buyan-studio/static/js/runtime~main.12c03931.js"
   },
   {
-    "revision": "1a0713cecf43bef4a46a",
-    "url": "/buyan-studio/static/js/vendors~main.1a0713ce.chunk.js"
+    "revision": "46a67e418dfd2c70d263",
+    "url": "/buyan-studio/static/js/vendors~main.46a67e41.chunk.js"
+  },
+  {
+    "revision": "bb130f32b2019a5be6af9d072b272780",
+    "url": "/buyan-studio/translations/LanguageEn.json"
+  },
+  {
+    "revision": "e92b508ea1d90b0154c42182214991ab",
+    "url": "/buyan-studio/translations/LanguageZhHans.json"
+  },
+  {
+    "revision": "a98309991e4cbf9f15c8c8c0e2dab302",
+    "url": "/buyan-studio/translations/LanguageZhHant.json"
   }
 ]);

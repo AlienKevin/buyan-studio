@@ -1,0 +1,22 @@
+{
+    "preferences": "Preferences",
+    "strokeWidth": "Stroke width",
+    "strokeLineCap": "Stroke linecap",
+    "strokeLineCapType": {
+        "round" : "Round",
+        "square" : "Square"
+    },
+    "snapToGrid": "Snap to grid",
+    "previewInParagraph": "Preview in Paragraph",
+    "language": "Language",
+    "writeTextHereToPreview": "Write text here to preview",
+    "doYouWantToDelete": "Do you want to delete ",
+    "thisCannotBeUndone": "This cannot be undone.",
+    "allCharsOfAType": "All {{charType}}",
+    "character": "Character",
+    "charType": {
+        "simple": "Simple Characters",
+        "compound": "Compound Characters"
+    },
+    "acceptOnlyOneCharacter": "Accept only 1 character"
+}
