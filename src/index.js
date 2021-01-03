@@ -164,7 +164,7 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
                 // console.log("Loaded default SimpleCharSvg " + char);
                 simpleCharSvgs[char] = svg;
                 if (Object.keys(simpleCharSvgs).length === defaultChars.length) {
-                  app.ports.gotSavedSimpleCharsPort.send(simpleCharSvgs);
+                  app.ports.gotNewSimpleCharsPort.send(simpleCharSvgs);
                   localforage.setItem(simpleCharSvgsStorageKey, simpleCharSvgs, function (error) {
                     if (error !== null) {
                       console.error("Error saving simpleCharSvgs: ", error);
