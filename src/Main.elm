@@ -2848,7 +2848,7 @@ renderCharHelper :
     -> Int
     -> MyChar
     -> Svg Msg
-renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIndex, isAspectRatioLocked, isSnapToGrid, palette } as model) { charClassName, index, isThumbnail, tightDimension } level myChar =
+renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIndex, isAspectRatioLocked, isSnapToGrid, palette, fontSize } as model) { charClassName, index, isThumbnail, tightDimension } level myChar =
     let
         char =
             charFromMyChar myChar
@@ -2912,7 +2912,7 @@ renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIn
                                 }
                                 0
                                 0
-                                unitSize
+                                fontSize.large
                                 isDraggable
                            , scaleHandle
                                 palette
@@ -2921,7 +2921,7 @@ renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIn
                                 }
                                 100
                                 0
-                                unitSize
+                                fontSize.large
                                 isDraggable
                            , scaleHandle
                                 palette
@@ -2930,7 +2930,7 @@ renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIn
                                 }
                                 0
                                 100
-                                unitSize
+                                fontSize.large
                                 isDraggable
                            , scaleHandle
                                 palette
@@ -2939,7 +2939,7 @@ renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIn
                                 }
                                 100
                                 100
-                                unitSize
+                                fontSize.large
                                 isDraggable
                            ]
 
@@ -2999,7 +2999,7 @@ aspectRatioLockButton { isSnapToGrid, isAspectRatioLocked, palette, spacing, fon
 
     else
         activeComponentButton fontSize
-            (-1.5 * toFloat fontSize.large - toFloat spacing.small)
+            (-1.5 * toFloat fontSize.title - toFloat spacing.small)
             (if isAspectRatioLocked then
                 FeatherIcons.lock
 
@@ -3012,12 +3012,12 @@ aspectRatioLockButton { isSnapToGrid, isAspectRatioLocked, palette, spacing, fon
 
 copyActiveComponentButton : Model -> Svg Msg
 copyActiveComponentButton { palette, spacing, fontSize } =
-    activeComponentButton fontSize (-0.5 * toFloat fontSize.large) FeatherIcons.copy palette.lightFg CopyActiveComponent
+    activeComponentButton fontSize (-0.5 * toFloat fontSize.title) FeatherIcons.copy palette.lightFg CopyActiveComponent
 
 
 deleteActiveComponentButton : Model -> Svg Msg
 deleteActiveComponentButton { palette, spacing, fontSize } =
-    activeComponentButton fontSize (0.5 * toFloat fontSize.large + toFloat spacing.small) FeatherIcons.trash2 palette.danger DeleteActiveComponent
+    activeComponentButton fontSize (0.5 * toFloat fontSize.title + toFloat spacing.small) FeatherIcons.trash2 palette.danger DeleteActiveComponent
 
 
 activeComponentButton : FontSize -> Float -> FeatherIcons.Icon -> E.Color -> Msg -> Svg Msg
@@ -3025,8 +3025,8 @@ activeComponentButton fontSize y icon backgroundColor onClick =
     Svg.svg
         [ SvgAttributes.x <| SvgTypes.px 0
         , SvgAttributes.y <| SvgTypes.px <| y
-        , SvgAttributes.width <| SvgTypes.px <| toFloat fontSize.large
-        , SvgAttributes.height <| SvgTypes.px <| toFloat fontSize.large
+        , SvgAttributes.width <| SvgTypes.px <| toFloat fontSize.title
+        , SvgAttributes.height <| SvgTypes.px <| toFloat fontSize.title
         ]
         [ Svg.rect
             [ SvgAttributes.width <| SvgTypes.percent 100
@@ -3050,12 +3050,12 @@ activeComponentButton fontSize y icon backgroundColor onClick =
         ]
 
 
-scaleHandle : Palette -> DragData -> Float -> Float -> Float -> Bool -> Svg Msg
+scaleHandle : Palette -> DragData -> Float -> Float -> Int -> Bool -> Svg Msg
 scaleHandle palette data x y size isDraggable =
     Svg.circle
         ([ SvgAttributes.cx (SvgTypes.percent x)
          , SvgAttributes.cy (SvgTypes.percent y)
-         , SvgAttributes.r (SvgTypes.px <| size / 2)
+         , SvgAttributes.r (SvgTypes.px <| toFloat size / 2)
          , SvgAttributes.fill <| SvgTypes.Paint <| toColor palette.darkFg
          ]
             ++ dragTrigger isDraggable data
