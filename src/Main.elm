@@ -606,7 +606,7 @@ updateLanguage language model =
       }
     , Http.get
         { url =
-            "/translations/" ++ stringFromLanguage language ++ ".json"
+            "translations/" ++ stringFromLanguage language ++ ".json"
         , expect =
             Http.expectJson GotTranslations I18Next.translationsDecoder
         }
