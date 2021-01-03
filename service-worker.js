@@ -14,7 +14,7 @@
 importScripts("https://storage.googleapis.com/workbox-cdn/releases/4.3.1/workbox-sw.js");
 
 importScripts(
-  "/buyan-studio/precache-manifest.daccc3c124d2f1ed875605af5bbb1871.js"
+  "/buyan-studio/precache-manifest.90af593d6dfb82bf13b5e3d281b92fda.js"
 );
 
 workbox.core.skipWaiting();
