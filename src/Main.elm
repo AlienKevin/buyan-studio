@@ -90,6 +90,38 @@ type alias Model =
     , trs : I18Next.Translations
     , language : Language
     , device : E.Device
+    , palette :
+        Palette
+    , spacing :
+        Spacing
+    , fontSize :
+        FontSize
+    }
+
+
+type alias Palette =
+    { lightBg : E.Color
+    , lightFg : E.Color
+    , darkFg : E.Color
+    , danger : E.Color
+    , black : E.Color
+    , white : E.Color
+    }
+
+
+type alias Spacing =
+    { tiny : Int
+    , small : Int
+    , medium : Int
+    , large : Int
+    }
+
+
+type alias FontSize =
+    { small : Int
+    , medium : Int
+    , large : Int
+    , title : Int
     }
 
 
@@ -213,6 +245,36 @@ init flags =
                 { class = E.Desktop
                 , orientation = E.Landscape
                 }
+            , palette =
+                { lightBg =
+                    E.rgb255 246 234 190
+                , lightFg =
+                    toElmUiColor Color.lightBlue
+                , darkFg =
+                    toElmUiColor Color.lightPurple
+                , danger =
+                    E.rgb255 210 99 71
+                , black =
+                    toElmUiColor Color.black
+                , white =
+                    toElmUiColor Color.white
+                }
+            , spacing =
+                { tiny = 5
+                , small = 10
+                , medium = 20
+                , large = 30
+                }
+            , fontSize =
+                { small =
+                    16
+                , medium =
+                    20
+                , large =
+                    30
+                , title =
+                    40
+                }
             }
     in
     case
@@ -233,43 +295,13 @@ init flags =
             flags
     of
         Ok { language, translations, windowWidth, windowHeight } ->
-            let
-                device =
-                    E.classifyDevice
-                        { width = windowWidth
-                        , height = windowHeight
-                        }
-            in
-            ( { model
-                | language =
-                    language
-                , trs =
-                    translations
-                , device =
-                    device
-                , unitSize =
-                    case device.class of
-                        E.Phone ->
-                            10
-
-                        E.Tablet ->
-                            12
-
-                        _ ->
-                            18
-                , thumbnailUnitSize =
-                    case device.class of
-                        E.Phone ->
-                            2
-
-                        E.Tablet ->
-                            2.5
-
-                        _ ->
-                            4
-              }
-            , Cmd.none
-            )
+            updateDevice windowWidth windowHeight <|
+                { model
+                    | language =
+                        language
+                    , trs =
+                        translations
+                }
 
         Err err ->
             ( model, Cmd.none )
@@ -431,12 +463,121 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentIndex } as 
 
 updateDevice : Int -> Int -> Model -> ( Model, Cmd Msg )
 updateDevice width height model =
-    ( { model
-        | device =
+    let
+        device =
             E.classifyDevice
                 { width = width
                 , height = height
                 }
+
+        minSize =
+            min width height
+
+        unitSize =
+            toFloat minSize * 0.7 / (toFloat model.boxUnits + model.borderUnits * 2)
+    in
+    ( { model
+        | device =
+            device
+        , unitSize =
+            unitSize
+        , thumbnailUnitSize =
+            case device.class of
+                E.Phone ->
+                    2
+
+                E.Tablet ->
+                    2.5
+
+                E.Desktop ->
+                    2.6
+
+                E.BigDesktop ->
+                    4
+        , spacing =
+            let
+                tiny =
+                    round << E.modular 5 1.25
+
+                small =
+                    round << E.modular 10 1.25
+
+                medium =
+                    round << E.modular 20 1.5
+
+                large =
+                    round << E.modular 30 1.5
+            in
+            case device.class of
+                E.Phone ->
+                    { tiny = tiny -3
+                    , small = small -3
+                    , medium = medium -3
+                    , large = large -3
+                    }
+
+                E.Tablet ->
+                    { tiny = tiny -2
+                    , small = small -2
+                    , medium = medium -2
+                    , large = large -2
+                    }
+
+                E.Desktop ->
+                    { tiny = tiny -1
+                    , small = small -1
+                    , medium = medium -1
+                    , large = large -1
+                    }
+
+                E.BigDesktop ->
+                    { tiny = tiny 1
+                    , small = small 1
+                    , medium = medium 1
+                    , large = large 1
+                    }
+        , fontSize =
+            let
+                small =
+                    round << E.modular 16 1.1
+
+                medium =
+                    round << E.modular 20 1.1
+
+                large =
+                    round << E.modular 30 1.25
+
+                title =
+                    round << E.modular 40 1.25
+            in
+            case device.class of
+                E.Phone ->
+                    { small = small -3
+                    , medium = medium -3
+                    , large = large -3
+                    , title = title -3
+                    }
+
+                E.Tablet ->
+                    { small = small -2
+                    , medium = medium -2
+                    , large = large -2
+                    , title = title -2
+                    }
+
+                E.Desktop ->
+                    { small = small -1
+                    , medium = medium -1
+                    , large = large -1
+                    , title = title -1
+                    }
+
+                E.BigDesktop ->
+                    { small = small 1
+                    , medium = medium 1
+                    , large = large 1
+                    , title = title 1
+                    }
       }
     , Cmd.none
     )
@@ -1579,12 +1720,13 @@ getCharType chars char =
 
 
 view : Model -> Html Msg
-view model =
+view ({ spacing, fontSize } as model) =
     E.layout
         [ E.padding spacing.large
         , E.inFront <| popUp model
         , E.width E.fill
         , E.height E.fill
+        , Font.size fontSize.medium
         ]
     <|
         E.row
@@ -1606,9 +1748,9 @@ view model =
                         , E.width E.fill
                         , E.height E.fill
                         ]
-                        [ title <| Translations.preferences model.trs
+                        [ titleText model.fontSize (Translations.preferences model.trs)
                         , preferences model
-                        , textButton (Translations.previewInParagraph model.trs) (Just PreviewInParagraph)
+                        , textButton model (Translations.previewInParagraph model.trs) (Just PreviewInParagraph)
                         ]
                     ]
                 ]
@@ -1635,16 +1777,15 @@ popUp model =
 
 
 confirmClearCharsPopUp : MyCharType -> Model -> E.Element Msg
-confirmClearCharsPopUp myCharType ({ trs, boxUnits, thumbnailUnitSize } as model) =
-    confirmDeletePopUpTemplate trs
-        boxUnits
-        thumbnailUnitSize
+confirmClearCharsPopUp myCharType ({ trs } as model) =
+    confirmDeletePopUpTemplate
+        model
         (Translations.allCharsOfAType trs (stringFromMyCharType trs myCharType))
         (ClearChars myCharType)
 
 
-confirmDeletePopUpTemplate : I18Next.Translations -> Int -> Float -> String -> Msg -> E.Element Msg
-confirmDeletePopUpTemplate trs boxUnits thumbnailUnitSize targetName onConfirm =
+confirmDeletePopUpTemplate : Model -> String -> Msg -> E.Element Msg
+confirmDeletePopUpTemplate ({ trs, boxUnits, thumbnailUnitSize, palette, spacing, fontSize } as model) targetName onConfirm =
     let
         borderWidth =
             6
@@ -1654,7 +1795,7 @@ confirmDeletePopUpTemplate trs boxUnits thumbnailUnitSize targetName onConfirm =
          , E.centerY
          , Background.color palette.lightBg
          , E.width <| E.px <| round <| toFloat boxUnits * thumbnailUnitSize + 10 * borderWidth
-         , E.height <| E.px <| round <| toFloat boxUnits * thumbnailUnitSize + fontSize.title + 10 * borderWidth
+         , E.height <| E.px <| round <| toFloat boxUnits * thumbnailUnitSize + toFloat fontSize.title + 10 * borderWidth
          , E.spaceEvenly
          , E.padding spacing.small
          , Font.size fontSize.medium
@@ -1662,6 +1803,7 @@ confirmDeletePopUpTemplate trs boxUnits thumbnailUnitSize targetName onConfirm =
             ++ highlightBorder
                 { color = palette.danger
                 , width = borderWidth
+                , spacing = spacing
                 , style = Border.dashed
                 , glowWidth = borderWidth
                 }
@@ -1714,7 +1856,7 @@ confirmDeletePopUpTemplate trs boxUnits thumbnailUnitSize targetName onConfirm =
 
 
 previewInParagraphPopUp : Model -> E.Element Msg
-previewInParagraphPopUp model =
+previewInParagraphPopUp ({ palette, spacing, fontSize } as model) =
     let
         previewFontSize =
             fontSize.title * 2
@@ -1750,7 +1892,7 @@ previewInParagraphPopUp model =
         ]
         [ E.el
             [ E.centerX ]
-            (title (Translations.previewInParagraph model.trs))
+            (titleText fontSize (Translations.previewInParagraph model.trs))
         , E.row
             [ E.height E.fill
             , E.width
@@ -1793,14 +1935,14 @@ previewInParagraphPopUp model =
         , E.el
             [ E.width E.fill
             , E.height <| E.fillPortion 3
-            , Font.size <| round previewFontSize
+            , Font.size <| previewFontSize
             , E.scrollbarY
             ]
             (renderPreviewInParagraph previewFontSize model)
         ]
 
 
-renderPreviewInParagraph : Float -> Model -> E.Element Msg
+renderPreviewInParagraph : Int -> Model -> E.Element Msg
 renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, simpleCharSvgs, activeComponentIndex, isAspectRatioLocked, isSnapToGrid } as model) =
     let
         lines =
@@ -1821,18 +1963,11 @@ renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize
                             Just myChar ->
                                 E.html <|
                                     renderChar
-                                        { unitSize = displayFontSize / toFloat boxUnits
-                                        , boxUnits = boxUnits
-                                        , borderUnits = borderUnits
-                                        , chars = chars
-                                        , simpleCharSvgs = simpleCharSvgs
-                                        , activeComponentIndex = activeComponentIndex
-                                        , strokeWidth = strokeWidth * displayFontSize / (toFloat boxUnits * unitSize)
-                                        , strokeLineCap = strokeLineCap
-                                        , isThumbnail = True
-                                        , isAspectRatioLocked = isAspectRatioLocked
-                                        , isSnapToGrid = isSnapToGrid
+                                        { model
+                                            | unitSize = toFloat displayFontSize / toFloat boxUnits
+                                            , strokeWidth = strokeWidth * toFloat displayFontSize / (toFloat boxUnits * unitSize)
                                         }
+                                        { isThumbnail = True }
                                         myChar
 
                             Nothing ->
@@ -1851,16 +1986,15 @@ renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize
 
 
 confirmDeleteSelectedCharPopUp : Model -> E.Element Msg
-confirmDeleteSelectedCharPopUp { trs, activeComponentIndex, boxUnits, thumbnailUnitSize, selectedChar } =
-    confirmDeletePopUpTemplate trs
-        boxUnits
-        thumbnailUnitSize
+confirmDeleteSelectedCharPopUp ({ selectedChar } as model) =
+    confirmDeletePopUpTemplate
+        model
         (String.fromChar (Maybe.withDefault '?' selectedChar))
         DeleteSelectedChar
 
 
 addCompoundCharPopUp : Model -> E.Element Msg
-addCompoundCharPopUp { trs, activeComponentIndex, boxUnits, thumbnailUnitSize, newCompoundChar, isInputErrorShown } =
+addCompoundCharPopUp { trs, activeComponentIndex, boxUnits, thumbnailUnitSize, newCompoundChar, isInputErrorShown, palette, spacing, fontSize } =
     let
         inputLength =
             String.length newCompoundChar
@@ -1879,7 +2013,7 @@ addCompoundCharPopUp { trs, activeComponentIndex, boxUnits, thumbnailUnitSize, n
          , E.centerY
          , Background.color palette.lightBg
          , E.width <| E.px <| round <| width
-         , E.height <| E.px <| round <| width + fontSize.title
+         , E.height <| E.px <| round <| width + toFloat fontSize.title
          , E.spacing spacing.small
          , Font.size fontSize.medium
          , E.inFront <|
@@ -1898,6 +2032,7 @@ addCompoundCharPopUp { trs, activeComponentIndex, boxUnits, thumbnailUnitSize, n
             ++ highlightBorder
                 { color = palette.lightFg
                 , width = borderWidth
+                , spacing = spacing
                 , style = Border.dashed
                 , glowWidth = borderWidth
                 }
@@ -1990,14 +2125,14 @@ onEnter =
             )
 
 
-title : String -> E.Element Msg
-title text =
+titleText : FontSize -> String -> E.Element Msg
+titleText fontSize text =
     E.el [ Font.size fontSize.title ] <|
         E.text text
 
 
 preferences : Model -> E.Element Msg
-preferences model =
+preferences ({ palette, spacing, fontSize } as model) =
     E.row
         [ E.spacing spacing.small
         , E.width E.fill
@@ -2048,15 +2183,15 @@ preferences model =
                 , label = Input.labelHidden (Translations.strokeLineCap model.trs)
                 , options =
                     [ Input.optionWith StrokeLineCapRound
-                        (radioOption (E.text (Translations.StrokeLineCapType.round model.trs)))
+                        (radioOption palette (E.text (Translations.StrokeLineCapType.round model.trs)))
                     , Input.optionWith StrokeLineCapSquare
-                        (radioOption (E.text (Translations.StrokeLineCapType.square model.trs)))
+                        (radioOption palette (E.text (Translations.StrokeLineCapType.square model.trs)))
                     ]
                 }
             , Input.checkbox
                 [ E.spacing spacing.small ]
                 { onChange = \_ -> ToggleIsSnapToGrid
-                , icon = checkbox
+                , icon = checkbox palette
                 , checked = model.isSnapToGrid
                 , label =
                     Input.labelHidden (Translations.snapToGrid model.trs)
@@ -2079,19 +2214,19 @@ preferences model =
                 , label = Input.labelHidden (Translations.language model.trs)
                 , options =
                     [ Input.optionWith LanguageEn
-                        (radioOption (E.text "English"))
+                        (radioOption palette (E.text "English"))
                     , Input.optionWith LanguageZhHans
-                        (radioOption (E.text "中文（简体）"))
+                        (radioOption palette (E.text "中文（简体）"))
                     , Input.optionWith LanguageZhHant
-                        (radioOption (E.text "中文（繁體）"))
+                        (radioOption palette (E.text "中文（繁體）"))
                     ]
                 }
             ]
         ]
 
 
-checkbox : Bool -> E.Element msg
-checkbox checked =
+checkbox : Palette -> Bool -> E.Element msg
+checkbox palette checked =
     E.el
         [ E.width
             (E.px 14)
@@ -2137,8 +2272,8 @@ checkbox checked =
         E.none
 
 
-radioOption : E.Element msg -> Input.OptionState -> E.Element msg
-radioOption optionLabel status =
+radioOption : Palette -> E.Element msg -> Input.OptionState -> E.Element msg
+radioOption palette optionLabel status =
     E.row
         [ E.spacing 10
         , E.alignLeft
@@ -2176,7 +2311,7 @@ radioOption optionLabel status =
 
 
 editor : Model -> E.Element Msg
-editor ({ activeComponentIndex, selectedChar, dragDropCharData, chars, simpleCharSvgs, boxUnits, borderUnits, unitSize, strokeWidth, strokeLineCap, isAspectRatioLocked, isSnapToGrid } as model) =
+editor ({ activeComponentIndex, selectedChar, dragDropCharData, chars, simpleCharSvgs, boxUnits, borderUnits, unitSize, strokeWidth, strokeLineCap, isAspectRatioLocked, isSnapToGrid, palette } as model) =
     let
         draggedChar =
             DragDrop.getDragId model.dragDropChar
@@ -2209,18 +2344,8 @@ editor ({ activeComponentIndex, selectedChar, dragDropCharData, chars, simpleCha
                 Just char ->
                     E.html <|
                         renderChar
-                            { unitSize = unitSize
-                            , boxUnits = boxUnits
-                            , borderUnits = borderUnits
-                            , chars = chars
-                            , simpleCharSvgs = simpleCharSvgs
-                            , activeComponentIndex = activeComponentIndex
-                            , strokeWidth = strokeWidth
-                            , strokeLineCap = strokeLineCap
-                            , isThumbnail = False
-                            , isAspectRatioLocked = isAspectRatioLocked
-                            , isSnapToGrid = isSnapToGrid
-                            }
+                            model
+                            { isThumbnail = False }
                             (myCharFromChar chars char)
 
                 Nothing ->
@@ -2262,6 +2387,7 @@ editor ({ activeComponentIndex, selectedChar, dragDropCharData, chars, simpleCha
                 , unitSize = unitSize
                 , borderUnits = borderUnits
                 , isHighlightBackground = isHighlightBackground
+                , palette = palette
                 }
 
 
@@ -2285,9 +2411,10 @@ gridBackground :
     , borderUnits : Float
     , unitSize : Float
     , isHighlightBackground : Bool
+    , palette : Palette
     }
     -> Svg Msg
-gridBackground { boxUnits, borderUnits, unitSize, isHighlightBackground } =
+gridBackground { boxUnits, borderUnits, unitSize, isHighlightBackground, palette } =
     let
         boxSize =
             toFloat boxUnits * unitSize
@@ -2401,7 +2528,7 @@ gridOutline { x, y, strokeWidth, size } =
 
 
 charPanels : Model -> E.Element Msg
-charPanels model =
+charPanels ({ spacing } as model) =
     E.column
         [ E.width E.fill
         , E.height E.fill
@@ -2413,7 +2540,7 @@ charPanels model =
 
 
 charPanel : MyCharType -> Model -> E.Element Msg
-charPanel myCharType ({ trs, boxUnits, thumbnailUnitSize } as model) =
+charPanel myCharType ({ trs, boxUnits, thumbnailUnitSize, palette, spacing, fontSize } as model) =
     let
         cards =
             List.filterMap
@@ -2464,7 +2591,7 @@ charPanel myCharType ({ trs, boxUnits, thumbnailUnitSize } as model) =
             , E.htmlAttribute <|
                 Html.Attributes.style "height" <|
                     "calc(50vh - "
-                        ++ String.fromFloat (fontSize.title + spacing.large * 4)
+                        ++ String.fromInt (fontSize.title + spacing.large * 4)
                         ++ "px)"
             , E.htmlAttribute <| Html.Attributes.style "overflow-x" "hidden"
             , E.spacing spacing.medium
@@ -2485,7 +2612,7 @@ stringFromMyCharType trs myCharType =
 
 
 charCard : Model -> MyChar -> E.Element Msg
-charCard { chars, activeComponentIndex, unitSize, thumbnailUnitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, simpleCharSvgs, selectedChar, isAspectRatioLocked, isSnapToGrid } myChar =
+charCard ({ chars, activeComponentIndex, unitSize, thumbnailUnitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, simpleCharSvgs, selectedChar, isAspectRatioLocked, isSnapToGrid, palette, spacing, fontSize } as model) myChar =
     let
         char =
             charFromMyChar myChar
@@ -2510,6 +2637,7 @@ charCard { chars, activeComponentIndex, unitSize, thumbnailUnitSize, boxUnits, b
                             highlightBorder
                                 { color = palette.lightFg
                                 , width = 0
+                                , spacing = spacing
                                 , style = Border.solid
                                 , glowWidth = spacing.small
                                 }
@@ -2569,27 +2697,21 @@ charCard { chars, activeComponentIndex, unitSize, thumbnailUnitSize, boxUnits, b
             ]
         , E.html <|
             renderChar
-                { unitSize = thumbnailUnitSize
-                , boxUnits = boxUnits
-                , borderUnits = borderUnits
-                , strokeWidth = strokeWidth * thumbnailUnitSize / unitSize
-                , strokeLineCap = strokeLineCap
-                , chars = chars
-                , simpleCharSvgs = simpleCharSvgs
-                , activeComponentIndex =
-                    Maybe.andThen
-                        (\selected ->
-                            if selected == char then
-                                activeComponentIndex
+                { model
+                    | unitSize = thumbnailUnitSize
+                    , strokeWidth = strokeWidth * thumbnailUnitSize / unitSize
+                    , activeComponentIndex =
+                        Maybe.andThen
+                            (\selected ->
+                                if selected == char then
+                                    activeComponentIndex
 
-                            else
-                                Nothing
-                        )
-                        selectedChar
-                , isThumbnail = True
-                , isAspectRatioLocked = isAspectRatioLocked
-                , isSnapToGrid = isSnapToGrid
+                                else
+                                    Nothing
+                            )
+                            selectedChar
                 }
+                { isThumbnail = True }
                 myChar
         ]
 
@@ -2617,22 +2739,8 @@ isMyCharType myCharType myChar =
             False
 
 
-renderChar :
-    { isThumbnail : Bool
-    , unitSize : Float
-    , boxUnits : Int
-    , borderUnits : Float
-    , strokeWidth : Float
-    , strokeLineCap : StrokeLineCap
-    , chars : Dict Char MyChar
-    , simpleCharSvgs : SimpleCharSvgs
-    , activeComponentIndex : Maybe Int
-    , isAspectRatioLocked : Bool
-    , isSnapToGrid : Bool
-    }
-    -> MyChar
-    -> Svg Msg
-renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, chars, simpleCharSvgs, activeComponentIndex, isAspectRatioLocked, isSnapToGrid } myChar =
+renderChar : Model -> { isThumbnail : Bool } -> MyChar -> Svg Msg
+renderChar ({ unitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, chars, simpleCharSvgs, activeComponentIndex, isAspectRatioLocked, isSnapToGrid } as model) { isThumbnail } myChar =
     let
         boxSize =
             toFloat boxUnits * unitSize
@@ -2708,24 +2816,21 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLi
             , Html.Attributes.style "pointer-events" "none"
             ]
             [ renderCharHelper
+                { model
+                    | unitSize = scaledUnitSize
+                    , isSnapToGrid =
+                        isSnapToGrid
+                            && (case myChar of
+                                    CompoundChar _ _ ->
+                                        True
+
+                                    SimpleChar _ ->
+                                        False
+                               )
+                }
                 { charClassName = charClassName
                 , index = -1
-                , unitSize = scaledUnitSize
-                , boxUnits = boxUnits
-                , chars = chars
-                , simpleCharSvgs = simpleCharSvgs
-                , activeComponentIndex = activeComponentIndex
                 , isThumbnail = isThumbnail
-                , isAspectRatioLocked = isAspectRatioLocked
-                , isSnapToGrid =
-                    isSnapToGrid
-                        && (case myChar of
-                                CompoundChar _ _ ->
-                                    True
-
-                                SimpleChar _ ->
-                                    False
-                           )
                 , tightDimension =
                     { position = Vector2.vec2 0 0, dimension = Vector2.vec2 100 100 }
                 }
@@ -2736,22 +2841,17 @@ renderChar { isThumbnail, unitSize, boxUnits, borderUnits, strokeWidth, strokeLi
 
 
 renderCharHelper :
-    { charClassName : String
-    , index : Int
-    , unitSize : Float
-    , boxUnits : Int
-    , chars : Dict Char MyChar
-    , simpleCharSvgs : SimpleCharSvgs
-    , activeComponentIndex : Maybe Int
-    , isThumbnail : Bool
-    , isAspectRatioLocked : Bool
-    , isSnapToGrid : Bool
-    , tightDimension : { position : Vec2, dimension : Vec2 }
-    }
+    Model
+    ->
+        { charClassName : String
+        , index : Int
+        , isThumbnail : Bool
+        , tightDimension : { position : Vec2, dimension : Vec2 }
+        }
     -> Int
     -> MyChar
     -> Svg Msg
-renderCharHelper { charClassName, index, unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIndex, isThumbnail, isAspectRatioLocked, isSnapToGrid, tightDimension } level myChar =
+renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIndex, isAspectRatioLocked, isSnapToGrid, palette } as model) { charClassName, index, isThumbnail, tightDimension } level myChar =
     let
         char =
             charFromMyChar myChar
@@ -2807,8 +2907,9 @@ renderCharHelper { charClassName, index, unitSize, boxUnits, chars, simpleCharSv
                                 , SvgAttributes.stroke <| SvgTypes.Paint <| toColor palette.darkFg
                                 ]
                                 []
-                           , activeComponentButtons isSnapToGrid isAspectRatioLocked
+                           , activeComponentButtons model
                            , scaleHandle
+                                palette
                                 { index = levelwiseIndex
                                 , scale = ScaleTopLeft
                                 }
@@ -2817,6 +2918,7 @@ renderCharHelper { charClassName, index, unitSize, boxUnits, chars, simpleCharSv
                                 unitSize
                                 isDraggable
                            , scaleHandle
+                                palette
                                 { index = levelwiseIndex
                                 , scale = ScaleTopRight
                                 }
@@ -2825,6 +2927,7 @@ renderCharHelper { charClassName, index, unitSize, boxUnits, chars, simpleCharSv
                                 unitSize
                                 isDraggable
                            , scaleHandle
+                                palette
                                 { index = levelwiseIndex
                                 , scale = ScaleBottomLeft
                                 }
@@ -2833,6 +2936,7 @@ renderCharHelper { charClassName, index, unitSize, boxUnits, chars, simpleCharSv
                                 unitSize
                                 isDraggable
                            , scaleHandle
+                                palette
                                 { index = levelwiseIndex
                                 , scale = ScaleBottomRight
                                 }
@@ -2860,16 +2964,10 @@ renderCharHelper { charClassName, index, unitSize, boxUnits, chars, simpleCharSv
                 List.indexedMap
                     (\componentIndex ->
                         renderCharHelper
+                            model
                             { charClassName = charClassName
                             , index = componentIndex
-                            , unitSize = unitSize
-                            , boxUnits = boxUnits
-                            , chars = chars
-                            , simpleCharSvgs = simpleCharSvgs
-                            , activeComponentIndex = activeComponentIndex
                             , isThumbnail = isThumbnail
-                            , isAspectRatioLocked = isAspectRatioLocked
-                            , isSnapToGrid = isSnapToGrid
                             , tightDimension =
                                 if level >= 1 then
                                     calculateMyCharDimension myChar
@@ -2883,27 +2981,28 @@ renderCharHelper { charClassName, index, unitSize, boxUnits, chars, simpleCharSv
                     components
 
 
-activeComponentButtons : Bool -> Bool -> Svg Msg
-activeComponentButtons isSnapToGrid isAspectRatioLocked =
+activeComponentButtons : Model -> Svg Msg
+activeComponentButtons ({ palette } as model) =
     Svg.svg
         [ SvgAttributes.x <| SvgTypes.px -35
         , SvgAttributes.y <| SvgTypes.percent 50
         , SvgAttributes.strokeWidth <| SvgTypes.px 2
         , SvgAttributes.color <| toColor palette.white
         ]
-        [ aspectRatioLockButton isSnapToGrid isAspectRatioLocked
-        , copyActiveComponentButton
-        , deleteActiveComponentButton
+        [ aspectRatioLockButton model
+        , copyActiveComponentButton model
+        , deleteActiveComponentButton model
         ]
 
 
-aspectRatioLockButton : Bool -> Bool -> Svg Msg
-aspectRatioLockButton isSnapToGrid isAspectRatioLocked =
+aspectRatioLockButton : Model -> Svg Msg
+aspectRatioLockButton { isSnapToGrid, isAspectRatioLocked, palette, spacing, fontSize } =
     if isSnapToGrid then
         Svg.g [] []
 
     else
-        activeComponentButton (-1.5 * fontSize.large - spacing.small)
+        activeComponentButton fontSize
+            (-1.5 * toFloat fontSize.large - toFloat spacing.small)
             (if isAspectRatioLocked then
                 FeatherIcons.lock
 
@@ -2914,23 +3013,23 @@ aspectRatioLockButton isSnapToGrid isAspectRatioLocked =
             ToggleIsAspectRatioLocked
 
 
-copyActiveComponentButton : Svg Msg
-copyActiveComponentButton =
-    activeComponentButton (-0.5 * fontSize.large) FeatherIcons.copy palette.lightFg CopyActiveComponent
+copyActiveComponentButton : Model -> Svg Msg
+copyActiveComponentButton { palette, spacing, fontSize } =
+    activeComponentButton fontSize (-0.5 * toFloat fontSize.large) FeatherIcons.copy palette.lightFg CopyActiveComponent
 
 
-deleteActiveComponentButton : Svg Msg
-deleteActiveComponentButton =
-    activeComponentButton (0.5 * fontSize.large + spacing.small) FeatherIcons.trash2 palette.danger DeleteActiveComponent
+deleteActiveComponentButton : Model -> Svg Msg
+deleteActiveComponentButton { palette, spacing, fontSize } =
+    activeComponentButton fontSize (0.5 * toFloat fontSize.large + toFloat spacing.small) FeatherIcons.trash2 palette.danger DeleteActiveComponent
 
 
-activeComponentButton : Float -> FeatherIcons.Icon -> E.Color -> Msg -> Svg Msg
-activeComponentButton y icon backgroundColor onClick =
+activeComponentButton : FontSize -> Float -> FeatherIcons.Icon -> E.Color -> Msg -> Svg Msg
+activeComponentButton fontSize y icon backgroundColor onClick =
     Svg.svg
         [ SvgAttributes.x <| SvgTypes.px 0
         , SvgAttributes.y <| SvgTypes.px <| y
-        , SvgAttributes.width <| SvgTypes.px fontSize.large
-        , SvgAttributes.height <| SvgTypes.px fontSize.large
+        , SvgAttributes.width <| SvgTypes.px <| toFloat fontSize.large
+        , SvgAttributes.height <| SvgTypes.px <| toFloat fontSize.large
         ]
         [ Svg.rect
             [ SvgAttributes.width <| SvgTypes.percent 100
@@ -2954,8 +3053,8 @@ activeComponentButton y icon backgroundColor onClick =
         ]
 
 
-scaleHandle : DragData -> Float -> Float -> Float -> Bool -> Svg Msg
-scaleHandle data x y size isDraggable =
+scaleHandle : Palette -> DragData -> Float -> Float -> Float -> Bool -> Svg Msg
+scaleHandle palette data x y size isDraggable =
     Svg.circle
         ([ SvgAttributes.cx (SvgTypes.percent x)
          , SvgAttributes.cy (SvgTypes.percent y)
@@ -3004,14 +3103,14 @@ myCharFromMyCharRef chars ref =
             CompoundChar (updateAttributes r) components
 
 
-iconButton : { icon : FeatherIcons.Icon, size : Float, onPress : Maybe Msg } -> E.Element Msg
+iconButton : { icon : FeatherIcons.Icon, size : Int, onPress : Maybe Msg } -> E.Element Msg
 iconButton { icon, size, onPress } =
     Input.button
         []
         { label =
             E.html
                 (icon
-                    |> FeatherIcons.withSize size
+                    |> FeatherIcons.withSize (toFloat size)
                     |> FeatherIcons.toHtml []
                 )
         , onPress =
@@ -3019,8 +3118,8 @@ iconButton { icon, size, onPress } =
         }
 
 
-textButton : String -> Maybe Msg -> E.Element Msg
-textButton text onPress =
+textButton : Model -> String -> Maybe Msg -> E.Element Msg
+textButton { palette, spacing, fontSize } text onPress =
     Input.button
         [ Border.width 3
         , Border.color palette.black
@@ -3037,16 +3136,17 @@ textButton text onPress =
 highlightBorder :
     { color : E.Color
     , width : Int
-    , glowWidth : Float
+    , spacing : Spacing
+    , glowWidth : Int
     , style : E.Attribute Msg
     }
     -> List (E.Attribute Msg)
-highlightBorder { color, width, glowWidth, style } =
+highlightBorder { color, width, spacing, glowWidth, style } =
     [ Border.rounded spacing.medium
     , Border.color color
     , Border.width width
     , style
-    , Border.glow color glowWidth
+    , Border.glow color (toFloat glowWidth)
     ]
 
 
@@ -3137,42 +3237,6 @@ main =
         , update = update
         , subscriptions = subscriptions
         }
-
-
-palette =
-    { lightBg =
-        E.rgb255 246 234 190
-    , lightFg =
-        toElmUiColor Color.lightBlue
-    , darkFg =
-        toElmUiColor Color.lightPurple
-    , danger =
-        E.rgb255 210 99 71
-    , black =
-        toElmUiColor Color.black
-    , white =
-        toElmUiColor Color.white
-    }
-
-
-spacing =
-    { tiny = 5
-    , small = 10
-    , medium = 20
-    , large = 30
-    }
-
-
-fontSize =
-    { small =
-        16
-    , medium =
-        20
-    , large =
-        30
-    , title =
-        40
-    }
 
 
 toElmUiColor : Color.Color -> E.Color
