@@ -79,7 +79,6 @@ type alias Model =
     , newCompoundChar : String
     , isInputErrorShown : Bool
     , dragDropChar : DragDrop.Model Char ()
-    , dragDropCharData : { char : Char }
     , drag : Draggable.State DragData
     , dragDelta : Vec2
     , activeComponentIndex : Maybe Int
@@ -231,7 +230,6 @@ init flags =
             , newCompoundChar = ""
             , isInputErrorShown = False
             , dragDropChar = DragDrop.init
-            , dragDropCharData = { char = '?' }
             , drag = Draggable.init
             , dragDelta = Vector2.vec2 0 0
             , activeComponentIndex = Nothing
@@ -1346,8 +1344,6 @@ dragDropChar msg_ model =
             { model
                 | dragDropChar =
                     model_
-                , dragDropCharData =
-                    model.dragDropCharData
                 , chars =
                     model.chars
             }
@@ -1356,8 +1352,6 @@ dragDropChar msg_ model =
             { model
                 | dragDropChar =
                     DragDrop.init
-                , dragDropCharData =
-                    { char = componentChar }
                 , chars =
                     Maybe.map
                         (\selectedChar ->
@@ -2314,7 +2308,7 @@ radioOption palette fontSize optionLabel status =
 
 
 editor : Model -> E.Element Msg
-editor ({ activeComponentIndex, selectedChar, dragDropCharData, chars, simpleCharSvgs, boxUnits, borderUnits, unitSize, strokeWidth, strokeLineCap, isAspectRatioLocked, isSnapToGrid, palette } as model) =
+editor ({ activeComponentIndex, selectedChar, chars, simpleCharSvgs, boxUnits, borderUnits, unitSize, strokeWidth, strokeLineCap, isAspectRatioLocked, isSnapToGrid, palette } as model) =
     let
         draggedChar =
             DragDrop.getDragId model.dragDropChar
