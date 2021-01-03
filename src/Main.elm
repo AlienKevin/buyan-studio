@@ -764,9 +764,6 @@ toggleIsSnapToGrid model =
     let
         newIsSnapToGrid =
             not model.isSnapToGrid
-
-        _ =
-            Debug.log "newIsSnapToGrid" newIsSnapToGrid
     in
     ( { model
         | isSnapToGrid =
@@ -3049,10 +3046,6 @@ activeComponentButtons charType ({ palette } as model) =
 
 aspectRatioLockButton : Model -> Svg Msg
 aspectRatioLockButton { isSnapToGrid, isAspectRatioLocked, palette, spacing, fontSize } =
-    let
-        _ =
-            Debug.log "isSnapToGrid" isSnapToGrid
-    in
     if isSnapToGrid then
         Svg.g [] []
 
