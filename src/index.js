@@ -28,7 +28,7 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
 
   var preferredLanguage = savedModelJson === null ? browserLanguage : savedModelJson.language;
   // console.log("Getting saved model: ", savedModelJson);
-  fetch(`/translations/${preferredLanguage}.json`)
+  fetch(`translations/${preferredLanguage}.json`)
     .then(function (response) {
       return response.json();
     })
