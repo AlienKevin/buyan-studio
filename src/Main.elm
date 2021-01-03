@@ -1774,25 +1774,6 @@ view ({ spacing, fontSize } as model) =
             , E.spacing spacing.large
             ]
             [ charPanels model
-            , E.column
-                [ E.spacing spacing.medium ]
-                [ editor model
-                , E.row
-                    [ E.width E.fill
-                    , E.height E.fill
-                    , E.spacing spacing.medium
-                    ]
-                    [ E.column
-                        [ E.spacing spacing.medium
-                        , E.width E.fill
-                        , E.height E.fill
-                        ]
-                        [ titleText model.fontSize (Translations.preferences model.trs)
-                        , preferences model
-                        , textButton model (Translations.previewInParagraph model.trs) (Just PreviewInParagraph)
-                        ]
-                    ]
-                ]
             ]
 
 
@@ -2572,8 +2553,14 @@ gridOutline { x, y, strokeWidth, size } =
 
 
 charPanels : Model -> E.Element Msg
-charPanels ({ spacing } as model) =
-    E.column
+charPanels ({ spacing, device } as model) =
+    (case device.orientation of
+        E.Portrait ->
+            E.column
+
+        E.Landscape ->
+            E.row
+    )
         [ E.width E.fill
         , E.height E.fill
         , E.spacing spacing.large
@@ -2601,7 +2588,6 @@ charPanel myCharType ({ trs, boxUnits, thumbnailUnitSize, palette, spacing, font
         [ E.spacing spacing.medium
         , E.height E.fill
         , E.width E.fill
-        , E.centerY
         ]
         [ E.row
             [ E.spacing spacing.small
@@ -2631,12 +2617,8 @@ charPanel myCharType ({ trs, boxUnits, thumbnailUnitSize, palette, spacing, font
         , E.wrappedRow
             [ E.width E.fill
             , E.height E.fill
+            , E.htmlAttribute <| Html.Attributes.id "charPanel-wrappedRow"
             , E.htmlAttribute <| Html.Attributes.style "overflow-y" "auto"
-            , E.htmlAttribute <|
-                Html.Attributes.style "height" <|
-                    "calc(50vh - "
-                        ++ String.fromInt (fontSize.title + spacing.large * 4)
-                        ++ "px)"
             , E.htmlAttribute <| Html.Attributes.style "overflow-x" "hidden"
             , E.spacing spacing.medium
             ]
