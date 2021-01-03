@@ -2134,22 +2134,14 @@ titleText fontSize text =
 preferences : Model -> E.Element Msg
 preferences ({ palette, spacing, fontSize } as model) =
     E.row
-        [ E.spacing spacing.small
+        [ E.spacing spacing.medium
         , E.width E.fill
         , E.height E.fill
         ]
         [ E.column
             [ E.spacing spacing.small
+            , E.width E.fill
             ]
-            [ E.text <|
-                Translations.strokeWidth model.trs
-            , E.el
-                [ E.paddingEach { top = 0, bottom = fontSize.medium, left = 0, right = 0 } ]
-                (E.text <| Translations.strokeLineCap model.trs)
-            , E.text (Translations.snapToGrid model.trs)
-            ]
-        , E.column
-            [ E.width E.fill ]
             [ Input.slider
                 [ E.height (E.px fontSize.small)
                 , E.width (E.px <| fontSize.small * 7)
@@ -2167,7 +2159,12 @@ preferences ({ palette, spacing, fontSize } as model) =
                 { onChange = UpdateStrokeWidth
                 , label =
                     Input.labelLeft []
-                        (E.text <| String.fromInt (round model.strokeWidth))
+                        (E.row
+                            [ E.spacing spacing.small ]
+                            [ E.text <| Translations.strokeWidth model.trs
+                            , E.text <| String.fromInt (round model.strokeWidth)
+                            ]
+                        )
                 , min = minStrokeWidth
                 , max = maxStrokeWidth
                 , step = Just 1
@@ -2176,11 +2173,11 @@ preferences ({ palette, spacing, fontSize } as model) =
                 }
             , Input.radio
                 [ E.spacing spacing.tiny
-                , E.paddingXY 0 spacing.small
+                , E.padding spacing.small
                 ]
                 { onChange = UpdateStrokeLineCap
                 , selected = Just model.strokeLineCap
-                , label = Input.labelHidden (Translations.strokeLineCap model.trs)
+                , label = Input.labelLeft [] (E.text (Translations.strokeLineCap model.trs))
                 , options =
                     [ Input.optionWith StrokeLineCapRound
                         (radioOption palette fontSize (E.text (Translations.StrokeLineCapType.round model.trs)))
@@ -2194,14 +2191,10 @@ preferences ({ palette, spacing, fontSize } as model) =
                 , icon = checkbox palette fontSize
                 , checked = model.isSnapToGrid
                 , label =
-                    Input.labelHidden (Translations.snapToGrid model.trs)
+                    Input.labelLeft []
+                        (E.text (Translations.snapToGrid model.trs))
                 }
             ]
-        , E.column
-            [ E.alignTop
-            , E.paddingEach { top = 0, bottom = 0, left = spacing.large, right = 0 }
-            ]
-            [ E.el [ E.alignRight ] <| E.text <| Translations.language model.trs ]
         , E.column
             [ E.alignTop
             , E.width E.fill
@@ -2211,7 +2204,7 @@ preferences ({ palette, spacing, fontSize } as model) =
                 ]
                 { onChange = UpdateLanguage
                 , selected = Just model.language
-                , label = Input.labelHidden (Translations.language model.trs)
+                , label = Input.labelLeft [] (E.text (Translations.language model.trs))
                 , options =
                     [ Input.optionWith LanguageEn
                         (radioOption palette fontSize (E.text "English"))
