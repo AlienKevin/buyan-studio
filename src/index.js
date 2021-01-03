@@ -77,7 +77,7 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
                   simpleCharSvgs[char] = event.target.result;
                   numberOfNewCharsAdded += 1;
                   if (numberOfNewCharsAdded === files.length) {
-                    app.ports.getSimpleCharsPort.send(simpleCharSvgs);
+                    app.ports.gotNewSimpleCharsPort.send(simpleCharSvgs);
                     localforage.setItem(simpleCharSvgsStorageKey, simpleCharSvgs, function (error) {
                       if (error !== null) {
                         console.error("Error saving simpleCharSvgs: ", error);
@@ -164,7 +164,7 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
                 // console.log("Loaded default SimpleCharSvg " + char);
                 simpleCharSvgs[char] = svg;
                 if (Object.keys(simpleCharSvgs).length === defaultChars.length) {
-                  app.ports.getSimpleCharsPort.send(simpleCharSvgs);
+                  app.ports.gotSavedSimpleCharsPort.send(simpleCharSvgs);
                   localforage.setItem(simpleCharSvgsStorageKey, simpleCharSvgs, function (error) {
                     if (error !== null) {
                       console.error("Error saving simpleCharSvgs: ", error);
@@ -175,7 +175,7 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
           });
         }
         // console.log("Getting saved simpleCharSvgs: ", savedSimpleCharSvgs);
-        app.ports.getSimpleCharsPort.send(savedSimpleCharSvgs);
+        app.ports.gotSavedSimpleCharsPort.send(savedSimpleCharSvgs);
       });
     });
 });

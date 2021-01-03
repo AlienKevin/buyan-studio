@@ -43,7 +43,10 @@ import TypedSvg.Types as SvgTypes
 port addSimpleCharsPort : () -> Cmd msg
 
 
-port getSimpleCharsPort : (Encode.Value -> msg) -> Sub msg
+port gotSavedSimpleCharsPort : (Encode.Value -> msg) -> Sub msg
+
+
+port gotNewSimpleCharsPort : (Encode.Value -> msg) -> Sub msg
 
 
 port downloadCharPort : String -> Cmd msg
@@ -311,7 +314,8 @@ init flags =
 
 type Msg
     = AddChar MyCharType
-    | GetSimpleChars Value
+    | GotNewSimpleChars Value
+    | GotSavedSimpleChars Value
     | SelectChar MyChar
     | RequestDeleteSelectedChar
     | DeleteSelectedChar
@@ -365,8 +369,11 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentIndex } as 
         AddChar myCharType ->
             addChar myCharType model
 
-        GetSimpleChars svgsJson ->
-            getSimpleChars svgsJson model
+        GotNewSimpleChars svgsJson ->
+            gotNewSimpleChars svgsJson model
+
+        GotSavedSimpleChars svgsJson ->
+            gotSavedSimpleChars svgsJson model
 
         SelectChar myChar ->
             selectChar myChar model
@@ -757,6 +764,9 @@ toggleIsSnapToGrid model =
     let
         newIsSnapToGrid =
             not model.isSnapToGrid
+
+        _ =
+            Debug.log "newIsSnapToGrid" newIsSnapToGrid
     in
     ( { model
         | isSnapToGrid =
@@ -1242,11 +1252,19 @@ updateActiveComponent func ({ activeComponentIndex } as model) =
                     Dict.update
                         selectedChar
                         (Maybe.map
-                            (updateMyCharComponents <|
-                                List.Extra.updateAt
-                                    -- impossible
-                                    (Maybe.withDefault -1 activeComponentIndex)
-                                    func
+                            (\myChar ->
+                                case myChar of
+                                    SimpleChar ref ->
+                                        SimpleChar (func ref)
+
+                                    CompoundChar _ _ ->
+                                        (updateMyCharComponents <|
+                                            List.Extra.updateAt
+                                                -- impossible
+                                                (Maybe.withDefault -1 activeComponentIndex)
+                                                func
+                                        )
+                                            myChar
                             )
                         )
                         model.chars
@@ -1556,8 +1574,33 @@ selectChar myChar model =
     )
 
 
-getSimpleChars : Value -> Model -> ( Model, Cmd Msg )
-getSimpleChars svgsJson model =
+gotSavedSimpleChars : Value -> Model -> ( Model, Cmd Msg )
+gotSavedSimpleChars svgsJson model =
+    ( case Decode.decodeValue decodeSimpleCharSvgs svgsJson of
+        Ok svgs ->
+            { model
+                | simpleCharSvgs =
+                    Dict.merge
+                        (\key a -> Dict.insert key a)
+                        (\key a b -> Dict.insert key a)
+                        (\key b -> Dict.insert key b)
+                        svgs
+                        model.simpleCharSvgs
+                        Dict.empty
+            }
+
+        Err err ->
+            -- let
+            --     _ =
+            --         Debug.log "err" err
+            -- in
+            model
+    , Cmd.none
+    )
+
+
+gotNewSimpleChars : Value -> Model -> ( Model, Cmd Msg )
+gotNewSimpleChars svgsJson model =
     ( case Decode.decodeValue decodeSimpleCharSvgs svgsJson of
         Ok svgs ->
             { model
@@ -1693,20 +1736,25 @@ updateMyCharRefDimension func myCharRef =
 -- Requires: char to be in chars
 
 
-getCharType : Dict Char MyChar -> Char -> MyCharType
-getCharType chars char =
+myCharTypeFromChar : Dict Char MyChar -> Char -> MyCharType
+myCharTypeFromChar chars char =
     case Dict.get char chars of
         Just myChar ->
-            case myChar of
-                SimpleChar _ ->
-                    SimpleCharType
-
-                CompoundChar _ _ ->
-                    CompoundCharType
+            myCharTypeFromMyChar myChar
 
         Nothing ->
             -- impossible
             SimpleCharType
+
+
+myCharTypeFromMyChar : MyChar -> MyCharType
+myCharTypeFromMyChar myChar =
+    case myChar of
+        SimpleChar _ ->
+            SimpleCharType
+
+        CompoundChar _ _ ->
+            CompoundCharType
 
 
 
@@ -2172,8 +2220,9 @@ preferences ({ palette, spacing, fontSize } as model) =
                 ]
                 { onChange = UpdateStrokeLineCap
                 , selected = Just model.strokeLineCap
-                , label = Input.labelLeft [ E.alignTop, E.paddingXY 0 spacing.small ]
-                    (E.text (Translations.strokeLineCap model.trs))
+                , label =
+                    Input.labelLeft [ E.alignTop, E.paddingXY 0 spacing.small ]
+                        (E.text (Translations.strokeLineCap model.trs))
                 , options =
                     [ Input.optionWith StrokeLineCapRound
                         (radioOption palette fontSize (E.text (Translations.StrokeLineCapType.round model.trs)))
@@ -2200,8 +2249,9 @@ preferences ({ palette, spacing, fontSize } as model) =
                 ]
                 { onChange = UpdateLanguage
                 , selected = Just model.language
-                , label = Input.labelLeft [ E.alignTop, E.paddingXY spacing.small 0 ]
-                    (E.text (Translations.language model.trs))
+                , label =
+                    Input.labelLeft [ E.alignTop, E.paddingXY spacing.small 0 ]
+                        (E.text (Translations.language model.trs))
                 , options =
                     [ Input.optionWith LanguageEn
                         (radioOption palette fontSize (E.text "English"))
@@ -2815,21 +2865,14 @@ renderChar ({ unitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, chars
             [ renderCharHelper
                 { model
                     | unitSize = scaledUnitSize
-                    , isSnapToGrid =
-                        isSnapToGrid
-                            && (case myChar of
-                                    CompoundChar _ _ ->
-                                        True
-
-                                    SimpleChar _ ->
-                                        False
-                               )
                 }
                 { charClassName = charClassName
                 , index = -1
                 , isThumbnail = isThumbnail
                 , tightDimension =
                     { position = Vector2.vec2 0 0, dimension = Vector2.vec2 100 100 }
+                , parentMyCharType =
+                    myCharTypeFromMyChar myChar
                 }
                 0
                 myChar
@@ -2844,11 +2887,12 @@ renderCharHelper :
         , index : Int
         , isThumbnail : Bool
         , tightDimension : { position : Vec2, dimension : Vec2 }
+        , parentMyCharType : MyCharType
         }
     -> Int
     -> MyChar
     -> Svg Msg
-renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIndex, isAspectRatioLocked, isSnapToGrid, palette, fontSize } as model) { charClassName, index, isThumbnail, tightDimension } level myChar =
+renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIndex, isAspectRatioLocked, isSnapToGrid, palette, fontSize } as model) { charClassName, index, isThumbnail, tightDimension, parentMyCharType } level myChar =
     let
         char =
             charFromMyChar myChar
@@ -2904,7 +2948,7 @@ renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIn
                                 , SvgAttributes.stroke <| SvgTypes.Paint <| toColor palette.darkFg
                                 ]
                                 []
-                           , activeComponentButtons model
+                           , activeComponentButtons parentMyCharType model
                            , scaleHandle
                                 palette
                                 { index = levelwiseIndex
@@ -2960,40 +3004,55 @@ renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIn
             constraint CompoundCharType dimension position <|
                 List.indexedMap
                     (\componentIndex ->
-                        renderCharHelper
-                            model
-                            { charClassName = charClassName
-                            , index = componentIndex
-                            , isThumbnail = isThumbnail
-                            , tightDimension =
-                                if level >= 1 then
-                                    calculateMyCharDimension myChar
+                        (\component ->
+                            renderCharHelper
+                                model
+                                { charClassName = charClassName
+                                , index = componentIndex
+                                , isThumbnail = isThumbnail
+                                , tightDimension =
+                                    if level >= 1 then
+                                        calculateMyCharDimension myChar
 
-                                else
-                                    { position = Vector2.vec2 0 0, dimension = Vector2.vec2 100 100 }
-                            }
-                            (level + 1)
+                                    else
+                                        { position = Vector2.vec2 0 0, dimension = Vector2.vec2 100 100 }
+                                , parentMyCharType = parentMyCharType
+                                }
+                                (level + 1)
+                                component
+                        )
                             << myCharFromMyCharRef chars
                     )
                     components
 
 
-activeComponentButtons : Model -> Svg Msg
-activeComponentButtons ({ palette } as model) =
+activeComponentButtons : MyCharType -> Model -> Svg Msg
+activeComponentButtons charType ({ palette } as model) =
     Svg.svg
         [ SvgAttributes.x <| SvgTypes.px -35
         , SvgAttributes.y <| SvgTypes.percent 50
         , SvgAttributes.strokeWidth <| SvgTypes.px 2
         , SvgAttributes.color <| toColor palette.white
         ]
-        [ aspectRatioLockButton model
-        , copyActiveComponentButton model
-        , deleteActiveComponentButton model
-        ]
+    <|
+        case charType of
+            SimpleCharType ->
+                [ aspectRatioLockButton model
+                ]
+
+            CompoundCharType ->
+                [ aspectRatioLockButton model
+                , copyActiveComponentButton model
+                , deleteActiveComponentButton model
+                ]
 
 
 aspectRatioLockButton : Model -> Svg Msg
 aspectRatioLockButton { isSnapToGrid, isAspectRatioLocked, palette, spacing, fontSize } =
+    let
+        _ =
+            Debug.log "isSnapToGrid" isSnapToGrid
+    in
     if isSnapToGrid then
         Svg.g [] []
 
@@ -3161,7 +3220,8 @@ subscriptions ({ drag } as model) =
     Sub.batch
         [ Draggable.subscriptions DragMsg drag
         , getModelPort GotModel
-        , getSimpleCharsPort GetSimpleChars
+        , gotSavedSimpleCharsPort GotSavedSimpleChars
+        , gotNewSimpleCharsPort GotNewSimpleChars
         , Time.every 1000 (\_ -> SaveModel ())
         , Browser.Events.onResize UpdateDevice
         ]
