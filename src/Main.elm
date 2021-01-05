@@ -19,7 +19,6 @@ import File exposing (File)
 import Html exposing (Html)
 import Html.Attributes
 import Html.Events
-import Html5.DragDrop as DragDrop
 import Http
 import I18Next
 import Json.Decode as Decode exposing (Decoder)
@@ -82,7 +81,6 @@ type alias Model =
     , popUp : PopUp
     , newCompoundChar : String
     , isInputErrorShown : Bool
-    , dragDropChar : DragDrop.Model Char ()
     , drag : Draggable.State DragData
     , dragDelta : Vec2
     , activeComponentIndex : Maybe Int
@@ -240,7 +238,6 @@ init flags =
             , popUp = NoPopUp
             , newCompoundChar = ""
             , isInputErrorShown = False
-            , dragDropChar = DragDrop.init
             , drag = Draggable.init
             , dragDelta = Vector2.vec2 0 0
             , activeComponentIndex = Nothing
@@ -334,7 +331,6 @@ type Msg
     | ShowInputError
     | HideInputError
     | ClosePopUp
-    | DragDropChar (DragDrop.Msg Char ())
     | OnDragBy Vec2
     | StartDragging DragData
     | StopDragging
@@ -414,9 +410,6 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentIndex } as 
 
         ClosePopUp ->
             closePopUp model
-
-        DragDropChar msg_ ->
-            dragDropChar msg_ model
 
         OnDragBy delta ->
             onDragBy delta model
@@ -1382,42 +1375,6 @@ snapToGrid boxUnits position =
     Vector2.vec2
         (roundToGrid <| Vector2.getX position)
         (roundToGrid <| Vector2.getY position)
-
-
-dragDropChar : DragDrop.Msg Char () -> Model -> ( Model, Cmd Msg )
-dragDropChar msg_ model =
-    let
-        ( model_, result ) =
-            DragDrop.update msg_ model.dragDropChar
-    in
-    ( case result of
-        Nothing ->
-            { model
-                | dragDropChar =
-                    model_
-                , chars =
-                    model.chars
-            }
-
-        Just ( componentChar, _, _ ) ->
-            { model
-                | dragDropChar =
-                    DragDrop.init
-                , chars =
-                    Maybe.map
-                        (\selectedChar ->
-                            Dict.update
-                                selectedChar
-                                (Maybe.map <|
-                                    addComponentToMyChar model.chars componentChar
-                                )
-                                model.chars
-                        )
-                        model.selectedChar
-                        |> Maybe.withDefault model.chars
-            }
-    , Cmd.none
-    )
 
 
 addComponentToMyChar : Dict Char MyChar -> Char -> MyChar -> MyChar
@@ -2427,34 +2384,8 @@ radioOption borderColor fontSize optionLabel status =
 
 editor : Model -> E.Element Msg
 editor ({ activeComponentIndex, selectedChar, chars, simpleCharSvgs, boxUnits, borderUnits, unitSize, strokeWidth, strokeLineCap, isAspectRatioLocked, isSnapToGrid, palette } as model) =
-    let
-        draggedChar =
-            DragDrop.getDragId model.dragDropChar
-
-        dropId =
-            DragDrop.getDropId model.dragDropChar
-
-        droppablePosition =
-            DragDrop.getDroppablePosition model.dragDropChar
-
-        droppable =
-            List.map E.htmlAttribute <| DragDrop.droppable DragDropChar ()
-
-        isHighlightBackground =
-            case dropId of
-                Just _ ->
-                    case droppablePosition of
-                        Nothing ->
-                            False
-
-                        Just _ ->
-                            True
-
-                Nothing ->
-                    False
-    in
     E.el
-        ([ E.inFront <|
+        [ E.inFront <|
             case selectedChar of
                 Just char ->
                     E.html <|
@@ -2465,43 +2396,13 @@ editor ({ activeComponentIndex, selectedChar, chars, simpleCharSvgs, boxUnits, b
 
                 Nothing ->
                     E.none
-         ]
-            ++ (case selectedChar of
-                    Just char ->
-                        let
-                            myChar =
-                                myCharFromChar chars char
-                        in
-                        if isMyCharType SimpleCharType myChar then
-                            []
-
-                        else
-                            case draggedChar of
-                                Just dragged ->
-                                    let
-                                        myDraggedChar =
-                                            myCharFromChar chars dragged
-                                    in
-                                    if isCharPartOfMyChar chars char myDraggedChar then
-                                        []
-
-                                    else
-                                        droppable
-
-                                Nothing ->
-                                    droppable
-
-                    Nothing ->
-                        []
-               )
-        )
+        ]
     <|
         E.html <|
             gridBackground
                 { boxUnits = boxUnits
                 , unitSize = unitSize
                 , borderUnits = borderUnits
-                , isHighlightBackground = isHighlightBackground
                 , palette = palette
                 }
 
@@ -2525,11 +2426,10 @@ gridBackground :
     { boxUnits : Int
     , borderUnits : Float
     , unitSize : Float
-    , isHighlightBackground : Bool
     , palette : Palette
     }
     -> Svg Msg
-gridBackground { boxUnits, borderUnits, unitSize, isHighlightBackground, palette } =
+gridBackground { boxUnits, borderUnits, unitSize, palette } =
     let
         boxSize =
             toFloat boxUnits * unitSize
@@ -2565,14 +2465,7 @@ gridBackground { boxUnits, borderUnits, unitSize, isHighlightBackground, palette
         [ Svg.rect
             [ SvgAttributes.width <| SvgTypes.Percent 100
             , SvgAttributes.height <| SvgTypes.Percent 100
-            , SvgAttributes.fill <|
-                SvgTypes.Paint <|
-                    toColor <|
-                        if isHighlightBackground then
-                            palette.lightBg
-
-                        else
-                            palette.white
+            , SvgAttributes.fill <| SvgTypes.Paint <| toColor palette.white
             , SvgAttributes.pointerEvents "fill"
             , TypedSvg.Events.onClick <| SetActiveComponent Nothing
             ]
@@ -2738,16 +2631,12 @@ charCard ({ chars, activeComponentIndex, unitSize, thumbnailUnitSize, boxUnits, 
             (toFloat boxUnits + 2 * minBorderUnits) * thumbnailUnitSize
     in
     E.column
-        (([ E.width <| E.px <| round outerBoxSize
-          , Background.color palette.lightBg
-          , Border.rounded spacing.medium
-          , Events.onClick <| SelectChar myChar
-          , E.pointer
-          ]
-            ++ (List.map E.htmlAttribute <|
-                    DragDrop.draggable DragDropChar char
-               )
-         )
+        ([ E.width <| E.px <| round outerBoxSize
+         , Background.color palette.lightBg
+         , Border.rounded spacing.medium
+         , Events.onClick <| SelectChar myChar
+         , E.pointer
+         ]
             ++ (case selectedChar of
                     Just selected ->
                         if selected == char then

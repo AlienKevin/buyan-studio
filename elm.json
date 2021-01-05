@@ -24,7 +24,6 @@
             "elm-explorations/linear-algebra": "1.0.3",
             "feathericons/elm-feather": "1.5.0",
             "mdgriffith/elm-ui": "1.1.8",
-            "norpan/elm-html5-drag-drop": "3.1.4",
             "zaboco/elm-draggable": "4.0.6"
         },
         "indirect": {
