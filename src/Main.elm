@@ -69,7 +69,8 @@ port clearSimpleCharsPort : () -> Cmd msg
 
 
 type alias Model =
-    { chars : Dict Char MyChar
+    { mode : Mode
+    , chars : Dict Char MyChar
     , selectedChar : Maybe Char
     , simpleCharSvgs : SimpleCharSvgs
     , boxUnits : Int
@@ -99,6 +100,11 @@ type alias Model =
     , fontSize :
         FontSize
     }
+
+
+type Mode
+    = BrowseMode
+    | EditMode
 
 
 type alias Palette =
@@ -193,6 +199,7 @@ type PopUp
     | ConfirmDeleteSelectedCharPopUp
     | ConfirmClearCharsPopUp MyCharType
     | PreviewInParagraphPopUp
+    | AppPreferencesPopUp
     | NoPopUp
 
 
@@ -220,7 +227,8 @@ init : Value -> ( Model, Cmd Msg )
 init flags =
     let
         model =
-            { chars = Dict.empty
+            { mode = BrowseMode
+            , chars = Dict.empty
             , selectedChar = Nothing
             , simpleCharSvgs = Dict.empty
             , boxUnits = 32
@@ -346,6 +354,8 @@ type Msg
     | UpdateLanguage Language
     | GotTranslations (Result Http.Error I18Next.Translations)
     | UpdateDevice Int Int
+    | UpdateMode Mode
+    | ShowAppPreferences
 
 
 type alias DragData =
@@ -465,6 +475,32 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentIndex } as 
         UpdateDevice width height ->
             updateDevice width height model
 
+        UpdateMode mode ->
+            updateMode mode model
+
+        ShowAppPreferences ->
+            showAppPreferences model
+
+
+showAppPreferences : Model -> ( Model, Cmd Msg )
+showAppPreferences model =
+    ( { model
+        | popUp =
+            AppPreferencesPopUp
+      }
+    , Cmd.none
+    )
+
+
+updateMode : Mode -> Model -> ( Model, Cmd Msg )
+updateMode mode model =
+    ( { model
+        | mode =
+            mode
+      }
+    , Cmd.none
+    )
+
 
 updateDevice : Int -> Int -> Model -> ( Model, Cmd Msg )
 updateDevice width height model =
@@ -479,7 +515,7 @@ updateDevice width height model =
             min width height
 
         unitSize =
-            toFloat minSize * 0.7 / (toFloat model.boxUnits + model.borderUnits * 2)
+            toFloat minSize * 0.95 / (toFloat model.boxUnits + model.borderUnits * 2)
     in
     ( { model
         | device =
@@ -1759,7 +1795,7 @@ myCharTypeFromMyChar myChar =
 
 
 view : Model -> Html Msg
-view ({ spacing, fontSize } as model) =
+view ({ mode, spacing, fontSize } as model) =
     E.layout
         [ E.padding spacing.large
         , E.inFront <| popUp model
@@ -1768,13 +1804,61 @@ view ({ spacing, fontSize } as model) =
         , Font.size fontSize.medium
         ]
     <|
-        E.row
-            [ E.width E.fill
-            , E.height E.fill
-            , E.spacing spacing.large
-            ]
-            [ charPanels model
-            ]
+        case mode of
+            BrowseMode ->
+                E.el
+                    [ E.inFront <|
+                        appHeader model
+                    , E.width E.fill
+                    , E.height E.fill
+                    ]
+                    (charPanels model)
+
+            EditMode ->
+                E.column
+                    [ E.width E.fill
+                    , E.height E.fill
+                    ]
+                    [ editHeader model
+                    , E.row
+                        [ E.spacing spacing.large ]
+                        [ editorPreferences model
+                        , editor model
+                        ]
+                    ]
+
+
+editHeader : Model -> E.Element Msg
+editHeader ({ fontSize } as model) =
+    E.row
+        [ E.width E.fill
+        , E.paddingEach { top = 0, bottom = fontSize.large, left = 0, right = 0 }
+        ]
+        [ iconButton
+            { icon =
+                FeatherIcons.chevronLeft
+            , size =
+                fontSize.large
+            , onPress =
+                Just <| UpdateMode BrowseMode
+            }
+        ]
+
+
+appHeader : Model -> E.Element Msg
+appHeader ({ palette, fontSize } as model) =
+    E.row
+        [ E.alignRight
+        ]
+        [ iconButton
+            { icon =
+                FeatherIcons.settings
+            , size =
+                fontSize.large
+            , onPress =
+                Just <| ShowAppPreferences
+            }
+        ]
 
 
 popUp : Model -> E.Element Msg
@@ -1792,8 +1876,92 @@ popUp model =
         PreviewInParagraphPopUp ->
             previewInParagraphPopUp model
 
+        AppPreferencesPopUp ->
+            appPreferencesPopUp model
+
         NoPopUp ->
             E.none
+
+
+appPreferencesPopUp : Model -> E.Element Msg
+appPreferencesPopUp ({ palette, spacing, fontSize } as model) =
+    popUpTemplate
+        { borderColor =
+            palette.lightFg
+        , isCloseButtonShown =
+            True
+        }
+        model
+        [ Input.radio
+            [ E.spacing spacing.small
+            , E.htmlAttribute <| Html.Attributes.style "align-self" "center"
+            ]
+            { onChange = UpdateLanguage
+            , selected = Just model.language
+            , label =
+                Input.labelAbove [ E.alignTop, E.paddingXY 0 spacing.small ]
+                    (E.text (Translations.language model.trs))
+            , options =
+                [ Input.optionWith LanguageEn
+                    (radioOption palette.lightFg fontSize (E.text "English"))
+                , Input.optionWith LanguageZhHans
+                    (radioOption palette.lightFg fontSize (E.text "中文（简体）"))
+                , Input.optionWith LanguageZhHant
+                    (radioOption palette.lightFg fontSize (E.text "中文（繁體）"))
+                ]
+            }
+        ]
+
+
+popUpTemplate :
+    { borderColor : E.Color
+    , isCloseButtonShown : Bool
+    }
+    -> Model
+    -> List (E.Element Msg)
+    -> E.Element Msg
+popUpTemplate { borderColor, isCloseButtonShown } { palette, spacing, fontSize, boxUnits, thumbnailUnitSize } =
+    let
+        borderWidth =
+            6
+
+        width =
+            toFloat boxUnits * thumbnailUnitSize * 2
+    in
+    E.column
+        ([ E.centerX
+         , E.centerY
+         , Background.color palette.lightBg
+         , E.width <| E.px <| round <| width
+         , E.height <| E.px <| round <| width + toFloat fontSize.title
+         , E.spacing spacing.small
+         , E.paddingXY spacing.small spacing.large
+         , Font.size fontSize.medium
+         , E.inFront <|
+            if isCloseButtonShown then
+                E.el
+                    [ E.padding spacing.tiny ]
+                <|
+                    iconButton
+                        { icon =
+                            FeatherIcons.x
+                        , size =
+                            fontSize.large
+                        , onPress =
+                            Just ClosePopUp
+                        }
+
+            else
+                E.none
+         ]
+            ++ highlightBorder
+                { color = borderColor
+                , width = borderWidth
+                , spacing = spacing
+                , style = Border.dashed
+                , glowWidth = borderWidth
+                }
+        )
 
 
 confirmClearCharsPopUp : MyCharType -> Model -> E.Element Msg
@@ -1806,28 +1974,13 @@ confirmClearCharsPopUp myCharType ({ trs } as model) =
 
 confirmDeletePopUpTemplate : Model -> String -> Msg -> E.Element Msg
 confirmDeletePopUpTemplate ({ trs, boxUnits, thumbnailUnitSize, palette, spacing, fontSize } as model) targetName onConfirm =
-    let
-        borderWidth =
-            6
-    in
-    E.column
-        ([ E.centerX
-         , E.centerY
-         , Background.color palette.lightBg
-         , E.width <| E.px <| round <| toFloat boxUnits * thumbnailUnitSize + 10 * borderWidth
-         , E.height <| E.px <| round <| toFloat boxUnits * thumbnailUnitSize + toFloat fontSize.title + 10 * borderWidth
-         , E.spaceEvenly
-         , E.padding spacing.small
-         , Font.size fontSize.medium
-         ]
-            ++ highlightBorder
-                { color = palette.danger
-                , width = borderWidth
-                , spacing = spacing
-                , style = Border.dashed
-                , glowWidth = borderWidth
-                }
-        )
+    popUpTemplate
+        { borderColor =
+            palette.danger
+        , isCloseButtonShown =
+            False
+        }
+        model
         [ E.el
             [ E.centerX ]
             (E.column
@@ -1950,7 +2103,7 @@ previewInParagraphPopUp ({ palette, spacing, fontSize } as model) =
                         }
                     )
                 ]
-            , E.el [ E.width <| E.fillPortion 2, E.height E.fill, E.paddingXY 0 spacing.small ] <| preferences model
+            , E.el [ E.width <| E.fillPortion 2, E.height E.fill, E.paddingXY 0 spacing.small ] <| editorPreferences model
             ]
         , E.el
             [ E.width E.fill
@@ -2014,7 +2167,7 @@ confirmDeleteSelectedCharPopUp ({ selectedChar } as model) =
 
 
 addCompoundCharPopUp : Model -> E.Element Msg
-addCompoundCharPopUp { trs, activeComponentIndex, boxUnits, thumbnailUnitSize, newCompoundChar, isInputErrorShown, palette, spacing, fontSize } =
+addCompoundCharPopUp ({ trs, activeComponentIndex, newCompoundChar, isInputErrorShown, palette, spacing, fontSize, boxUnits, thumbnailUnitSize } as model) =
     let
         inputLength =
             String.length newCompoundChar
@@ -2022,41 +2175,16 @@ addCompoundCharPopUp { trs, activeComponentIndex, boxUnits, thumbnailUnitSize, n
         isValidNewChar =
             inputLength == 1
 
-        borderWidth =
-            6
-
         width =
-            toFloat boxUnits * thumbnailUnitSize + 10 * borderWidth
+            toFloat boxUnits * thumbnailUnitSize * 2
     in
-    E.column
-        ([ E.centerX
-         , E.centerY
-         , Background.color palette.lightBg
-         , E.width <| E.px <| round <| width
-         , E.height <| E.px <| round <| width + toFloat fontSize.title
-         , E.spacing spacing.small
-         , Font.size fontSize.medium
-         , E.inFront <|
-            E.el
-                [ E.padding spacing.tiny ]
-            <|
-                iconButton
-                    { icon =
-                        FeatherIcons.x
-                    , size =
-                        fontSize.small
-                    , onPress =
-                        Just ClosePopUp
-                    }
-         ]
-            ++ highlightBorder
-                { color = palette.lightFg
-                , width = borderWidth
-                , spacing = spacing
-                , style = Border.dashed
-                , glowWidth = borderWidth
-                }
-        )
+    popUpTemplate
+        { borderColor =
+            palette.lightFg
+        , isCloseButtonShown =
+            True
+        }
+        model
         [ Input.text
             [ E.width <| E.px <| fontSize.medium * 5
             , E.centerX
@@ -2151,95 +2279,67 @@ titleText fontSize text =
         E.text text
 
 
-preferences : Model -> E.Element Msg
-preferences ({ palette, spacing, fontSize } as model) =
-    E.row
+editorPreferences : Model -> E.Element Msg
+editorPreferences ({ palette, spacing, fontSize } as model) =
+    E.column
         [ E.spacing spacing.medium
         , E.width E.fill
         , E.height E.fill
         ]
-        [ E.column
-            [ E.alignTop
-            , E.spacing spacing.small
-            , E.width E.fill
+        [ Input.slider
+            [ E.height (E.px fontSize.small)
+            , E.width (E.px <| fontSize.small * 7)
+            , E.behindContent
+                (E.el
+                    [ E.width E.fill
+                    , E.height (E.px <| fontSize.small // 3)
+                    , E.centerY
+                    , Background.color palette.darkFg
+                    , Border.rounded (fontSize.small // 3)
+                    ]
+                    E.none
+                )
             ]
-            [ Input.slider
-                [ E.height (E.px fontSize.small)
-                , E.width (E.px <| fontSize.small * 7)
-                , E.behindContent
-                    (E.el
-                        [ E.width E.fill
-                        , E.height (E.px <| fontSize.small // 3)
-                        , E.centerY
-                        , Background.color palette.darkFg
-                        , Border.rounded (fontSize.small // 3)
+            { onChange = UpdateStrokeWidth
+            , label =
+                Input.labelLeft []
+                    (E.row
+                        [ E.spacing spacing.small ]
+                        [ E.text <| Translations.strokeWidth model.trs
+                        , E.text <| String.fromInt (round model.strokeWidth)
                         ]
-                        E.none
                     )
-                ]
-                { onChange = UpdateStrokeWidth
-                , label =
-                    Input.labelLeft []
-                        (E.row
-                            [ E.spacing spacing.small ]
-                            [ E.text <| Translations.strokeWidth model.trs
-                            , E.text <| String.fromInt (round model.strokeWidth)
-                            ]
-                        )
-                , min = minStrokeWidth
-                , max = maxStrokeWidth
-                , step = Just 1
-                , value = model.strokeWidth
-                , thumb = sliderThumb palette fontSize
-                }
-            , Input.radio
-                [ E.spacing spacing.small
-                , E.padding spacing.small
-                ]
-                { onChange = UpdateStrokeLineCap
-                , selected = Just model.strokeLineCap
-                , label =
-                    Input.labelLeft [ E.alignTop, E.paddingXY 0 spacing.small ]
-                        (E.text (Translations.strokeLineCap model.trs))
-                , options =
-                    [ Input.optionWith StrokeLineCapRound
-                        (radioOption palette fontSize (E.text (Translations.StrokeLineCapType.round model.trs)))
-                    , Input.optionWith StrokeLineCapSquare
-                        (radioOption palette fontSize (E.text (Translations.StrokeLineCapType.square model.trs)))
-                    ]
-                }
-            , Input.checkbox
-                [ E.spacing spacing.small ]
-                { onChange = \_ -> ToggleIsSnapToGrid
-                , icon = checkbox palette fontSize
-                , checked = model.isSnapToGrid
-                , label =
-                    Input.labelLeft []
-                        (E.text (Translations.snapToGrid model.trs))
-                }
+            , min = minStrokeWidth
+            , max = maxStrokeWidth
+            , step = Just 1
+            , value = model.strokeWidth
+            , thumb = sliderThumb palette fontSize
+            }
+        , Input.radio
+            [ E.spacing spacing.small
+            , E.padding spacing.small
             ]
-        , E.column
-            [ E.alignTop
-            , E.width E.fill
-            ]
-            [ Input.radio
-                [ E.spacing spacing.small
+            { onChange = UpdateStrokeLineCap
+            , selected = Just model.strokeLineCap
+            , label =
+                Input.labelLeft [ E.alignTop, E.paddingXY 0 spacing.small ]
+                    (E.text (Translations.strokeLineCap model.trs))
+            , options =
+                [ Input.optionWith StrokeLineCapRound
+                    (radioOption palette.darkFg fontSize (E.text (Translations.StrokeLineCapType.round model.trs)))
+                , Input.optionWith StrokeLineCapSquare
+                    (radioOption palette.darkFg fontSize (E.text (Translations.StrokeLineCapType.square model.trs)))
                 ]
-                { onChange = UpdateLanguage
-                , selected = Just model.language
-                , label =
-                    Input.labelLeft [ E.alignTop, E.paddingXY spacing.small 0 ]
-                        (E.text (Translations.language model.trs))
-                , options =
-                    [ Input.optionWith LanguageEn
-                        (radioOption palette fontSize (E.text "English"))
-                    , Input.optionWith LanguageZhHans
-                        (radioOption palette fontSize (E.text "中文（简体）"))
-                    , Input.optionWith LanguageZhHant
-                        (radioOption palette fontSize (E.text "中文（繁體）"))
-                    ]
-                }
-            ]
+            }
+        , Input.checkbox
+            [ E.spacing spacing.small ]
+            { onChange = \_ -> ToggleIsSnapToGrid
+            , icon = checkbox palette fontSize
+            , checked = model.isSnapToGrid
+            , label =
+                Input.labelLeft []
+                    (E.text (Translations.snapToGrid model.trs))
+            }
         ]
 
 
@@ -2293,8 +2393,8 @@ checkbox palette fontSize checked =
         E.none
 
 
-radioOption : Palette -> FontSize -> E.Element msg -> Input.OptionState -> E.Element msg
-radioOption palette fontSize optionLabel status =
+radioOption : E.Color -> FontSize -> E.Element msg -> Input.OptionState -> E.Element msg
+radioOption borderColor fontSize optionLabel status =
     let
         radius =
             round <| toFloat fontSize.large / 2
@@ -2318,17 +2418,7 @@ radioOption palette fontSize optionLabel status =
 
                     Input.Selected ->
                         radius
-            , Border.color <|
-                case status of
-                    Input.Idle ->
-                        palette.darkFg
-
-                    Input.Focused ->
-                        palette.darkFg
-
-                    Input.Selected ->
-                        palette.darkFg
-            , Background.color palette.white
+            , Border.color borderColor
             ]
             E.none
         , E.el [ E.width E.fill ] optionLabel
@@ -2592,6 +2682,7 @@ charPanel myCharType ({ trs, boxUnits, thumbnailUnitSize, palette, spacing, font
         [ E.row
             [ E.spacing spacing.small
             , Font.size fontSize.title
+            , E.width E.fill
             ]
             [ E.text <|
                 (String.Extra.toSentenceCase <| stringFromMyCharType trs myCharType)
@@ -2697,11 +2788,11 @@ charCard ({ chars, activeComponentIndex, unitSize, thumbnailUnitSize, boxUnits, 
                         ]
                         (iconButton
                             { icon =
-                                FeatherIcons.download
+                                FeatherIcons.edit
                             , size =
                                 fontSize.large
                             , onPress =
-                                Just DownloadSelectedChar
+                                Just <| UpdateMode EditMode
                             }
                         )
                     , E.el
