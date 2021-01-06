@@ -65,3 +65,13 @@ character translations =
 acceptOnlyOneCharacter : Translations -> String
 acceptOnlyOneCharacter translations =
     t translations "acceptOnlyOneCharacter"
+
+
+cannotContainSelfReference : Translations -> String
+cannotContainSelfReference translations =
+    t translations "cannotContainSelfReference"
+
+
+characterNotFound : Translations -> String -> String
+characterNotFound translations char =
+    tr translations Curly "characterNotFound" [ ( "char", char ) ]

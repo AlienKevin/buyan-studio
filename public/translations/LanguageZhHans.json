@@ -18,5 +18,7 @@
         "simple": "独体字",
         "compound": "合体字"
     },
-    "acceptOnlyOneCharacter": "仅接受1个字符"
+    "acceptOnlyOneCharacter": "仅接受1个字符",
+    "cannotContainSelfReference": "不能含有自我参照",
+    "characterNotFound": "找不到字符“{{char}}”"
 }

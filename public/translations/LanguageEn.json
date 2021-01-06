@@ -18,5 +18,7 @@
         "simple": "Simple Characters",
         "compound": "Compound Characters"
     },
-    "acceptOnlyOneCharacter": "Accept only 1 character"
+    "acceptOnlyOneCharacter": "Accept only 1 character",
+    "cannotContainSelfReference": "Cannot contain self reference",
+    "characterNotFound": "Character \"{{char}}\" is not found"
 }

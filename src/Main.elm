@@ -80,7 +80,8 @@ type alias Model =
     , strokeLineCap : StrokeLineCap
     , popUp : PopUp
     , newCompoundChar : String
-    , isInputErrorShown : Bool
+    , newComponentChar : String
+    , inputError : Maybe InputError
     , drag : Draggable.State DragData
     , dragDelta : Vec2
     , activeComponentIndex : Maybe Int
@@ -103,6 +104,12 @@ type alias Model =
 type Mode
     = BrowseMode
     | EditMode
+
+
+type InputError
+    = InvalidInputLength Int
+    | CharacterNotFound
+    | ContainsSelfReference
 
 
 type alias Palette =
@@ -198,6 +205,7 @@ type PopUp
     | ConfirmClearCharsPopUp MyCharType
     | PreviewInParagraphPopUp
     | AppPreferencesPopUp
+    | AddComponentToSelectedCharPopUp
     | NoPopUp
 
 
@@ -237,7 +245,8 @@ init flags =
             , strokeLineCap = StrokeLineCapRound
             , popUp = NoPopUp
             , newCompoundChar = ""
-            , isInputErrorShown = False
+            , newComponentChar = ""
+            , inputError = Nothing
             , drag = Draggable.init
             , dragDelta = Vector2.vec2 0 0
             , activeComponentIndex = Nothing
@@ -322,13 +331,16 @@ type Msg
     | GotNewSimpleChars Value
     | GotSavedSimpleChars Value
     | SelectChar MyChar
+    | RequestAddComponentToSelectedChar
+    | UpdatePendingComponentChar String
+    | AddPendingComponentChar
     | RequestDeleteSelectedChar
     | DeleteSelectedChar
     | RequestClearChars MyCharType
     | ClearChars MyCharType
     | UpdatePendingCompoundChar String
     | AddPendingCompoundChar
-    | ShowInputError
+    | ShowInputError InputError
     | HideInputError
     | ClosePopUp
     | OnDragBy Vec2
@@ -384,6 +396,15 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentIndex } as 
         SelectChar myChar ->
             selectChar myChar model
 
+        RequestAddComponentToSelectedChar ->
+            requestAddComponentToSelectedChar model
+
+        UpdatePendingComponentChar charInput ->
+            updatePendingComponentChar charInput model
+
+        AddPendingComponentChar ->
+            addPendingComponentChar model
+
         RequestDeleteSelectedChar ->
             requestDeleteSelectedChar model
 
@@ -402,8 +423,8 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentIndex } as 
         AddPendingCompoundChar ->
             addPendingCompoundChar model
 
-        ShowInputError ->
-            showInputError model
+        ShowInputError error ->
+            showInputError error model
 
         HideInputError ->
             hideInputError model
@@ -473,6 +494,53 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentIndex } as 
 
         ShowAppPreferences ->
             showAppPreferences model
+
+
+addPendingComponentChar : Model -> ( Model, Cmd Msg )
+addPendingComponentChar model =
+    ( { model
+        | chars =
+            Maybe.map
+                (\selectedChar ->
+                    Dict.update
+                        selectedChar
+                        (Maybe.map <|
+                            addComponentToMyChar model.chars (charFromString model.newComponentChar)
+                        )
+                        model.chars
+                )
+                model.selectedChar
+                |> Maybe.withDefault model.chars
+        , popUp =
+            NoPopUp
+      }
+    , Cmd.none
+    )
+
+
+updatePendingComponentChar : String -> Model -> ( Model, Cmd Msg )
+updatePendingComponentChar charInput model =
+    ( { model
+        | newComponentChar =
+            charInput
+      }
+    , Cmd.none
+    )
+
+
+addComponentToSelectedChar : Model -> ( Model, Cmd Msg )
+addComponentToSelectedChar model =
+    Debug.todo "TODO"
+
+
+requestAddComponentToSelectedChar : Model -> ( Model, Cmd Msg )
+requestAddComponentToSelectedChar model =
+    ( { model
+        | popUp =
+            AddComponentToSelectedCharPopUp
+      }
+    , Cmd.none
+    )
 
 
 showAppPreferences : Model -> ( Model, Cmd Msg )
@@ -1501,16 +1569,18 @@ closePopUp model =
 hideInputError : Model -> ( Model, Cmd Msg )
 hideInputError model =
     ( { model
-        | isInputErrorShown = False
+        | inputError =
+            Nothing
       }
     , Cmd.none
     )
 
 
-showInputError : Model -> ( Model, Cmd Msg )
-showInputError model =
+showInputError : InputError -> Model -> ( Model, Cmd Msg )
+showInputError error model =
     ( { model
-        | isInputErrorShown = True
+        | inputError =
+            Just error
       }
     , Cmd.none
     )
@@ -1836,8 +1906,130 @@ popUp model =
         AppPreferencesPopUp ->
             appPreferencesPopUp model
 
+        AddComponentToSelectedCharPopUp ->
+            addComponentToSelectedCharPopUp model
+
         NoPopUp ->
             E.none
+
+
+addComponentToSelectedCharPopUp : Model -> E.Element Msg
+addComponentToSelectedCharPopUp ({ chars, selectedChar, trs, newComponentChar, inputError, boxUnits, thumbnailUnitSize, palette, spacing, fontSize } as model) =
+    let
+        newInputError =
+            case String.uncons newComponentChar of
+                Just ( char, _ ) ->
+                    let
+                        inputLength =
+                            String.length newComponentChar
+                    in
+                    if inputLength /= 1 then
+                        Just <| InvalidInputLength inputLength
+
+                    else if
+                        isCharPartOfMyChar chars
+                            (unboxChar selectedChar)
+                            (myCharFromChar chars char)
+                    then
+                        Just <| ContainsSelfReference
+
+                    else if not (Dict.member char chars) then
+                        Just <| CharacterNotFound
+
+                    else
+                        Nothing
+
+                Nothing ->
+                    Just <| InvalidInputLength 0
+
+        width =
+            toFloat boxUnits * thumbnailUnitSize * 2
+    in
+    popUpTemplate
+        { borderColor =
+            palette.lightFg
+        , isCloseButtonShown =
+            True
+        }
+        model
+        [ Input.text
+            [ E.width <| E.px <| fontSize.medium * 5
+            , E.centerX
+            , onEnter <|
+                case newInputError of
+                    Nothing ->
+                        Just AddPendingComponentChar
+
+                    Just _ ->
+                        Nothing
+            ]
+            { onChange =
+                UpdatePendingComponentChar
+            , text =
+                newComponentChar
+            , placeholder =
+                Nothing
+            , label =
+                Input.labelAbove
+                    [ E.paddingEach { top = spacing.medium, bottom = 0, left = 0, right = 0 } ]
+                    (E.text (Translations.character trs))
+            }
+        , E.el
+            ([ E.centerX
+             , E.below <|
+                case inputError of
+                    Just error ->
+                        E.paragraph
+                            [ E.centerX
+                            , Font.size fontSize.small
+                            , E.width <| E.px <| round width
+                            , E.padding spacing.small
+                            ]
+                            [ E.text <|
+                                case error of
+                                    InvalidInputLength _ ->
+                                        Translations.acceptOnlyOneCharacter trs
+
+                                    ContainsSelfReference ->
+                                        Translations.cannotContainSelfReference trs
+
+                                    CharacterNotFound ->
+                                        Translations.characterNotFound trs newComponentChar
+                            ]
+
+                    Nothing ->
+                        E.none
+             ]
+                ++ (case newInputError of
+                        Nothing ->
+                            []
+
+                        Just error ->
+                            [ Events.onMouseEnter <| ShowInputError error
+                            , Events.onMouseLeave HideInputError
+                            ]
+                   )
+            )
+          <|
+            iconButton
+                { icon =
+                    case newInputError of
+                        Nothing ->
+                            FeatherIcons.checkCircle
+
+                        Just _ ->
+                            FeatherIcons.alertTriangle
+                , size =
+                    fontSize.title
+                , onPress =
+                    case newInputError of
+                        Nothing ->
+                            Just AddPendingComponentChar
+
+                        Just _ ->
+                            Nothing
+                }
+        ]
 
 
 appPreferencesPopUp : Model -> E.Element Msg
@@ -2119,18 +2311,22 @@ confirmDeleteSelectedCharPopUp : Model -> E.Element Msg
 confirmDeleteSelectedCharPopUp ({ selectedChar } as model) =
     confirmDeletePopUpTemplate
         model
-        (String.fromChar (Maybe.withDefault '?' selectedChar))
+        (String.fromChar (unboxChar selectedChar))
         DeleteSelectedChar
 
 
 addCompoundCharPopUp : Model -> E.Element Msg
-addCompoundCharPopUp ({ trs, activeComponentIndex, newCompoundChar, isInputErrorShown, palette, spacing, fontSize, boxUnits, thumbnailUnitSize } as model) =
+addCompoundCharPopUp ({ trs, activeComponentIndex, newCompoundChar, inputError, palette, spacing, fontSize, boxUnits, thumbnailUnitSize } as model) =
     let
         inputLength =
             String.length newCompoundChar
 
-        isValidNewChar =
-            inputLength == 1
+        newInputError =
+            if inputLength /= 1 then
+                Just <| InvalidInputLength inputLength
+
+            else
+                Nothing
 
         width =
             toFloat boxUnits * thumbnailUnitSize * 2
@@ -2146,11 +2342,12 @@ addCompoundCharPopUp ({ trs, activeComponentIndex, newCompoundChar, isInputError
             [ E.width <| E.px <| fontSize.medium * 5
             , E.centerX
             , onEnter <|
-                if isValidNewChar then
-                    Just AddPendingCompoundChar
+                case newInputError of
+                    Nothing ->
+                        Just AddPendingCompoundChar
 
-                else
-                    Nothing
+                    Just _ ->
+                        Nothing
             ]
             { onChange =
                 UpdatePendingCompoundChar
@@ -2166,44 +2363,48 @@ addCompoundCharPopUp ({ trs, activeComponentIndex, newCompoundChar, isInputError
         , E.el
             ([ E.centerX
              , E.below <|
-                if isInputErrorShown then
-                    E.paragraph
-                        [ E.centerX
-                        , Font.size fontSize.small
-                        , E.width <| E.px <| round width
-                        , E.padding spacing.small
-                        ]
-                        [ E.text (Translations.acceptOnlyOneCharacter trs)
-                        ]
+                case inputError of
+                    Just _ ->
+                        E.paragraph
+                            [ E.centerX
+                            , Font.size fontSize.small
+                            , E.width <| E.px <| round width
+                            , E.padding spacing.small
+                            ]
+                            [ E.text (Translations.acceptOnlyOneCharacter trs)
+                            ]
 
-                else
-                    E.none
+                    Nothing ->
+                        E.none
              ]
-                ++ (if isValidNewChar then
-                        []
+                ++ (case newInputError of
+                        Nothing ->
+                            []
 
-                    else
-                        [ Events.onMouseEnter ShowInputError
-                        , Events.onMouseLeave HideInputError
-                        ]
+                        Just error ->
+                            [ Events.onMouseEnter <| ShowInputError error
+                            , Events.onMouseLeave HideInputError
+                            ]
                    )
             )
           <|
             iconButton
                 { icon =
-                    if isValidNewChar then
-                        FeatherIcons.checkCircle
+                    case newInputError of
+                        Nothing ->
+                            FeatherIcons.checkCircle
 
-                    else
-                        FeatherIcons.alertTriangle
+                        Just _ ->
+                            FeatherIcons.alertTriangle
                 , size =
                     fontSize.title
                 , onPress =
-                    if isValidNewChar then
-                        Just AddPendingCompoundChar
+                    case newInputError of
+                        Nothing ->
+                            Just AddPendingCompoundChar
 
-                    else
-                        Nothing
+                        Just _ ->
+                            Nothing
                 }
         ]
 
@@ -2383,7 +2584,7 @@ radioOption borderColor fontSize optionLabel status =
 
 
 editor : Model -> E.Element Msg
-editor ({ activeComponentIndex, selectedChar, chars, simpleCharSvgs, boxUnits, borderUnits, unitSize, strokeWidth, strokeLineCap, isAspectRatioLocked, isSnapToGrid, palette } as model) =
+editor ({ activeComponentIndex, selectedChar, chars, simpleCharSvgs, boxUnits, borderUnits, unitSize, strokeWidth, strokeLineCap, isAspectRatioLocked, isSnapToGrid, palette, spacing, fontSize } as model) =
     E.el
         [ E.inFront <|
             case selectedChar of
@@ -2396,6 +2597,30 @@ editor ({ activeComponentIndex, selectedChar, chars, simpleCharSvgs, boxUnits, b
 
                 Nothing ->
                     E.none
+        , E.above <|
+            E.row
+                [ E.width E.fill
+                , E.paddingEach { top = 0, bottom = spacing.large, left = 0, right = 0 }
+                , E.inFront <|
+                    if isMyCharType SimpleCharType (myCharFromChar chars (unboxChar selectedChar)) then
+                        E.none
+
+                    else
+                        iconButton
+                            { icon =
+                                FeatherIcons.plus
+                            , size =
+                                fontSize.large
+                            , onPress =
+                                Just <| RequestAddComponentToSelectedChar
+                            }
+                ]
+                [ E.el [ E.centerX, Font.size fontSize.large, Font.bold ]
+                    (E.text <|
+                        String.fromChar <|
+                            unboxChar selectedChar
+                    )
+                ]
         ]
     <|
         E.html <|
@@ -2405,6 +2630,11 @@ editor ({ activeComponentIndex, selectedChar, chars, simpleCharSvgs, boxUnits, b
                 , borderUnits = borderUnits
                 , palette = palette
                 }
+
+
+unboxChar : Maybe Char -> Char
+unboxChar =
+    Maybe.withDefault '?'
 
 
 isCharPartOfMyChar : Dict Char MyChar -> Char -> MyChar -> Bool
