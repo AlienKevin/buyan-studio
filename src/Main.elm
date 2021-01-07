@@ -19,6 +19,7 @@ import File exposing (File)
 import Html exposing (Html)
 import Html.Attributes
 import Html.Events
+import Html.Events.Extra.Touch
 import Http
 import I18Next
 import Json.Decode as Decode exposing (Decoder)
@@ -589,7 +590,7 @@ updateDevice width height model =
                     2
 
                 E.Tablet ->
-                    2.5
+                    2.6
 
                 E.Desktop ->
                     2.6
@@ -661,10 +662,10 @@ updateDevice width height model =
                     }
 
                 E.Tablet ->
-                    { small = small -2
-                    , medium = medium -2
-                    , large = large -2
-                    , title = title -2
+                    { small = small -1
+                    , medium = medium -1
+                    , large = large -1
+                    , title = title -1
                     }
 
                 E.Desktop ->
@@ -3145,7 +3146,7 @@ renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIn
                                 }
                                 0
                                 0
-                                fontSize.large
+                                fontSize.title
                                 isDraggable
                            , scaleHandle
                                 palette
@@ -3154,7 +3155,7 @@ renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIn
                                 }
                                 100
                                 0
-                                fontSize.large
+                                fontSize.title
                                 isDraggable
                            , scaleHandle
                                 palette
@@ -3163,7 +3164,7 @@ renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIn
                                 }
                                 0
                                 100
-                                fontSize.large
+                                fontSize.title
                                 isDraggable
                            , scaleHandle
                                 palette
@@ -3172,7 +3173,7 @@ renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIn
                                 }
                                 100
                                 100
-                                fontSize.large
+                                fontSize.title
                                 isDraggable
                            ]
 
@@ -3279,6 +3280,7 @@ activeComponentButton fontSize y icon backgroundColor onClick =
             , SvgAttributes.ry <| SvgTypes.percent 20
             , SvgAttributes.fill <| SvgTypes.Paint <| toColor backgroundColor
             , TypedSvg.Events.onClick onClick
+            , Html.Events.Extra.Touch.onStart (\_ -> onClick)
             ]
             []
         , Svg.svg

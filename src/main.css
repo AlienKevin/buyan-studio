@@ -27,4 +27,5 @@ img {
 
 #charPanel-wrappedRow > div {
   align-content: flex-start;
+  align-items: flex-start;
 }
