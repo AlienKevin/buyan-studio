@@ -1823,7 +1823,7 @@ myCharTypeFromMyChar myChar =
 
 
 view : Model -> Html Msg
-view ({ mode, spacing, fontSize } as model) =
+view ({ mode, spacing, fontSize, device } as model) =
     E.layout
         [ E.padding spacing.large
         , E.inFront <| popUp model
@@ -1848,10 +1848,16 @@ view ({ mode, spacing, fontSize } as model) =
                     , E.height E.fill
                     ]
                     [ editHeader model
-                    , E.row
+                    , (case device.orientation of
+                        E.Portrait ->
+                            E.column
+
+                        E.Landscape ->
+                            E.row
+                      )
                         [ E.spacing spacing.large ]
-                        [ editorPreferences model
-                        , editor model
+                        [ editor model
+                        , editorPreferences model
                         ]
                     ]
 
@@ -1860,7 +1866,7 @@ editHeader : Model -> E.Element Msg
 editHeader ({ fontSize } as model) =
     E.row
         [ E.width E.fill
-        , E.paddingEach { top = 0, bottom = fontSize.large, left = 0, right = 0 }
+        , E.paddingEach { top = 0, bottom = fontSize.small, left = 0, right = 0 }
         ]
         [ iconButton
             { icon =
@@ -2607,14 +2613,15 @@ editor ({ activeComponentIndex, selectedChar, chars, simpleCharSvgs, boxUnits, b
                         E.none
 
                     else
-                        iconButton
-                            { icon =
-                                FeatherIcons.plus
-                            , size =
-                                fontSize.large
-                            , onPress =
-                                Just <| RequestAddComponentToSelectedChar
-                            }
+                        E.el [ E.alignRight ] <|
+                            iconButton
+                                { icon =
+                                    FeatherIcons.plus
+                                , size =
+                                    fontSize.large
+                                , onPress =
+                                    Just <| RequestAddComponentToSelectedChar
+                                }
                 ]
                 [ E.el [ E.centerX, Font.size fontSize.large, Font.bold ]
                     (E.text <|
