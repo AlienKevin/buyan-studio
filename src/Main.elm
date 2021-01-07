@@ -136,6 +136,7 @@ type alias FontSize =
     , medium : Int
     , large : Int
     , title : Int
+    , thumb : Int
     }
 
 
@@ -290,6 +291,8 @@ init flags =
                     30
                 , title =
                     40
+                , thumb =
+                    30
                 }
             }
     in
@@ -556,6 +559,10 @@ showAppPreferences model =
 
 updateMode : Mode -> Model -> ( Model, Cmd Msg )
 updateMode mode model =
+    let
+        _ =
+            Debug.log "updateMode" ""
+    in
     ( { model
         | mode =
             mode
@@ -655,10 +662,11 @@ updateDevice width height model =
             in
             case device.class of
                 E.Phone ->
-                    { small = small -3
-                    , medium = medium -3
-                    , large = large -3
-                    , title = title -3
+                    { small = small -2
+                    , medium = medium -1
+                    , large = large -2
+                    , title = title -2
+                    , thumb = title -2
                     }
 
                 E.Tablet ->
@@ -666,6 +674,7 @@ updateDevice width height model =
                     , medium = medium -1
                     , large = large -1
                     , title = title -1
+                    , thumb = title -1
                     }
 
                 E.Desktop ->
@@ -673,6 +682,7 @@ updateDevice width height model =
                     , medium = medium -1
                     , large = large -1
                     , title = title -1
+                    , thumb = large -1
                     }
 
                 E.BigDesktop ->
@@ -680,6 +690,7 @@ updateDevice width height model =
                     , medium = medium 1
                     , large = large 1
                     , title = title 1
+                    , thumb = large 1
                     }
       }
     , Cmd.none
@@ -1847,8 +1858,7 @@ view ({ mode, spacing, fontSize, device } as model) =
                     [ E.width E.fill
                     , E.height E.fill
                     ]
-                    [ editHeader model
-                    , (case device.orientation of
+                    [ (case device.orientation of
                         E.Portrait ->
                             E.column
 
@@ -1860,23 +1870,6 @@ view ({ mode, spacing, fontSize, device } as model) =
                         , editorPreferences model
                         ]
                     ]
-
-
-editHeader : Model -> E.Element Msg
-editHeader ({ fontSize } as model) =
-    E.row
-        [ E.width E.fill
-        , E.paddingEach { top = 0, bottom = fontSize.small, left = 0, right = 0 }
-        ]
-        [ iconButton
-            { icon =
-                FeatherIcons.chevronLeft
-            , size =
-                fontSize.large
-            , onPress =
-                Just <| UpdateMode BrowseMode
-            }
-        ]
 
 
 appHeader : Model -> E.Element Msg
@@ -1950,7 +1943,7 @@ addComponentToSelectedCharPopUp ({ chars, selectedChar, trs, newComponentChar, i
                     Just <| InvalidInputLength 0
 
         width =
-            toFloat boxUnits * thumbnailUnitSize * 2
+            toFloat boxUnits * thumbnailUnitSize * 2.3
     in
     popUpTemplate
         { borderColor =
@@ -2082,7 +2075,7 @@ popUpTemplate { borderColor, isCloseButtonShown } { palette, spacing, fontSize, 
             6
 
         width =
-            toFloat boxUnits * thumbnailUnitSize * 2
+            toFloat boxUnits * thumbnailUnitSize * 2.3
     in
     E.column
         ([ E.centerX
@@ -2336,7 +2329,7 @@ addCompoundCharPopUp ({ trs, activeComponentIndex, newCompoundChar, inputError, 
                 Nothing
 
         width =
-            toFloat boxUnits * thumbnailUnitSize * 2
+            toFloat boxUnits * thumbnailUnitSize * 2.3
     in
     popUpTemplate
         { borderColor =
@@ -2511,9 +2504,9 @@ editorPreferences ({ palette, spacing, fontSize } as model) =
 sliderThumb : Palette -> FontSize -> Input.Thumb
 sliderThumb palette fontSize =
     Input.thumb
-        [ E.width (E.px fontSize.large)
-        , E.height (E.px fontSize.large)
-        , Border.rounded (round <| toFloat fontSize.large / 2)
+        [ E.width (E.px fontSize.thumb)
+        , E.height (E.px fontSize.thumb)
+        , Border.rounded (round <| toFloat fontSize.thumb / 2)
         , Border.width 2
         , Border.color palette.darkFg
         , Background.color palette.white
@@ -2523,8 +2516,8 @@ sliderThumb palette fontSize =
 checkbox : Palette -> FontSize -> Bool -> E.Element msg
 checkbox palette fontSize checked =
     E.el
-        [ E.width (E.px fontSize.large)
-        , E.height (E.px fontSize.large)
+        [ E.width (E.px fontSize.thumb)
+        , E.height (E.px fontSize.thumb)
         , Font.color palette.white
         , E.centerY
         , Font.size 9
@@ -2547,7 +2540,7 @@ checkbox palette fontSize checked =
             (if checked then
                 E.html
                     (FeatherIcons.check
-                        |> FeatherIcons.withSize (toFloat fontSize.large)
+                        |> FeatherIcons.withSize (toFloat fontSize.thumb)
                         |> FeatherIcons.toHtml []
                     )
 
@@ -2562,7 +2555,7 @@ radioOption : E.Color -> FontSize -> E.Element msg -> Input.OptionState -> E.Ele
 radioOption borderColor fontSize optionLabel status =
     let
         radius =
-            round <| toFloat fontSize.large / 2
+            round <| toFloat fontSize.thumb / 2
     in
     E.row
         [ E.spacing 10
@@ -2570,8 +2563,8 @@ radioOption borderColor fontSize optionLabel status =
         , E.width E.shrink
         ]
         [ E.el
-            [ E.width (E.px fontSize.large)
-            , E.height (E.px fontSize.large)
+            [ E.width (E.px fontSize.thumb)
+            , E.height (E.px fontSize.thumb)
             , Border.rounded radius
             , Border.width <|
                 case status of
@@ -2592,52 +2585,62 @@ radioOption borderColor fontSize optionLabel status =
 
 editor : Model -> E.Element Msg
 editor ({ activeComponentIndex, selectedChar, chars, simpleCharSvgs, boxUnits, borderUnits, unitSize, strokeWidth, strokeLineCap, isAspectRatioLocked, isSnapToGrid, palette, spacing, fontSize } as model) =
-    E.el
-        [ E.inFront <|
-            case selectedChar of
-                Just char ->
-                    E.html <|
-                        renderChar
-                            model
-                            { isThumbnail = False }
-                            (myCharFromChar chars char)
+    E.column
+        []
+        [ E.row
+            [ E.width E.fill
+            , E.paddingEach { top = 0, bottom = spacing.large, left = 0, right = 0 }
+            ]
+            [ E.el [ E.alignLeft ] <|
+                iconButton
+                    { icon =
+                        FeatherIcons.chevronLeft
+                    , size =
+                        fontSize.title
+                    , onPress =
+                        Just <| UpdateMode BrowseMode
+                    }
+            , E.el [ E.centerX, Font.size fontSize.title, Font.bold ]
+                (E.text <|
+                    String.fromChar <|
+                        unboxChar selectedChar
+                )
+            , if isMyCharType SimpleCharType (myCharFromChar chars (unboxChar selectedChar)) then
+                E.none
 
-                Nothing ->
-                    E.none
-        , E.above <|
-            E.row
-                [ E.width E.fill
-                , E.paddingEach { top = 0, bottom = spacing.large, left = 0, right = 0 }
-                , E.inFront <|
-                    if isMyCharType SimpleCharType (myCharFromChar chars (unboxChar selectedChar)) then
+              else
+                E.el [ E.alignRight ] <|
+                    iconButton
+                        { icon =
+                            FeatherIcons.plus
+                        , size =
+                            fontSize.title
+                        , onPress =
+                            Just <| RequestAddComponentToSelectedChar
+                        }
+            ]
+        , E.el
+            [ E.inFront <|
+                case selectedChar of
+                    Just char ->
+                        E.html <|
+                            renderChar
+                                model
+                                { isThumbnail = False }
+                                (myCharFromChar chars char)
+
+                    Nothing ->
                         E.none
-
-                    else
-                        E.el [ E.alignRight ] <|
-                            iconButton
-                                { icon =
-                                    FeatherIcons.plus
-                                , size =
-                                    fontSize.large
-                                , onPress =
-                                    Just <| RequestAddComponentToSelectedChar
-                                }
-                ]
-                [ E.el [ E.centerX, Font.size fontSize.large, Font.bold ]
-                    (E.text <|
-                        String.fromChar <|
-                            unboxChar selectedChar
-                    )
-                ]
+            ]
+            (E.html <|
+                gridBackground
+                    { boxUnits = boxUnits
+                    , unitSize = unitSize
+                    , borderUnits = borderUnits
+                    , palette = palette
+                    }
+            )
         ]
-    <|
-        E.html <|
-            gridBackground
-                { boxUnits = boxUnits
-                , unitSize = unitSize
-                , borderUnits = borderUnits
-                , palette = palette
-                }
 
 
 unboxChar : Maybe Char -> Char
@@ -3153,7 +3156,7 @@ renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIn
                                 }
                                 0
                                 0
-                                fontSize.title
+                                fontSize.thumb
                                 isDraggable
                            , scaleHandle
                                 palette
@@ -3162,7 +3165,7 @@ renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIn
                                 }
                                 100
                                 0
-                                fontSize.title
+                                fontSize.thumb
                                 isDraggable
                            , scaleHandle
                                 palette
@@ -3171,7 +3174,7 @@ renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIn
                                 }
                                 0
                                 100
-                                fontSize.title
+                                fontSize.thumb
                                 isDraggable
                            , scaleHandle
                                 palette
@@ -3180,7 +3183,7 @@ renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIn
                                 }
                                 100
                                 100
-                                fontSize.title
+                                fontSize.thumb
                                 isDraggable
                            ]
 
