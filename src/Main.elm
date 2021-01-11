@@ -559,10 +559,6 @@ showAppPreferences model =
 
 updateMode : Mode -> Model -> ( Model, Cmd Msg )
 updateMode mode model =
-    let
-        _ =
-            Debug.log "updateMode" ""
-    in
     ( { model
         | mode =
             mode
@@ -581,10 +577,18 @@ updateDevice width height model =
                 }
 
         minSize =
-            min width height
+            toFloat <|
+                min width height
+                    - (case device.orientation of
+                        E.Portrait ->
+                            0
+
+                        E.Landscape ->
+                            model.fontSize.large + model.spacing.small
+                      )
 
         unitSize =
-            toFloat minSize * 0.95 / (toFloat model.boxUnits + model.borderUnits * 2)
+            minSize / (toFloat model.boxUnits + model.borderUnits * 2)
     in
     ( { model
         | device =
