@@ -1,11 +1,6 @@
 {
     "preferences": "偏好",
     "strokeWidth": "笔画宽度",
-    "strokeLineCap": "笔画线帽",
-    "strokeLineCapType": {
-        "round": "圆头",
-        "square": "方头"
-    },
     "snapToGrid": "对齐网格",
     "previewInParagraph": "在段落中预览",
     "language": "语言",

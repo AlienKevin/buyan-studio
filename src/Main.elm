@@ -32,7 +32,6 @@ import Task
 import Time
 import Translations
 import Translations.CharType
-import Translations.StrokeLineCapType
 import TypedSvg as Svg
 import TypedSvg.Attributes as SvgAttributes
 import TypedSvg.Core exposing (Svg)
@@ -78,7 +77,6 @@ type alias Model =
     , unitSize : Float
     , thumbnailUnitSize : Float
     , strokeWidth : Float
-    , strokeLineCap : StrokeLineCap
     , popUp : PopUp
     , newCompoundChar : String
     , newComponentChar : String
@@ -143,14 +141,8 @@ type alias FontSize =
 type alias SavedModel =
     { chars : Dict Char MyChar
     , strokeWidth : Float
-    , strokeLineCap : StrokeLineCap
     , language : Language
     }
-
-
-type StrokeLineCap
-    = StrokeLineCapRound
-    | StrokeLineCapSquare
 
 
 type Language
@@ -244,7 +236,6 @@ init flags =
             , unitSize = 18
             , thumbnailUnitSize = 4
             , strokeWidth = 10
-            , strokeLineCap = StrokeLineCapRound
             , popUp = NoPopUp
             , newCompoundChar = ""
             , newComponentChar = ""
@@ -357,7 +348,6 @@ type Msg
     | GotModel Value
     | SaveModel ()
     | UpdateStrokeWidth Float
-    | UpdateStrokeLineCap StrokeLineCap
     | ToggleIsAspectRatioLocked
     | PreviewInParagraph
     | UpdateParagraphForPreview String
@@ -465,9 +455,6 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentIndex } as 
 
         UpdateStrokeWidth newStrokeWidth ->
             updateStrokeWidth newStrokeWidth model
-
-        UpdateStrokeLineCap newStrokeLineCap ->
-            updateStrokeLineCap newStrokeLineCap model
 
         ToggleIsAspectRatioLocked ->
             toggleIsAspectRatioLocked model
@@ -946,16 +933,6 @@ deleteSelectedChar model =
     )
 
 
-updateStrokeLineCap : StrokeLineCap -> Model -> ( Model, Cmd Msg )
-updateStrokeLineCap newStrokeLineCap model =
-    ( { model
-        | strokeLineCap =
-            newStrokeLineCap
-      }
-    , Cmd.none
-    )
-
-
 toggleIsAspectRatioLocked : Model -> ( Model, Cmd Msg )
 toggleIsAspectRatioLocked model =
     ( { model
@@ -984,11 +961,10 @@ saveModel model =
 
 
 encodeModel : Model -> Value
-encodeModel { chars, simpleCharSvgs, strokeWidth, strokeLineCap, language } =
+encodeModel { chars, simpleCharSvgs, strokeWidth, language } =
     Encode.object
         [ ( "chars", Encode.dict String.fromChar encodeMyChar chars )
         , ( "strokeWidth", Encode.float strokeWidth )
-        , ( "strokeLineCap", encodeStrokeLineCap strokeLineCap )
         , ( "language", encodeLanguage language )
         ]
 
@@ -1009,17 +985,6 @@ stringFromLanguage language =
 
         LanguageZhHant ->
             "LanguageZhHant"
-
-
-encodeStrokeLineCap : StrokeLineCap -> Value
-encodeStrokeLineCap strokeLineCap =
-    Encode.string <|
-        case strokeLineCap of
-            StrokeLineCapRound ->
-                "StrokeLineCapRound"
-
-            StrokeLineCapSquare ->
-                "StrokeLineCapSquare"
 
 
 encodeChar : Char -> Value
@@ -1064,7 +1029,7 @@ encodeVec2 vec =
 gotModel : Value -> Model -> ( Model, Cmd Msg )
 gotModel savedModelJson model =
     case Decode.decodeValue decodeSavedModel savedModelJson of
-        Ok { chars, strokeWidth, strokeLineCap, language } ->
+        Ok { chars, strokeWidth, language } ->
             let
                 newModel =
                     { model
@@ -1072,8 +1037,6 @@ gotModel savedModelJson model =
                             chars
                         , strokeWidth =
                             strokeWidth
-                        , strokeLineCap =
-                            strokeLineCap
                         , language =
                             language
                     }
@@ -1090,14 +1053,13 @@ gotModel savedModelJson model =
 
 decodeSavedModel : Decoder SavedModel
 decodeSavedModel =
-    Decode.map4 SavedModel
+    Decode.map3 SavedModel
         (Decode.field "chars"
             (Decode.map (Dict.Extra.mapKeys charFromString) <|
                 Decode.dict decodeMyChar
             )
         )
         (Decode.field "strokeWidth" Decode.float)
-        (Decode.field "strokeLineCap" decodeStrokeLineCap)
         (Decode.field "language" decodeLanguage)
 
 
@@ -1120,26 +1082,6 @@ decodeLanguage =
                         Decode.fail <|
                             "Trying to decode Language, but "
                                 ++ language
-                                ++ " is not supported."
-            )
-
-
-decodeStrokeLineCap : Decoder StrokeLineCap
-decodeStrokeLineCap =
-    Decode.string
-        |> Decode.andThen
-            (\strokeLineCap ->
-                case strokeLineCap of
-                    "StrokeLineCapRound" ->
-                        Decode.succeed StrokeLineCapRound
-
-                    "StrokeLineCapSquare" ->
-                        Decode.succeed StrokeLineCapSquare
-
-                    _ ->
-                        Decode.fail <|
-                            "Trying to decode StrokeLineCapRound, but "
-                                ++ strokeLineCap
                                 ++ " is not supported."
             )
 
@@ -2269,7 +2211,7 @@ previewInParagraphPopUp ({ palette, spacing, fontSize } as model) =
 
 
 renderPreviewInParagraph : Int -> Model -> E.Element Msg
-renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, simpleCharSvgs, activeComponentIndex, isAspectRatioLocked, isSnapToGrid } as model) =
+renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize, boxUnits, borderUnits, strokeWidth, simpleCharSvgs, activeComponentIndex, isAspectRatioLocked, isSnapToGrid } as model) =
     let
         lines =
             String.split "\n" paragraphForPreview
@@ -2477,22 +2419,6 @@ editorPreferences ({ palette, spacing, fontSize } as model) =
             , value = model.strokeWidth
             , thumb = sliderThumb palette fontSize
             }
-        , Input.radio
-            [ E.spacing spacing.small
-            , E.padding spacing.small
-            ]
-            { onChange = UpdateStrokeLineCap
-            , selected = Just model.strokeLineCap
-            , label =
-                Input.labelLeft [ E.alignTop, E.paddingXY 0 spacing.small ]
-                    (E.text (Translations.strokeLineCap model.trs))
-            , options =
-                [ Input.optionWith StrokeLineCapRound
-                    (radioOption palette.darkFg fontSize (E.text (Translations.StrokeLineCapType.round model.trs)))
-                , Input.optionWith StrokeLineCapSquare
-                    (radioOption palette.darkFg fontSize (E.text (Translations.StrokeLineCapType.square model.trs)))
-                ]
-            }
         , Input.checkbox
             [ E.spacing spacing.small ]
             { onChange = \_ -> ToggleIsSnapToGrid
@@ -2588,7 +2514,7 @@ radioOption borderColor fontSize optionLabel status =
 
 
 editor : Model -> E.Element Msg
-editor ({ activeComponentIndex, selectedChar, chars, simpleCharSvgs, boxUnits, borderUnits, unitSize, strokeWidth, strokeLineCap, isAspectRatioLocked, isSnapToGrid, palette, spacing, fontSize } as model) =
+editor ({ activeComponentIndex, selectedChar, chars, simpleCharSvgs, boxUnits, borderUnits, unitSize, strokeWidth, isAspectRatioLocked, isSnapToGrid, palette, spacing, fontSize } as model) =
     E.column
         []
         [ E.row
@@ -2867,7 +2793,7 @@ stringFromMyCharType trs myCharType =
 
 
 charCard : Model -> MyChar -> E.Element Msg
-charCard ({ chars, activeComponentIndex, unitSize, thumbnailUnitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, simpleCharSvgs, selectedChar, isAspectRatioLocked, isSnapToGrid, palette, spacing, fontSize } as model) myChar =
+charCard ({ chars, activeComponentIndex, unitSize, thumbnailUnitSize, boxUnits, borderUnits, strokeWidth, simpleCharSvgs, selectedChar, isAspectRatioLocked, isSnapToGrid, palette, spacing, fontSize } as model) myChar =
     let
         char =
             charFromMyChar myChar
@@ -2991,7 +2917,7 @@ isMyCharType myCharType myChar =
 
 
 renderChar : Model -> { isThumbnail : Bool } -> MyChar -> Svg Msg
-renderChar ({ unitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, chars, simpleCharSvgs, activeComponentIndex, isAspectRatioLocked, isSnapToGrid } as model) { isThumbnail } myChar =
+renderChar ({ unitSize, boxUnits, borderUnits, strokeWidth, chars, simpleCharSvgs, activeComponentIndex, isAspectRatioLocked, isSnapToGrid } as model) { isThumbnail } myChar =
     let
         boxSize =
             toFloat boxUnits * unitSize
@@ -3037,15 +2963,7 @@ renderChar ({ unitSize, boxUnits, borderUnits, strokeWidth, strokeLineCap, chars
                         ++ """ * {
                         fill: none;
                         stroke: #000;
-                        stroke-linecap: """
-                        ++ (case strokeLineCap of
-                                StrokeLineCapRound ->
-                                    "round"
-
-                                StrokeLineCapSquare ->
-                                    "square"
-                           )
-                        ++ """!important;
+                        stroke-linecap: round !important;
                         stroke-miterlimit: 10;
                         stroke-width: """
                         ++ String.fromFloat strokeWidth

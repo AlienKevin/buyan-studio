@@ -17,11 +17,6 @@ strokeWidth translations =
     t translations "strokeWidth"
 
 
-strokeLineCap : Translations -> String
-strokeLineCap translations =
-    t translations "strokeLineCap"
-
-
 snapToGrid : Translations -> String
 snapToGrid translations =
     t translations "snapToGrid"

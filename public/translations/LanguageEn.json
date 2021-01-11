@@ -1,11 +1,6 @@
 {
     "preferences": "Preferences",
     "strokeWidth": "Stroke width",
-    "strokeLineCap": "Stroke linecap",
-    "strokeLineCapType": {
-        "round" : "Round",
-        "square" : "Square"
-    },
     "snapToGrid": "Snap to grid",
     "previewInParagraph": "Preview in Paragraph",
     "language": "Language",
