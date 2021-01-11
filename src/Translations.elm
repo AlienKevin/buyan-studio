@@ -22,6 +22,11 @@ snapToGrid translations =
     t translations "snapToGrid"
 
 
+showReference : Translations -> String
+showReference translations =
+    t translations "showReference"
+
+
 previewInParagraph : Translations -> String
 previewInParagraph translations =
     t translations "previewInParagraph"

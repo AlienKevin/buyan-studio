@@ -4,6 +4,7 @@ import Array
 import Browser
 import Browser.Events
 import Color
+import Color.Manipulate
 import Dict exposing (Dict, size)
 import Dict.Extra
 import Draggable
@@ -87,6 +88,7 @@ type alias Model =
     , activeScale : Scale
     , isAspectRatioLocked : Bool
     , isSnapToGrid : Bool
+    , isReferenceCharShown : Bool
     , paragraphForPreview : String
     , trs : I18Next.Translations
     , language : Language
@@ -246,6 +248,7 @@ init flags =
             , activeScale = NoScale
             , isAspectRatioLocked = False
             , isSnapToGrid = True
+            , isReferenceCharShown = True
             , paragraphForPreview = ""
             , trs = I18Next.initialTranslations
             , language = LanguageEn
@@ -352,6 +355,7 @@ type Msg
     | PreviewInParagraph
     | UpdateParagraphForPreview String
     | ToggleIsSnapToGrid
+    | ToggleIsReferenceCharShown
     | DownloadSelectedChar
     | UpdateLanguage Language
     | GotTranslations (Result Http.Error I18Next.Translations)
@@ -468,6 +472,9 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentIndex } as 
         ToggleIsSnapToGrid ->
             toggleIsSnapToGrid model
 
+        ToggleIsReferenceCharShown ->
+            toggleIsReferenceCharShown model
+
         DownloadSelectedChar ->
             downloadSelectedChar model
 
@@ -485,6 +492,16 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentIndex } as 
 
         ShowAppPreferences ->
             showAppPreferences model
+
+
+toggleIsReferenceCharShown : Model -> ( Model, Cmd Msg )
+toggleIsReferenceCharShown model =
+    ( { model
+        | isReferenceCharShown =
+            not model.isReferenceCharShown
+      }
+    , Cmd.none
+    )
 
 
 addPendingComponentChar : Model -> ( Model, Cmd Msg )
@@ -1787,6 +1804,7 @@ view ({ mode, spacing, fontSize, device } as model) =
         , E.width E.fill
         , E.height E.fill
         , Font.size fontSize.medium
+        , Font.family [ Font.typeface "Source Han Sans TC", Font.sansSerif ]
         ]
     <|
         case mode of
@@ -2428,6 +2446,15 @@ editorPreferences ({ palette, spacing, fontSize } as model) =
                 Input.labelLeft []
                     (E.text (Translations.snapToGrid model.trs))
             }
+        , Input.checkbox
+            [ E.spacing spacing.small ]
+            { onChange = \_ -> ToggleIsReferenceCharShown
+            , icon = checkbox palette fontSize
+            , checked = model.isReferenceCharShown
+            , label =
+                Input.labelLeft []
+                    (E.text (Translations.showReference model.trs))
+            }
         ]
 
 
@@ -2562,14 +2589,7 @@ editor ({ activeComponentIndex, selectedChar, chars, simpleCharSvgs, boxUnits, b
                     Nothing ->
                         E.none
             ]
-            (E.html <|
-                gridBackground
-                    { boxUnits = boxUnits
-                    , unitSize = unitSize
-                    , borderUnits = borderUnits
-                    , palette = palette
-                    }
-            )
+            (E.html <| gridBackground model)
         ]
 
 
@@ -2593,14 +2613,8 @@ isCharPartOfMyChar chars char myChar =
                     components
 
 
-gridBackground :
-    { boxUnits : Int
-    , borderUnits : Float
-    , unitSize : Float
-    , palette : Palette
-    }
-    -> Svg Msg
-gridBackground { boxUnits, borderUnits, unitSize, palette } =
+gridBackground : Model -> Svg Msg
+gridBackground { boxUnits, borderUnits, unitSize, palette, selectedChar, isReferenceCharShown } =
     let
         boxSize =
             toFloat boxUnits * unitSize
@@ -2641,6 +2655,22 @@ gridBackground { boxUnits, borderUnits, unitSize, palette } =
             , TypedSvg.Events.onClick <| SetActiveComponent Nothing
             ]
             []
+        , if isReferenceCharShown then
+            Svg.text_
+                [ SvgAttributes.x <| SvgTypes.px <| 0
+                , SvgAttributes.y <| SvgTypes.px <| boxSize - unitSize / 2
+                , SvgAttributes.fontSize (SvgTypes.px <| outerBoxSize)
+                , SvgAttributes.fill <|
+                    SvgTypes.Paint <|
+                        Color.Manipulate.fadeOut 0.7 <|
+                            toColor palette.black
+                , SvgAttributes.pointerEvents "none"
+                ]
+                [ TypedSvg.Core.text <| String.fromChar <| unboxChar selectedChar
+                ]
+
+          else
+            Svg.g [] []
         , gridOutline
             { x = 0
             , y = 0
