@@ -1837,11 +1837,20 @@ view ({ mode, spacing, fontSize, device } as model) =
 
 
 appHeader : Model -> E.Element Msg
-appHeader ({ palette, fontSize } as model) =
+appHeader ({ palette, spacing, fontSize } as model) =
     E.row
         [ E.alignRight
+        , E.spacing spacing.medium
         ]
         [ iconButton
+            { icon =
+                FeatherIcons.eye
+            , size =
+                fontSize.large
+            , onPress =
+                Just <| PreviewInParagraph
+            }
+        , iconButton
             { icon =
                 FeatherIcons.settings
             , size =
