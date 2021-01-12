@@ -2225,7 +2225,7 @@ previewInParagraphPopUp ({ palette, spacing, fontSize } as model) =
                         }
                     )
                 ]
-            , E.el [ E.width <| E.fillPortion 2, E.height E.fill, E.paddingXY 0 spacing.small ] <| editorPreferences model
+            , E.el [ E.width <| E.fillPortion 2, E.height E.fill, E.paddingXY 0 spacing.small ] <| strokeWidthPreference model
             ]
         , E.el
             [ E.width E.fill
