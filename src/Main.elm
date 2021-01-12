@@ -2417,54 +2417,69 @@ editorPreferences ({ palette, spacing, fontSize } as model) =
         , E.width E.fill
         , E.height E.fill
         ]
-        [ Input.slider
-            [ E.height (E.px fontSize.small)
-            , E.width (E.px <| fontSize.small * 7)
-            , E.behindContent
-                (E.el
-                    [ E.width E.fill
-                    , E.height (E.px <| fontSize.small // 3)
-                    , E.centerY
-                    , Background.color palette.darkFg
-                    , Border.rounded (fontSize.small // 3)
-                    ]
-                    E.none
-                )
-            ]
-            { onChange = UpdateStrokeWidth
-            , label =
-                Input.labelLeft []
-                    (E.row
-                        [ E.spacing spacing.small ]
-                        [ E.text <| Translations.strokeWidth model.trs
-                        , E.text <| String.fromInt (round model.strokeWidth)
-                        ]
-                    )
-            , min = minStrokeWidth
-            , max = maxStrokeWidth
-            , step = Just 1
-            , value = model.strokeWidth
-            , thumb = sliderThumb palette fontSize
-            }
-        , Input.checkbox
-            [ E.spacing spacing.small ]
-            { onChange = \_ -> ToggleIsSnapToGrid
-            , icon = checkbox palette fontSize
-            , checked = model.isSnapToGrid
-            , label =
-                Input.labelLeft []
-                    (E.text (Translations.snapToGrid model.trs))
-            }
-        , Input.checkbox
-            [ E.spacing spacing.small ]
-            { onChange = \_ -> ToggleIsReferenceCharShown
-            , icon = checkbox palette fontSize
-            , checked = model.isReferenceCharShown
-            , label =
-                Input.labelLeft []
-                    (E.text (Translations.showReference model.trs))
-            }
+        [ strokeWidthPreference model
+        , isSnapToGridPreference model
+        , isReferenceShownPreference model
         ]
+
+
+isReferenceShownPreference : Model -> E.Element Msg
+isReferenceShownPreference { palette, spacing, fontSize, isReferenceCharShown, trs } =
+    Input.checkbox
+        [ E.spacing spacing.small ]
+        { onChange = \_ -> ToggleIsReferenceCharShown
+        , icon = checkbox palette fontSize
+        , checked = isReferenceCharShown
+        , label =
+            Input.labelLeft []
+                (E.text (Translations.showReference trs))
+        }
+
+
+isSnapToGridPreference : Model -> E.Element Msg
+isSnapToGridPreference { palette, spacing, fontSize, isSnapToGrid, trs } =
+    Input.checkbox
+        [ E.spacing spacing.small ]
+        { onChange = \_ -> ToggleIsSnapToGrid
+        , icon = checkbox palette fontSize
+        , checked = isSnapToGrid
+        , label =
+            Input.labelLeft []
+                (E.text (Translations.snapToGrid trs))
+        }
+
+
+strokeWidthPreference : Model -> E.Element Msg
+strokeWidthPreference { palette, spacing, fontSize, strokeWidth, trs } =
+    Input.slider
+        [ E.height (E.px fontSize.small)
+        , E.width (E.px <| fontSize.small * 7)
+        , E.behindContent
+            (E.el
+                [ E.width E.fill
+                , E.height (E.px <| fontSize.small // 3)
+                , E.centerY
+                , Background.color palette.darkFg
+                , Border.rounded (fontSize.small // 3)
+                ]
+                E.none
+            )
+        ]
+        { onChange = UpdateStrokeWidth
+        , label =
+            Input.labelLeft []
+                (E.row
+                    [ E.spacing spacing.small ]
+                    [ E.text <| Translations.strokeWidth trs
+                    , E.text <| String.fromInt (round strokeWidth)
+                    ]
+                )
+        , min = minStrokeWidth
+        , max = maxStrokeWidth
+        , step = Just 1
+        , value = strokeWidth
+        , thumb = sliderThumb palette fontSize
+        }
 
 
 sliderThumb : Palette -> FontSize -> Input.Thumb
