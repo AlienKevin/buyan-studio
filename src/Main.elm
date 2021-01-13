@@ -160,6 +160,8 @@ type Scale
     | ScaleBottomRight
     | ScaleLeft
     | ScaleRight
+    | ScaleTop
+    | ScaleBottom
     | NoScale
 
 
@@ -1345,6 +1347,20 @@ updateOnDrag factor delta ({ dragDelta, activeScale, boxUnits, unitSize, chars, 
                         ScaleTopRight
                         (Vector2.add (offsetPosition 0 0))
                         (Vector2.add (offsetDimension 0 1))
+                
+                ScaleTop ->
+                    updateMyCharRefPositionAndDimension
+                        unitPercent
+                        ScaleTopLeft
+                        (Vector2.add (offsetPosition 0 1))
+                        (Vector2.add (offsetDimension 0 -1))
+
+                ScaleBottom ->
+                    updateMyCharRefPositionAndDimension
+                        unitPercent
+                        ScaleTopRight
+                        (Vector2.add (offsetPosition 0 0))
+                        (Vector2.add (offsetDimension 0 1))
             )
                 char
         )
@@ -1819,6 +1835,12 @@ updateMyCharRefPositionAndDimension unitPercent scale updatePos updateDim myChar
 
                 ScaleRight ->
                     Vector2.add (Vector2.vec2 (Vector2.getX updatedDim) 0)
+                
+                ScaleTop ->
+                    \_ -> Vector2.setY (Vector2.getY updatedPos) myCharRef.position
+
+                ScaleBottom ->
+                    Vector2.add (Vector2.vec2 0 (Vector2.getY updatedDim))
 
                 NoScale ->
                     identity
@@ -3283,7 +3305,7 @@ renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIn
                                 , scaleHandle
                                     palette
                                     { index = levelwiseIndex
-                                    , scale = ScaleTopLeft
+                                    , scale = ScaleTop
                                     }
                                     0
                                     0
@@ -3292,7 +3314,7 @@ renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIn
                                 , scaleHandle
                                     palette
                                     { index = levelwiseIndex
-                                    , scale = ScaleTopRight
+                                    , scale = ScaleBottom
                                     }
                                     0
                                     100
