@@ -2588,6 +2588,7 @@ editorPreferences ({ palette, spacing, fontSize } as model) =
         [ E.spacing spacing.medium
         , E.width E.fill
         , E.height E.fill
+        , E.htmlAttribute <| Html.Attributes.style "user-select" "none"
         ]
         [ strokeWidthPreference model
         , isSnapToGridPreference model
@@ -2861,6 +2862,7 @@ gridBackground { boxUnits, borderUnits, unitSize, palette, selectedChar, isRefer
                         Color.Manipulate.fadeOut 0.7 <|
                             toColor palette.black
                 , SvgAttributes.pointerEvents "none"
+                , Html.Attributes.style "user-select" "none"
                 ]
                 [ TypedSvg.Core.text <| String.fromChar <| unboxChar selectedChar
                 ]
@@ -2973,6 +2975,7 @@ charPanel myCharType ({ trs, boxUnits, thumbnailUnitSize, palette, spacing, font
             [ E.spacing spacing.small
             , Font.size fontSize.title
             , E.width E.fill
+            , E.htmlAttribute <| Html.Attributes.style "user-select" "none"
             ]
             [ E.text <|
                 (String.Extra.toSentenceCase <| stringFromMyCharType trs myCharType)
@@ -3059,7 +3062,9 @@ charCard ({ chars, activeComponentIndex, unitSize, thumbnailUnitSize, boxUnits, 
             , E.width E.fill
             ]
             [ E.el
-                [ E.alignLeft ]
+                [ E.alignLeft
+                , E.htmlAttribute <| Html.Attributes.style "user-select" "none"
+                ]
                 (E.text <|
                     String.fromChar <|
                         char
