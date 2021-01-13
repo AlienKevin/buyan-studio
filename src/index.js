@@ -68,20 +68,22 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
               if (simpleCharSvgs === null) {
                 simpleCharSvgs = {};
               }
+              var newSimpleCharSvgs = {};
               var numberOfNewCharsAdded = 0;
               Array.from(files).forEach(function (file) {
                 var reader = new FileReader();
                 reader.addEventListener('load', function (event) {
                   var char = file.name.slice(0, -(".svg".length));
-                  simpleCharSvgs[char] = event.target.result;
+                  newSimpleCharSvgs[char] = event.target.result;
                   numberOfNewCharsAdded += 1;
                   if (numberOfNewCharsAdded === files.length) {
-                    app.ports.gotNewSimpleCharsPort.send(simpleCharSvgs);
-                    localforage.setItem(simpleCharSvgsStorageKey, simpleCharSvgs, function (error) {
-                      if (error !== null) {
-                        console.error("Error saving simpleCharSvgs: ", error);
-                      }
-                    });
+                    app.ports.gotNewSimpleCharsPort.send(newSimpleCharSvgs);
+                    localforage.setItem(simpleCharSvgsStorageKey
+                      , Object.assign(simpleCharSvgs, newSimpleCharSvgs), function (error) {
+                        if (error !== null) {
+                          console.error("Error saving simpleCharSvgs: ", error);
+                        }
+                      });
                   }
                 });
                 reader.readAsText(file);
