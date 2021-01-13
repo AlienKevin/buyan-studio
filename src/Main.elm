@@ -1346,7 +1346,7 @@ updateOnDrag factor delta ({ dragDelta, activeScale, boxUnits, unitSize, chars, 
                         unitPercent
                         ScaleTopRight
                         (Vector2.add (offsetPosition 0 0))
-                        (Vector2.add (offsetDimension 0 1))
+                        (Vector2.add (offsetDimension 1 0))
                 
                 ScaleTop ->
                     updateMyCharRefPositionAndDimension
@@ -3335,7 +3335,7 @@ renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIn
                                 , scaleHandle
                                     palette
                                     { index = levelwiseIndex
-                                    , scale = ScaleTopLeft
+                                    , scale = ScaleLeft
                                     }
                                     0
                                     0
@@ -3344,7 +3344,7 @@ renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIn
                                 , scaleHandle
                                     palette
                                     { index = levelwiseIndex
-                                    , scale = ScaleTopRight
+                                    , scale = ScaleRight
                                     }
                                     100
                                     0
