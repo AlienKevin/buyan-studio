@@ -158,6 +158,8 @@ type Scale
     | ScaleTopRight
     | ScaleBottomLeft
     | ScaleBottomRight
+    | ScaleLeft
+    | ScaleRight
     | NoScale
 
 
@@ -1190,9 +1192,13 @@ stopDragging model =
 
 startDragging : DragData -> Model -> ( Model, Cmd Msg )
 startDragging { index, scale } ({ isSnapToGrid, boxUnits, strokeWidth, unitSize } as model) =
+    let
+        unitPercent =
+            100 / toFloat boxUnits
+    in
     ( updateActiveComponent
         (if isSnapToGrid then
-            updateMyCharRefPositionAndDimension ScaleTopLeft (snapToGrid boxUnits) (snapToGrid boxUnits)
+            updateMyCharRefPositionAndDimension unitPercent ScaleTopLeft (snapToGrid boxUnits) (snapToGrid boxUnits)
 
          else
             identity
@@ -1289,6 +1295,9 @@ updateOnDrag factor delta ({ dragDelta, activeScale, boxUnits, unitSize, chars, 
 
                 offsetPosition xDir yDir =
                     offsetDrag PositionOffset isAspectRatioLocked char.dimension factor xDir yDir delta
+
+                unitPercent =
+                    100 / toFloat boxUnits
             in
             (case activeScale of
                 NoScale ->
@@ -1297,27 +1306,45 @@ updateOnDrag factor delta ({ dragDelta, activeScale, boxUnits, unitSize, chars, 
 
                 ScaleTopLeft ->
                     updateMyCharRefPositionAndDimension
+                        unitPercent
                         ScaleTopLeft
                         (Vector2.add (offsetPosition 1 1))
                         (Vector2.add (offsetDimension -1 -1))
 
                 ScaleTopRight ->
                     updateMyCharRefPositionAndDimension
+                        unitPercent
                         ScaleTopRight
                         (Vector2.add (offsetPosition 0 1))
                         (Vector2.add (offsetDimension 1 -1))
 
                 ScaleBottomLeft ->
                     updateMyCharRefPositionAndDimension
+                        unitPercent
                         ScaleBottomLeft
                         (Vector2.add (offsetPosition 1 0))
                         (Vector2.add (offsetDimension -1 1))
 
                 ScaleBottomRight ->
                     updateMyCharRefPositionAndDimension
+                        unitPercent
                         ScaleBottomRight
                         (Vector2.add (offsetPosition 0 0))
                         (Vector2.add (offsetDimension 1 1))
+
+                ScaleLeft ->
+                    updateMyCharRefPositionAndDimension
+                        unitPercent
+                        ScaleTopLeft
+                        (Vector2.add (offsetPosition 1 0))
+                        (Vector2.add (offsetDimension -1 0))
+
+                ScaleRight ->
+                    updateMyCharRefPositionAndDimension
+                        unitPercent
+                        ScaleTopRight
+                        (Vector2.add (offsetPosition 0 0))
+                        (Vector2.add (offsetDimension 0 1))
             )
                 char
         )
@@ -1744,14 +1771,34 @@ updateMyCharComponents func myChar =
             CompoundChar c (func components)
 
 
-updateMyCharRefPositionAndDimension : Scale -> (Vec2 -> Vec2) -> (Vec2 -> Vec2) -> MyCharRef -> MyCharRef
-updateMyCharRefPositionAndDimension scale updatePos updateDim myCharRef =
+updateMyCharRefPositionAndDimension : Float -> Scale -> (Vec2 -> Vec2) -> (Vec2 -> Vec2) -> MyCharRef -> MyCharRef
+updateMyCharRefPositionAndDimension unitPercent scale updatePos updateDim myCharRef =
     let
+        oldDim =
+            myCharRef.dimension
+
+        oldPos =
+            myCharRef.position
+
         updatedDim =
-            updateDim myCharRef.dimension
+            updateDim oldDim
 
         updatedPos =
-            updatePos myCharRef.position
+            updatePos oldPos
+
+        minX =
+            if Vector2.getX oldDim < unitPercent then
+                Vector2.getX oldDim
+
+            else
+                minComponentSize
+
+        minY =
+            if Vector2.getY oldDim < unitPercent then
+                Vector2.getY oldDim
+
+            else
+                minComponentSize
 
         scalePoint =
             (case scale of
@@ -1767,6 +1814,12 @@ updateMyCharRefPositionAndDimension scale updatePos updateDim myCharRef =
                 ScaleBottomRight ->
                     Vector2.add updatedDim
 
+                ScaleLeft ->
+                    \_ -> Vector2.setX (Vector2.getX updatedPos) myCharRef.position
+
+                ScaleRight ->
+                    Vector2.add (Vector2.vec2 (Vector2.getX updatedDim) 0)
+
                 NoScale ->
                     identity
             )
@@ -1776,10 +1829,10 @@ updateMyCharRefPositionAndDimension scale updatePos updateDim myCharRef =
         -- _ = Debug.log "dimensionClampResult" dimensionClampResult
         ( newPos, newDim ) =
             mapTuple
-                (case ( clampVec2 0 100 0 100 scalePoint, clampVec2 minComponentSize 100 minComponentSize 100 updatedDim ) of
+                (case ( clampVec2 0 100 0 100 scalePoint, clampVec2 minX 100 minY 100 updatedDim ) of
                     ( ClampSafe _, ClampSafe dim ) ->
                         ( \_ -> updatedPos, \_ -> dim )
-                    
+
                     ( ClampSafeX _, ClampSafeX dimX ) ->
                         ( Vector2.setX (Vector2.getX updatedPos), Vector2.setX dimX )
 
@@ -3197,6 +3250,9 @@ renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIn
 
                         CompoundCharType ->
                             contents
+
+                unitPercent =
+                    100 / toFloat boxUnits
             in
             Svg.svg
                 ([ SvgAttributes.x <| SvgTypes.Percent <| xFactor * Vector2.getX tightPosition
@@ -3213,52 +3269,114 @@ renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIn
             <|
                 if Just levelwiseIndex == activeComponentIndex && not isThumbnail then
                     styledContents
-                        ++ [ Svg.rect
-                                [ SvgAttributes.width <| SvgTypes.Percent 100
-                                , SvgAttributes.height <| SvgTypes.Percent 100
-                                , SvgAttributes.fill <| SvgTypes.PaintNone
-                                , SvgAttributes.strokeWidth <| SvgTypes.px 2
-                                , SvgAttributes.stroke <| SvgTypes.Paint <| toColor palette.darkFg
+                        ++ [ activeComponentButtons parentMyCharType model ]
+                        ++ (if Vector2.getX dimension < unitPercent then
+                                [ Svg.line
+                                    [ SvgAttributes.x1 <| SvgTypes.px <| 0
+                                    , SvgAttributes.y1 <| SvgTypes.px <| 0
+                                    , SvgAttributes.x2 <| SvgTypes.px <| 0
+                                    , SvgAttributes.y2 <| SvgTypes.Percent 100
+                                    , SvgAttributes.strokeWidth <| SvgTypes.px 2
+                                    , SvgAttributes.stroke <| SvgTypes.Paint <| toColor palette.darkFg
+                                    ]
+                                    []
+                                , scaleHandle
+                                    palette
+                                    { index = levelwiseIndex
+                                    , scale = ScaleTopLeft
+                                    }
+                                    0
+                                    0
+                                    fontSize.thumb
+                                    isDraggable
+                                , scaleHandle
+                                    palette
+                                    { index = levelwiseIndex
+                                    , scale = ScaleTopRight
+                                    }
+                                    0
+                                    100
+                                    fontSize.thumb
+                                    isDraggable
                                 ]
-                                []
-                           , activeComponentButtons parentMyCharType model
-                           , scaleHandle
-                                palette
-                                { index = levelwiseIndex
-                                , scale = ScaleTopLeft
-                                }
-                                0
-                                0
-                                fontSize.thumb
-                                isDraggable
-                           , scaleHandle
-                                palette
-                                { index = levelwiseIndex
-                                , scale = ScaleTopRight
-                                }
-                                100
-                                0
-                                fontSize.thumb
-                                isDraggable
-                           , scaleHandle
-                                palette
-                                { index = levelwiseIndex
-                                , scale = ScaleBottomLeft
-                                }
-                                0
-                                100
-                                fontSize.thumb
-                                isDraggable
-                           , scaleHandle
-                                palette
-                                { index = levelwiseIndex
-                                , scale = ScaleBottomRight
-                                }
-                                100
-                                100
-                                fontSize.thumb
-                                isDraggable
-                           ]
+
+                            else if Vector2.getY dimension < unitPercent then
+                                [ Svg.line
+                                    [ SvgAttributes.x1 <| SvgTypes.px <| 0
+                                    , SvgAttributes.y1 <| SvgTypes.px <| 0
+                                    , SvgAttributes.x2 <| SvgTypes.Percent 100
+                                    , SvgAttributes.y2 <| SvgTypes.px <| 0
+                                    , SvgAttributes.strokeWidth <| SvgTypes.px 2
+                                    , SvgAttributes.stroke <| SvgTypes.Paint <| toColor palette.darkFg
+                                    ]
+                                    []
+                                , scaleHandle
+                                    palette
+                                    { index = levelwiseIndex
+                                    , scale = ScaleTopLeft
+                                    }
+                                    0
+                                    0
+                                    fontSize.thumb
+                                    isDraggable
+                                , scaleHandle
+                                    palette
+                                    { index = levelwiseIndex
+                                    , scale = ScaleTopRight
+                                    }
+                                    100
+                                    0
+                                    fontSize.thumb
+                                    isDraggable
+                                ]
+
+                            else
+                                [ Svg.rect
+                                    [ SvgAttributes.width <| SvgTypes.Percent 100
+                                    , SvgAttributes.height <| SvgTypes.Percent 100
+                                    , SvgAttributes.fill <| SvgTypes.PaintNone
+                                    , SvgAttributes.strokeWidth <| SvgTypes.px 2
+                                    , SvgAttributes.stroke <| SvgTypes.Paint <| toColor palette.darkFg
+                                    ]
+                                    []
+                                , scaleHandle
+                                    palette
+                                    { index = levelwiseIndex
+                                    , scale = ScaleTopLeft
+                                    }
+                                    0
+                                    0
+                                    fontSize.thumb
+                                    isDraggable
+                                , scaleHandle
+                                    palette
+                                    { index = levelwiseIndex
+                                    , scale = ScaleTopRight
+                                    }
+                                    100
+                                    0
+                                    fontSize.thumb
+                                    isDraggable
+                                , scaleHandle
+                                    palette
+                                    { index = levelwiseIndex
+                                    , scale = ScaleBottomLeft
+                                    }
+                                    0
+                                    100
+                                    fontSize.thumb
+                                    isDraggable
+                                , scaleHandle
+                                    palette
+                                    { index = levelwiseIndex
+                                    , scale = ScaleBottomRight
+                                    }
+                                    100
+                                    100
+                                    fontSize.thumb
+                                    isDraggable
+                                ]
+                           )
 
                 else
                     styledContents
