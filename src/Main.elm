@@ -225,6 +225,11 @@ maxBorderUnits =
     3.5
 
 
+minComponentSize : Float
+minComponentSize =
+    25
+
+
 init : Value -> ( Model, Cmd Msg )
 init flags =
     let
@@ -1187,8 +1192,7 @@ startDragging : DragData -> Model -> ( Model, Cmd Msg )
 startDragging { index, scale } ({ isSnapToGrid, boxUnits, strokeWidth, unitSize } as model) =
     ( updateActiveComponent
         (if isSnapToGrid then
-            updateMyCharRefDimension (snapToGrid boxUnits)
-                << updateMyCharRefPosition (snapToGrid boxUnits)
+            updateMyCharRefPositionAndDimension ScaleTopLeft (snapToGrid boxUnits) (snapToGrid boxUnits)
 
          else
             identity
@@ -1292,20 +1296,28 @@ updateOnDrag factor delta ({ dragDelta, activeScale, boxUnits, unitSize, chars, 
                         (Vector2.add <| Vector2.scale factor delta)
 
                 ScaleTopLeft ->
-                    updateMyCharRefDimension (Vector2.add (offsetDimension -1 -1))
-                        << updateMyCharRefPosition (Vector2.add (offsetPosition 1 1))
+                    updateMyCharRefPositionAndDimension
+                        ScaleTopLeft
+                        (Vector2.add (offsetPosition 1 1))
+                        (Vector2.add (offsetDimension -1 -1))
 
                 ScaleTopRight ->
-                    updateMyCharRefDimension (Vector2.add (offsetDimension 1 -1))
-                        << updateMyCharRefPosition (Vector2.add (offsetPosition 0 1))
+                    updateMyCharRefPositionAndDimension
+                        ScaleTopRight
+                        (Vector2.add (offsetPosition 0 1))
+                        (Vector2.add (offsetDimension 1 -1))
 
                 ScaleBottomLeft ->
-                    updateMyCharRefDimension (Vector2.add (offsetDimension -1 1))
-                        << updateMyCharRefPosition (Vector2.add (offsetPosition 1 0))
+                    updateMyCharRefPositionAndDimension
+                        ScaleBottomLeft
+                        (Vector2.add (offsetPosition 1 0))
+                        (Vector2.add (offsetDimension -1 1))
 
                 ScaleBottomRight ->
-                    updateMyCharRefDimension (Vector2.add (offsetDimension 1 1))
-                        << updateMyCharRefPosition (Vector2.add (offsetPosition 0 0))
+                    updateMyCharRefPositionAndDimension
+                        ScaleBottomRight
+                        (Vector2.add (offsetPosition 0 0))
+                        (Vector2.add (offsetDimension 1 1))
             )
                 char
         )
@@ -1732,39 +1744,124 @@ updateMyCharComponents func myChar =
             CompoundChar c (func components)
 
 
+updateMyCharRefPositionAndDimension : Scale -> (Vec2 -> Vec2) -> (Vec2 -> Vec2) -> MyCharRef -> MyCharRef
+updateMyCharRefPositionAndDimension scale updatePos updateDim myCharRef =
+    let
+        updatedDim =
+            updateDim myCharRef.dimension
+
+        updatedPos =
+            updatePos myCharRef.position
+
+        scalePoint =
+            (case scale of
+                ScaleTopLeft ->
+                    identity
+
+                ScaleTopRight ->
+                    Vector2.add (Vector2.vec2 (Vector2.getX updatedDim) 0)
+
+                ScaleBottomLeft ->
+                    Vector2.add (Vector2.vec2 0 (Vector2.getY updatedDim))
+
+                ScaleBottomRight ->
+                    Vector2.add updatedDim
+
+                NoScale ->
+                    identity
+            )
+                updatedPos
+
+        -- _ = Debug.log "positionClampResult" positionClampResult
+        -- _ = Debug.log "dimensionClampResult" dimensionClampResult
+        ( newPos, newDim ) =
+            mapTuple
+                (case ( clampVec2 0 100 0 100 scalePoint, clampVec2 minComponentSize 100 minComponentSize 100 updatedDim ) of
+                    ( ClampSafe _, ClampSafe dim ) ->
+                        ( \_ -> updatedPos, \_ -> dim )
+                    
+                    ( ClampSafeX _, ClampSafeX dimX ) ->
+                        ( Vector2.setX (Vector2.getX updatedPos), Vector2.setX dimX )
+
+                    ( ClampSafeY _, ClampSafeY dimY ) ->
+                        ( Vector2.setY (Vector2.getY updatedPos), Vector2.setY dimY )
+
+                    _ ->
+                        ( identity, identity )
+                )
+                ( myCharRef.position, myCharRef.dimension )
+    in
+    { myCharRef
+        | position =
+            newPos
+        , dimension =
+            newDim
+    }
+
+
+mapTuple : ( a -> x, b -> y ) -> ( a, b ) -> ( x, y )
+mapTuple ( mapA, mapB ) ( a, b ) =
+    ( mapA a, mapB b )
+
+
 updateMyCharRefPosition : (Vec2 -> Vec2) -> MyCharRef -> MyCharRef
 updateMyCharRefPosition func myCharRef =
     { myCharRef
         | position =
-            func myCharRef.position
+            case
+                clampVec2 0
+                    (100 - Vector2.getX myCharRef.dimension)
+                    0
+                    (100 - Vector2.getY myCharRef.dimension)
+                    (func myCharRef.position)
+            of
+                ClampSafe newPos ->
+                    newPos
+
+                ClampSafeX posX ->
+                    Vector2.setX posX myCharRef.position
+
+                ClampSafeY posY ->
+                    Vector2.setY posY myCharRef.position
+
+                ClampUnsafe newPos ->
+                    newPos
     }
 
 
-updateMyCharDimension : (Vec2 -> Vec2) -> MyChar -> MyChar
-updateMyCharDimension func myChar =
-    case myChar of
-        SimpleChar c ->
-            SimpleChar
-                { c
-                    | dimension =
-                        func c.dimension
-                }
+clampVec2 : Float -> Float -> Float -> Float -> Vec2 -> ClampResult
+clampVec2 minX maxX minY maxY vec =
+    let
+        x =
+            Vector2.getX vec
 
-        CompoundChar c components ->
-            CompoundChar
-                { c
-                    | dimension =
-                        func c.dimension
-                }
-                components
+        y =
+            Vector2.getY vec
+
+        isSafeX =
+            minX <= x && x <= maxX
+
+        isSafeY =
+            minY <= y && y <= maxY
+    in
+    if isSafeX && isSafeY then
+        ClampSafe vec
+
+    else if isSafeX then
+        ClampSafeX x
+
+    else if isSafeY then
+        ClampSafeY y
+
+    else
+        ClampUnsafe <| Vector2.vec2 (clamp minX maxX x) (clamp minY maxY y)
 
 
-updateMyCharRefDimension : (Vec2 -> Vec2) -> MyCharRef -> MyCharRef
-updateMyCharRefDimension func myCharRef =
-    { myCharRef
-        | dimension =
-            func myCharRef.dimension
-    }
+type ClampResult
+    = ClampSafe Vec2
+    | ClampSafeX Float
+    | ClampSafeY Float
+    | ClampUnsafe Vec2
 
 
 
