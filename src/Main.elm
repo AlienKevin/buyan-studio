@@ -71,6 +71,7 @@ port clearSimpleCharsPort : () -> Cmd msg
 type alias Model =
     { mode : Mode
     , chars : Dict Char MyChar
+    , charExplainations : Dict Char Explaination
     , selectedChar : Maybe Char
     , simpleCharSvgs : SimpleCharSvgs
     , boxUnits : Int
@@ -99,6 +100,31 @@ type alias Model =
         Spacing
     , fontSize :
         FontSize
+    }
+
+
+type alias Explaination =
+    { note : String
+    , referenceImage :
+        { image : DataUrl
+        , caption : String
+        , url : String
+        }
+    }
+
+
+type alias DataUrl =
+    String
+
+
+emptyExplaination : Explaination
+emptyExplaination =
+    { note = ""
+    , referenceImage =
+        { image = ""
+        , caption = ""
+        , url = ""
+        }
     }
 
 
@@ -240,6 +266,7 @@ init flags =
         model =
             { mode = BrowseMode
             , chars = Dict.empty
+            , charExplainations = Dict.empty
             , selectedChar = Nothing
             , simpleCharSvgs = Dict.empty
             , boxUnits = 32
@@ -371,6 +398,7 @@ type Msg
     | UpdateDevice Int Int
     | UpdateMode Mode
     | ShowAppPreferences
+    | UpdateSelectedCharExplainationNote String
 
 
 type alias DragData =
@@ -501,6 +529,36 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentIndex } as 
 
         ShowAppPreferences ->
             showAppPreferences model
+
+        UpdateSelectedCharExplainationNote note ->
+            updateSelectedCharExplainationNote note model
+
+
+updateSelectedCharExplainationNote : String -> Model -> ( Model, Cmd Msg )
+updateSelectedCharExplainationNote note model =
+    ( { model
+        | charExplainations =
+            case model.selectedChar of
+                Just char ->
+                    Dict.update
+                        char
+                        (\explaination ->
+                            Maybe.map
+                                (\e ->
+                                    { e
+                                        | note =
+                                            note
+                                    }
+                                )
+                                explaination
+                        )
+                        model.charExplainations
+
+                Nothing ->
+                    model.charExplainations
+      }
+    , Cmd.none
+    )
 
 
 toggleIsReferenceCharShown : Model -> ( Model, Cmd Msg )
@@ -1347,7 +1405,7 @@ updateOnDrag factor delta ({ dragDelta, activeScale, boxUnits, unitSize, chars, 
                         ScaleTopRight
                         (Vector2.add (offsetPosition 0 0))
                         (Vector2.add (offsetDimension 1 0))
-                
+
                 ScaleTop ->
                     updateMyCharRefPositionAndDimension
                         unitPercent
@@ -1633,6 +1691,8 @@ addPendingCompoundChar model =
     ( { model
         | chars =
             Dict.insert newChar newCompoundChar model.chars
+        , charExplainations =
+            Dict.insert newChar emptyExplaination model.charExplainations
         , selectedChar =
             Just <| charFromMyChar newCompoundChar
         , popUp =
@@ -1835,7 +1895,7 @@ updateMyCharRefPositionAndDimension unitPercent scale updatePos updateDim myChar
 
                 ScaleRight ->
                     Vector2.add (Vector2.vec2 (Vector2.getX updatedDim) 0)
-                
+
                 ScaleTop ->
                     \_ -> Vector2.setY (Vector2.getY updatedPos) myCharRef.position
 
@@ -2003,7 +2063,7 @@ view ({ mode, spacing, fontSize, device } as model) =
                       )
                         [ E.spacing spacing.large ]
                         [ editor model
-                        , editorPreferences model
+                        , editorSidePanel model
                         ]
                     ]
 
@@ -2582,8 +2642,8 @@ titleText fontSize text =
         E.text text
 
 
-editorPreferences : Model -> E.Element Msg
-editorPreferences ({ palette, spacing, fontSize } as model) =
+editorSidePanel : Model -> E.Element Msg
+editorSidePanel ({ palette, spacing, fontSize } as model) =
     E.column
         [ E.spacing spacing.medium
         , E.width E.fill
@@ -2593,6 +2653,39 @@ editorPreferences ({ palette, spacing, fontSize } as model) =
         [ strokeWidthPreference model
         , isSnapToGridPreference model
         , isReferenceShownPreference model
+        , charExplaination model
+        ]
+
+
+charExplaination : Model -> E.Element Msg
+charExplaination ({ fontSize, spacing, selectedChar, charExplainations } as model) =
+    E.column
+        [ E.paddingEach { top = spacing.large, bottom = 0, left = 0, right = 0 }
+        ]
+        [ Input.multiline
+            [ E.width <| E.px <| fontSize.medium * 15
+            , Font.alignLeft
+            ]
+            { onChange =
+                UpdateSelectedCharExplainationNote
+            , text =
+                case selectedChar of
+                    Just char ->
+                        .note <| Maybe.withDefault emptyExplaination <| Dict.get char charExplainations
+
+                    Nothing ->
+                        ""
+            , placeholder =
+                Nothing
+            , label =
+                Input.labelAbove
+                    [ E.alignLeft
+                    , E.paddingEach { top = 0, bottom = spacing.small, left = 0, right = 0 }
+                    ]
+                    (E.text "Explaination")
+            , spellcheck =
+                False
+            }
         ]
 
 
