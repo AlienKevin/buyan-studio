@@ -17,6 +17,7 @@ import Element.Font as Font
 import Element.Input as Input
 import FeatherIcons
 import File exposing (File)
+import File.Select
 import Html exposing (Html)
 import Html.Attributes
 import Html.Events
@@ -398,7 +399,10 @@ type Msg
     | UpdateDevice Int Int
     | UpdateMode Mode
     | ShowAppPreferences
-    | UpdateSelectedCharExplainationNote String
+    | UpdateExplainationNote String
+    | UploadReferenceImage
+    | SelectedReferenceImage File
+    | LoadedReferenceImage DataUrl
 
 
 type alias DragData =
@@ -530,12 +534,69 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentIndex } as 
         ShowAppPreferences ->
             showAppPreferences model
 
-        UpdateSelectedCharExplainationNote note ->
-            updateSelectedCharExplainationNote note model
+        UpdateExplainationNote note ->
+            updateExplainationNote note model
+
+        UploadReferenceImage ->
+            uploadReferenceImage model
+
+        SelectedReferenceImage file ->
+            selectedReferenceImage file model
+
+        LoadedReferenceImage dataUrl ->
+            loadedReferenceImage dataUrl model
 
 
-updateSelectedCharExplainationNote : String -> Model -> ( Model, Cmd Msg )
-updateSelectedCharExplainationNote note model =
+loadedReferenceImage : DataUrl -> Model -> ( Model, Cmd Msg )
+loadedReferenceImage dataUrl model =
+    ( { model
+        | charExplainations =
+            case model.selectedChar of
+                Just char ->
+                    Dict.update
+                        char
+                        (\explaination ->
+                            Maybe.map
+                                (\e ->
+                                    let
+                                        referenceImage =
+                                            e.referenceImage
+                                    in
+                                    { e
+                                        | referenceImage =
+                                            { referenceImage
+                                                | image =
+                                                    dataUrl
+                                            }
+                                    }
+                                )
+                                explaination
+                        )
+                        model.charExplainations
+
+                Nothing ->
+                    model.charExplainations
+      }
+    , Cmd.none
+    )
+
+
+selectedReferenceImage : File -> Model -> ( Model, Cmd Msg )
+selectedReferenceImage file model =
+    ( model
+    , Task.perform LoadedReferenceImage (File.toUrl file)
+    )
+
+
+uploadReferenceImage : Model -> ( Model, Cmd Msg )
+uploadReferenceImage model =
+    ( model
+    , File.Select.file [ "image/jpeg", "image/png" ] SelectedReferenceImage
+    )
+
+
+updateExplainationNote : String -> Model -> ( Model, Cmd Msg )
+updateExplainationNote note model =
     ( { model
         | charExplainations =
             case model.selectedChar of
@@ -2659,22 +2720,26 @@ editorSidePanel ({ palette, spacing, fontSize } as model) =
 
 charExplaination : Model -> E.Element Msg
 charExplaination ({ fontSize, spacing, selectedChar, charExplainations } as model) =
+    let
+        explaination =
+            Maybe.withDefault emptyExplaination <|
+                Dict.get (unboxChar selectedChar) charExplainations
+        hasReferenceImage =
+            not <| String.isEmpty explaination.referenceImage.image
+    in
     E.column
         [ E.paddingEach { top = spacing.large, bottom = 0, left = 0, right = 0 }
+        , E.spacing spacing.medium
+        , E.width <| E.px <| fontSize.medium * 15
         ]
         [ Input.multiline
-            [ E.width <| E.px <| fontSize.medium * 15
+            [ E.width E.fill
             , Font.alignLeft
             ]
             { onChange =
-                UpdateSelectedCharExplainationNote
+                UpdateExplainationNote
             , text =
-                case selectedChar of
-                    Just char ->
-                        .note <| Maybe.withDefault emptyExplaination <| Dict.get char charExplainations
-
-                    Nothing ->
-                        ""
+                explaination.note
             , placeholder =
                 Nothing
             , label =
@@ -2686,6 +2751,40 @@ charExplaination ({ fontSize, spacing, selectedChar, charExplainations } as mode
             , spellcheck =
                 False
             }
+        , E.row
+                [ E.spacing spacing.small
+                , E.width E.fill
+                ]
+                [ E.text "Reference image"
+                , if hasReferenceImage then
+                    iconButton
+                    { icon =
+                        FeatherIcons.refreshCw
+                    , size =
+                        fontSize.title
+                    , onPress =
+                        Just UploadReferenceImage
+                    }
+                else
+                 iconButton
+                    { icon =
+                        FeatherIcons.upload
+                    , size =
+                        fontSize.title
+                    , onPress =
+                        Just UploadReferenceImage
+                    }
+                ]
+        , if hasReferenceImage then
+            E.image
+            [ E.width E.fill ]
+            { src =
+                explaination.referenceImage.image
+            , description =
+                "Reference image"
+            }
+        else
+            E.none
         ]
 
 
