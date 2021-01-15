@@ -2756,19 +2756,12 @@ charExplaination ({ fontSize, spacing, selectedChar, charExplainations } as mode
                 , E.width E.fill
                 ]
                 [ E.text "Reference image"
-                , if hasReferenceImage then
-                    iconButton
+                , iconButton
                     { icon =
-                        FeatherIcons.refreshCw
-                    , size =
-                        fontSize.title
-                    , onPress =
-                        Just UploadReferenceImage
-                    }
-                else
-                 iconButton
-                    { icon =
-                        FeatherIcons.upload
+                        if hasReferenceImage then
+                            FeatherIcons.refreshCw
+                        else
+                            FeatherIcons.upload
                     , size =
                         fontSize.title
                     , onPress =
