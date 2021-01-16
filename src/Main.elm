@@ -128,7 +128,7 @@ emptyReferenceImage =
     { image = ""
     , origin = ""
     , time = Nothing
-    , script = SealScript
+    , script = Seal
     , url = ""
     }
 
@@ -151,9 +151,9 @@ type Subperiod
 
 
 type Script
-    = OracleScript
-    | BronzeScript
-    | SealScript
+    = Oracle
+    | Bronze
+    | Seal
 
 
 emptyExplaination : Explaination
@@ -203,6 +203,7 @@ type alias FontSize =
 
 type alias SavedModel =
     { chars : Dict Char MyChar
+    , charExplainations : Dict Char Explaination
     , strokeWidth : Float
     , language : Language
     }
@@ -752,9 +753,7 @@ updateExplaination func model =
                 Just char ->
                     Dict.update
                         char
-                        (\explaination ->
-                            Maybe.map func explaination
-                        )
+                        (Just << func << Maybe.withDefault emptyExplaination)
                         model.charExplainations
 
                 Nothing ->
@@ -1248,12 +1247,50 @@ saveModel model =
 
 
 encodeModel : Model -> Value
-encodeModel { chars, simpleCharSvgs, strokeWidth, language } =
+encodeModel { chars, charExplainations, simpleCharSvgs, strokeWidth, language } =
     Encode.object
         [ ( "chars", Encode.dict String.fromChar encodeMyChar chars )
+        , ( "charExplainations", Encode.dict String.fromChar encodeExplaination charExplainations )
         , ( "strokeWidth", Encode.float strokeWidth )
         , ( "language", encodeLanguage language )
         ]
+
+
+encodeExplaination : Explaination -> Value
+encodeExplaination { note, referenceImage } =
+    Encode.object <|
+        ( "note", Encode.string note )
+            :: (case referenceImage of
+                    Just image ->
+                        [ ( "referenceImage", encodeReferenceImage image ) ]
+
+                    Nothing ->
+                        []
+               )
+
+
+encodeReferenceImage : ReferenceImage -> Value
+encodeReferenceImage { image, origin, time, script, url } =
+    Encode.object <|
+        [ ( "image", Encode.string image )
+        , ( "origin", Encode.string origin )
+        ]
+            ++ (case time of
+                    Just { period, subperiod } ->
+                        [ ( "time"
+                          , Encode.object
+                                [ ( "period", encodePeriod period )
+                                , ( "subperiod", encodeSubperiod subperiod )
+                                ]
+                          )
+                        ]
+
+                    Nothing ->
+                        []
+               )
+            ++ [ ( "script", encodeScript script )
+               , ( "url", Encode.string url )
+               ]
 
 
 encodeLanguage : Language -> Value
@@ -1277,6 +1314,51 @@ stringFromLanguage language =
 encodeChar : Char -> Value
 encodeChar =
     Encode.string << String.fromChar
+
+
+encodePeriod : Period -> Value
+encodePeriod period =
+    Encode.string <|
+        case period of
+            Shang ->
+                "Shang"
+
+            WesternZhou ->
+                "WesternZhou"
+
+            SpringAndAutumn ->
+                "SpringAndAutumn"
+
+            WarringStates ->
+                "WarringStates"
+
+
+encodeSubperiod : Subperiod -> Value
+encodeSubperiod subperiod =
+    Encode.string <|
+        case subperiod of
+            Early ->
+                "Early"
+
+            Middle ->
+                "Middle"
+
+            Late ->
+                "Late"
+
+
+encodeScript : Script -> Value
+encodeScript script =
+    Encode.string <|
+        case script of
+            Oracle ->
+                "Oracle"
+
+            Bronze ->
+                "Bronze"
+
+            Seal ->
+                "Seal"
 
 
 encodeMyChar : MyChar -> Value
@@ -1316,12 +1398,15 @@ encodeVec2 vec =
 gotModel : Value -> Model -> ( Model, Cmd Msg )
 gotModel savedModelJson model =
     case Decode.decodeValue decodeSavedModel savedModelJson of
-        Ok { chars, strokeWidth, language } ->
+        Ok { chars, charExplainations, strokeWidth, language } ->
             let
+                _ = Debug.log "charExplainations" charExplainations
                 newModel =
                     { model
                         | chars =
                             chars
+                        , charExplainations =
+                            charExplainations
                         , strokeWidth =
                             strokeWidth
                         , language =
@@ -1331,23 +1416,127 @@ gotModel savedModelJson model =
             updateLanguage language newModel
 
         Err err ->
-            -- let
-            -- _ =
-            --     Debug.log "err" err
-            -- in
+            let
+                _ =
+                    Debug.log "err" err
+            in
             ( model, Cmd.none )
 
 
 decodeSavedModel : Decoder SavedModel
 decodeSavedModel =
-    Decode.map3 SavedModel
+    Decode.map4 SavedModel
         (Decode.field "chars"
             (Decode.map (Dict.Extra.mapKeys charFromString) <|
                 Decode.dict decodeMyChar
             )
         )
+        (Decode.field "charExplainations"
+            (Decode.map (Dict.Extra.mapKeys charFromString) <|
+                Decode.dict decodeExplaination
+            )
+        )
         (Decode.field "strokeWidth" Decode.float)
         (Decode.field "language" decodeLanguage)
+
+
+decodeExplaination : Decoder Explaination
+decodeExplaination =
+    Decode.map2 Explaination
+        (Decode.field "note" Decode.string)
+        (Decode.maybe <| Decode.field "referenceImage" decodeReferenceImage)
+
+
+decodeReferenceImage : Decoder ReferenceImage
+decodeReferenceImage =
+    Decode.map5 ReferenceImage
+        (Decode.field "image" Decode.string)
+        (Decode.field "origin" Decode.string)
+        (Decode.maybe <|
+            Decode.field "time" <|
+                Decode.map2
+                    (\period subperiod ->
+                        { period = period
+                        , subperiod = subperiod
+                        }
+                    )
+                    (Decode.field "period" decodePeriod)
+                    (Decode.field "subperiod" decodeSubperiod)
+        )
+        (Decode.field "script" decodeScript)
+        (Decode.field "url" Decode.string)
+
+
+decodePeriod : Decoder Period
+decodePeriod =
+    Decode.string
+        |> Decode.andThen
+            (\period ->
+                case period of
+                    "Shang" ->
+                        Decode.succeed Shang
+
+                    "WesternZhou" ->
+                        Decode.succeed WesternZhou
+
+                    "SpringAndAutumn" ->
+                        Decode.succeed SpringAndAutumn
+
+                    "WarringStates" ->
+                        Decode.succeed WarringStates
+
+                    _ ->
+                        Decode.fail <|
+                            "Trying to decode Period, but "
+                                ++ period
+                                ++ " is not supported."
+            )
+
+
+decodeSubperiod : Decoder Subperiod
+decodeSubperiod =
+    Decode.string
+        |> Decode.andThen
+            (\subperiod ->
+                case subperiod of
+                    "Early" ->
+                        Decode.succeed Early
+
+                    "Middle" ->
+                        Decode.succeed Middle
+
+                    "Late" ->
+                        Decode.succeed Late
+
+                    _ ->
+                        Decode.fail <|
+                            "Trying to decode Subperiod, but "
+                                ++ subperiod
+                                ++ " is not supported."
+            )
+
+
+decodeScript : Decoder Script
+decodeScript =
+    Decode.string
+        |> Decode.andThen
+            (\script ->
+                case script of
+                    "Oracle" ->
+                        Decode.succeed Oracle
+
+                    "Bronze" ->
+                        Decode.succeed Bronze
+
+                    "Seal" ->
+                        Decode.succeed Seal
+
+                    _ ->
+                        Decode.fail <|
+                            "Trying to decode Script, but "
+                                ++ script
+                                ++ " is not supported."
+            )
 
 
 decodeLanguage : Decoder Language
@@ -2920,107 +3109,108 @@ charExplaination ({ palette, fontSize, spacing, selectedChar, charExplainations 
         , case explaination.referenceImage of
             Just referenceImage ->
                 E.row
-                [ E.spacing spacing.medium ]
-                [ E.column
-                    [ E.spacing <| spacing.medium
-                    , E.width <| E.px <| fontSize.medium * 15
-                    ]
-                    [ E.image
-                        [ E.width E.fill ]
-                        { src =
-                            referenceImage.image
-                        , description =
-                            "Reference image"
-                        }
-                    , Input.text
-                        [ E.width E.fill
-                        , Font.alignLeft
+                    [ E.spacing spacing.medium ]
+                    [ E.column
+                        [ E.spacing <| spacing.medium
+                        , E.width <| E.px <| fontSize.medium * 15
                         ]
-                        { onChange =
-                            UpdateReferenceImageOrigin
-                        , text =
-                            referenceImage.origin
-                        , placeholder =
-                            Just <| Input.placeholder [] <| E.text "Origin"
-                        , label =
-                            Input.labelHidden "Origin"
-                        }
-                    , Input.text
-                        [ E.width E.fill
-                        , Font.alignLeft
-                        , E.onRight <|
-                            if String.isEmpty referenceImage.url then
-                                E.none
-                            else
-                                E.newTabLink
-                                [ E.centerY
-                                , E.paddingXY spacing.small 0
-                                ]
-                                { url =
-                                    referenceImage.url
-                                , label =
-                                    iconButton
-                                        { icon =
-                                            FeatherIcons.externalLink
-                                        , size =
-                                            fontSize.thumb
-                                        , onPress =
-                                            Nothing
+                        [ E.image
+                            [ E.width E.fill ]
+                            { src =
+                                referenceImage.image
+                            , description =
+                                "Reference image"
+                            }
+                        , Input.text
+                            [ E.width E.fill
+                            , Font.alignLeft
+                            ]
+                            { onChange =
+                                UpdateReferenceImageOrigin
+                            , text =
+                                referenceImage.origin
+                            , placeholder =
+                                Just <| Input.placeholder [] <| E.text "Origin"
+                            , label =
+                                Input.labelHidden "Origin"
+                            }
+                        , Input.text
+                            [ E.width E.fill
+                            , Font.alignLeft
+                            , E.onRight <|
+                                if String.isEmpty referenceImage.url then
+                                    E.none
+
+                                else
+                                    E.newTabLink
+                                        [ E.centerY
+                                        , E.paddingXY spacing.small 0
+                                        ]
+                                        { url =
+                                            referenceImage.url
+                                        , label =
+                                            iconButton
+                                                { icon =
+                                                    FeatherIcons.externalLink
+                                                , size =
+                                                    fontSize.thumb
+                                                , onPress =
+                                                    Nothing
+                                                }
                                         }
-                                }
-                        ]
-                        { onChange =
-                            UpdateReferenceImageUrl
-                        , text =
-                            referenceImage.url
-                        , placeholder =
-                            Just <| Input.placeholder [] <| E.text "URL"
-                        , label =
-                            Input.labelHidden "URL"
-                        }
-                    ]
-                , E.column
-                    [ E.spacing spacing.medium
-                    , E.alignTop
-                    ]
-                    [ Input.radio
-                        [ E.spacing spacing.small
-                        ]
-                        { onChange = UpdateReferenceImagePeriod
-                        , selected = Maybe.map .period referenceImage.time
-                        , label =
-                            Input.labelAbove [ E.alignLeft, E.paddingEach { top = 0, bottom = spacing.small, left = 0, right = 0 } ]
-                                (E.text "Period")
-                        , options =
-                            [ Input.optionWith Shang
-                                (radioOption palette.lightFg fontSize (E.text "Shang"))
-                            , Input.optionWith WesternZhou
-                                (radioOption palette.lightFg fontSize (E.text "Western Zhou"))
-                            , Input.optionWith SpringAndAutumn
-                                (radioOption palette.lightFg fontSize (E.text "Spring and Autumn"))
-                            , Input.optionWith WarringStates
-                                (radioOption palette.lightFg fontSize (E.text "The Warring States"))
                             ]
-                        }
-                    , Input.radio
-                        [ E.spacing spacing.small
+                            { onChange =
+                                UpdateReferenceImageUrl
+                            , text =
+                                referenceImage.url
+                            , placeholder =
+                                Just <| Input.placeholder [] <| E.text "URL"
+                            , label =
+                                Input.labelHidden "URL"
+                            }
                         ]
-                        { onChange = UpdateReferenceImageSubperiod
-                        , selected = Maybe.map .subperiod referenceImage.time
-                        , label =
-                            Input.labelAbove [ E.alignLeft, E.paddingEach { top = 0, bottom = spacing.small, left = 0, right = 0 } ]
-                                (E.text "Subperiod")
-                        , options =
-                            [ Input.optionWith Early
-                                (radioOption palette.lightFg fontSize (E.text "Early"))
-                            , Input.optionWith Middle
-                                (radioOption palette.lightFg fontSize (E.text "Middle"))
-                            , Input.optionWith Late
-                                (radioOption palette.lightFg fontSize (E.text "Late"))
+                    , E.column
+                        [ E.spacing spacing.medium
+                        , E.alignTop
+                        ]
+                        [ Input.radio
+                            [ E.spacing spacing.small
                             ]
-                        }
+                            { onChange = UpdateReferenceImagePeriod
+                            , selected = Maybe.map .period referenceImage.time
+                            , label =
+                                Input.labelAbove [ E.alignLeft, E.paddingEach { top = 0, bottom = spacing.small, left = 0, right = 0 } ]
+                                    (E.text "Period")
+                            , options =
+                                [ Input.optionWith Shang
+                                    (radioOption palette.lightFg fontSize (E.text "Shang"))
+                                , Input.optionWith WesternZhou
+                                    (radioOption palette.lightFg fontSize (E.text "Western Zhou"))
+                                , Input.optionWith SpringAndAutumn
+                                    (radioOption palette.lightFg fontSize (E.text "Spring and Autumn"))
+                                , Input.optionWith WarringStates
+                                    (radioOption palette.lightFg fontSize (E.text "The Warring States"))
+                                ]
+                            }
+                        , Input.radio
+                            [ E.spacing spacing.small
+                            ]
+                            { onChange = UpdateReferenceImageSubperiod
+                            , selected = Maybe.map .subperiod referenceImage.time
+                            , label =
+                                Input.labelAbove [ E.alignLeft, E.paddingEach { top = 0, bottom = spacing.small, left = 0, right = 0 } ]
+                                    (E.text "Subperiod")
+                            , options =
+                                [ Input.optionWith Early
+                                    (radioOption palette.lightFg fontSize (E.text "Early"))
+                                , Input.optionWith Middle
+                                    (radioOption palette.lightFg fontSize (E.text "Middle"))
+                                , Input.optionWith Late
+                                    (radioOption palette.lightFg fontSize (E.text "Late"))
+                                ]
+                            }
+                        ]
                     ]
-                ]
 
             Nothing ->
                 E.none
