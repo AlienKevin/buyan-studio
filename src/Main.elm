@@ -52,6 +52,12 @@ port gotSavedSimpleCharsPort : (Encode.Value -> msg) -> Sub msg
 port gotNewSimpleCharsPort : (Encode.Value -> msg) -> Sub msg
 
 
+port uploadSimpleCharPort : String -> Cmd msg
+
+
+port loadedSimpleCharPort : (Encode.Value -> msg) -> Sub msg
+
+
 port downloadCharPort : String -> Cmd msg
 
 
@@ -402,6 +408,8 @@ type Msg
     = AddChar MyCharType
     | GotNewSimpleChars Value
     | GotSavedSimpleChars Value
+    | UploadSimpleChar
+    | LoadedSimpleChar Value
     | SelectChar MyChar
     | RequestAddComponentToSelectedChar
     | UpdatePendingComponentChar String
@@ -472,6 +480,12 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentIndex } as 
 
         GotSavedSimpleChars svgsJson ->
             gotSavedSimpleChars svgsJson model
+
+        UploadSimpleChar ->
+            uploadSimpleChar model
+
+        LoadedSimpleChar svgJson ->
+            loadedSimpleChar svgJson model
 
         SelectChar myChar ->
             selectChar myChar model
@@ -598,6 +612,36 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentIndex } as 
 
         UpdateReferenceImageUrl url ->
             updateReferenceImageUrl url model
+
+
+loadedSimpleChar : Value -> Model -> ( Model, Cmd Msg )
+loadedSimpleChar svgJson model =
+    ( case Decode.decodeValue decodeSimpleCharSvg svgJson of
+        Ok svg ->
+            { model
+                | simpleCharSvgs =
+                    case model.selectedChar of
+                        Just c ->
+                            Dict.insert
+                                c
+                                svg
+                                model.simpleCharSvgs
+
+                        Nothing ->
+                            model.simpleCharSvgs
+            }
+
+        Err err ->
+            model
+    , Cmd.none
+    )
+
+
+uploadSimpleChar : Model -> ( Model, Cmd Msg )
+uploadSimpleChar model =
+    ( model
+    , uploadSimpleCharPort (String.fromChar <| unboxChar model.selectedChar)
+    )
 
 
 updateReferenceImageUrl : String -> Model -> ( Model, Cmd Msg )
@@ -3382,7 +3426,15 @@ editor ({ activeComponentIndex, selectedChar, chars, simpleCharSvgs, boxUnits, b
                         unboxChar selectedChar
                 )
             , if isMyCharType SimpleCharType (myCharFromChar chars (unboxChar selectedChar)) then
-                E.none
+                E.el [ E.alignRight ] <|
+                    iconButton
+                        { icon =
+                            FeatherIcons.refreshCw
+                        , size =
+                            fontSize.title
+                        , onPress =
+                            Just <| UploadSimpleChar
+                        }
 
               else
                 E.el [ E.alignRight ] <|
@@ -4259,6 +4311,7 @@ subscriptions ({ drag } as model) =
         , getModelPort GotModel
         , gotSavedSimpleCharsPort GotSavedSimpleChars
         , gotNewSimpleCharsPort GotNewSimpleChars
+        , loadedSimpleCharPort LoadedSimpleChar
         , Time.every 1000 (\_ -> SaveModel ())
         , Browser.Events.onResize UpdateDevice
         ]

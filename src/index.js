@@ -94,6 +94,44 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
           });
       });
 
+      app.ports.uploadSimpleCharPort.subscribe(function (char) {
+        var options = {
+          // List of allowed MIME types, defaults to `*/*`.
+          mimeTypes: ['image/svg+xml'],
+          // List of allowed file extensions (with leading '.'), defaults to `''`.
+          extensions: ['.svg'],
+          // Set to `true` for allowing multiple files, defaults to `false`.
+          multiple: false,
+          // Textual description for file dialog , defaults to `''`.
+          description: 'SVG for ' + char,
+        };
+        fileOpen(options)
+          .then(function (file) {
+            // console.log(files);
+            localforage.getItem(simpleCharSvgsStorageKey, function (error, simpleCharSvgs) {
+              if (error !== null) {
+                console.error("Error getting saved simpleCharSvgs: ", error);
+              }
+              if (simpleCharSvgs === null) {
+                simpleCharSvgs = {};
+              }
+              var reader = new FileReader();
+              reader.addEventListener('load', function (event) {
+                var svg = event.target.result;
+                simpleCharSvgs[char] = svg;
+                app.ports.loadedSimpleCharPort.send(svg);
+                localforage.setItem(simpleCharSvgsStorageKey
+                  , simpleCharSvgs, function (error) {
+                    if (error !== null) {
+                      console.error("Error saving simpleCharSvgs: ", error);
+                    }
+                  });
+              });
+              reader.readAsText(file);
+            });
+          });
+      });
+
       app.ports.deleteSimpleCharPort.subscribe(function (char) {
         localforage.getItem(simpleCharSvgsStorageKey, function (error, simpleCharSvgs) {
           if (error !== null) {
