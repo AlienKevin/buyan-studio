@@ -116,7 +116,7 @@ type alias ReferenceImage =
     , time :
         Maybe
             { period : Period
-            , subperiod : Subperiod
+            , stage : Stage
             }
     , script : Script
     , url : String
@@ -144,7 +144,7 @@ type Period
     | WarringStates
 
 
-type Subperiod
+type Stage
     = Early
     | Middle
     | Late
@@ -440,7 +440,7 @@ type Msg
     | LoadedReferenceImage DataUrl
     | UpdateReferenceImageOrigin String
     | UpdateReferenceImagePeriod Period
-    | UpdateReferenceImageSubperiod Subperiod
+    | UpdateReferenceImageStage Stage
     | UpdateReferenceImageUrl String
 
 
@@ -591,8 +591,8 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentIndex } as 
         UpdateReferenceImagePeriod period ->
             updateReferenceImagePeriod period model
 
-        UpdateReferenceImageSubperiod subperiod ->
-            updateReferenceImageSubperiod subperiod model
+        UpdateReferenceImageStage stage ->
+            updateReferenceImageStage stage model
 
         UpdateReferenceImageUrl url ->
             updateReferenceImageUrl url model
@@ -612,8 +612,8 @@ updateReferenceImageUrl url model =
         model
 
 
-updateReferenceImageSubperiod : Subperiod -> Model -> ( Model, Cmd Msg )
-updateReferenceImageSubperiod subperiod model =
+updateReferenceImageStage : Stage -> Model -> ( Model, Cmd Msg )
+updateReferenceImageStage stage model =
     updateReferenceImage
         (Maybe.map
             (\referenceImage ->
@@ -623,14 +623,14 @@ updateReferenceImageSubperiod subperiod model =
                             Just time ->
                                 Just
                                     { time
-                                        | subperiod =
-                                            subperiod
+                                        | stage =
+                                            stage
                                     }
 
                             Nothing ->
                                 Just
-                                    { subperiod =
-                                        subperiod
+                                    { stage =
+                                        stage
                                     , period =
                                         Shang
                                     }
@@ -659,7 +659,7 @@ updateReferenceImagePeriod period model =
                                 Just
                                     { period =
                                         period
-                                    , subperiod =
+                                    , stage =
                                         Early
                                     }
                 }
@@ -1276,11 +1276,11 @@ encodeReferenceImage { image, origin, time, script, url } =
         , ( "origin", Encode.string origin )
         ]
             ++ (case time of
-                    Just { period, subperiod } ->
+                    Just { period, stage } ->
                         [ ( "time"
                           , Encode.object
                                 [ ( "period", encodePeriod period )
-                                , ( "subperiod", encodeSubperiod subperiod )
+                                , ( "stage", encodeStage stage )
                                 ]
                           )
                         ]
@@ -1333,10 +1333,10 @@ encodePeriod period =
                 "WarringStates"
 
 
-encodeSubperiod : Subperiod -> Value
-encodeSubperiod subperiod =
+encodeStage : Stage -> Value
+encodeStage stage =
     Encode.string <|
-        case subperiod of
+        case stage of
             Early ->
                 "Early"
 
@@ -1454,13 +1454,13 @@ decodeReferenceImage =
         (Decode.maybe <|
             Decode.field "time" <|
                 Decode.map2
-                    (\period subperiod ->
+                    (\period stage ->
                         { period = period
-                        , subperiod = subperiod
+                        , stage = stage
                         }
                     )
                     (Decode.field "period" decodePeriod)
-                    (Decode.field "subperiod" decodeSubperiod)
+                    (Decode.field "stage" decodeStage)
         )
         (Decode.field "script" decodeScript)
         (Decode.field "url" Decode.string)
@@ -1492,12 +1492,12 @@ decodePeriod =
             )
 
 
-decodeSubperiod : Decoder Subperiod
-decodeSubperiod =
+decodeStage : Decoder Stage
+decodeStage =
     Decode.string
         |> Decode.andThen
-            (\subperiod ->
-                case subperiod of
+            (\stage ->
+                case stage of
                     "Early" ->
                         Decode.succeed Early
 
@@ -1509,8 +1509,8 @@ decodeSubperiod =
 
                     _ ->
                         Decode.fail <|
-                            "Trying to decode Subperiod, but "
-                                ++ subperiod
+                            "Trying to decode Stage, but "
+                                ++ stage
                                 ++ " is not supported."
             )
 
@@ -3194,11 +3194,11 @@ charExplaination ({ palette, fontSize, spacing, selectedChar, charExplainations 
                         , Input.radio
                             [ E.spacing spacing.small
                             ]
-                            { onChange = UpdateReferenceImageSubperiod
-                            , selected = Maybe.map .subperiod referenceImage.time
+                            { onChange = UpdateReferenceImageStage
+                            , selected = Maybe.map .stage referenceImage.time
                             , label =
                                 Input.labelAbove [ E.alignLeft, E.paddingEach { top = 0, bottom = spacing.small, left = 0, right = 0 } ]
-                                    (E.text "Subperiod")
+                                    (E.text "Stage")
                             , options =
                                 [ Input.optionWith Early
                                     (radioOption palette.lightFg fontSize (E.text "Early"))
