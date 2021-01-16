@@ -106,11 +106,30 @@ type alias Model =
 
 type alias Explaination =
     { note : String
-    , referenceImage :
-        { image : DataUrl
-        , caption : String
-        , url : String
-        }
+    , referenceImage : Maybe ReferenceImage
+    }
+
+
+type alias ReferenceImage =
+    { image : DataUrl
+    , origin : String
+    , time :
+        Maybe
+            { period : Period
+            , subperiod : Subperiod
+            }
+    , script : Script
+    , url : String
+    }
+
+
+emptyReferenceImage : ReferenceImage
+emptyReferenceImage =
+    { image = ""
+    , origin = ""
+    , time = Nothing
+    , script = SealScript
+    , url = ""
     }
 
 
@@ -118,14 +137,29 @@ type alias DataUrl =
     String
 
 
+type Period
+    = Shang
+    | WesternZhou
+    | SpringAndAutumn
+    | WarringStates
+
+
+type Subperiod
+    = Early
+    | Middle
+    | Late
+
+
+type Script
+    = OracleScript
+    | BronzeScript
+    | SealScript
+
+
 emptyExplaination : Explaination
 emptyExplaination =
     { note = ""
-    , referenceImage =
-        { image = ""
-        , caption = ""
-        , url = ""
-        }
+    , referenceImage = Nothing
     }
 
 
@@ -403,6 +437,10 @@ type Msg
     | UploadReferenceImage
     | SelectedReferenceImage File
     | LoadedReferenceImage DataUrl
+    | UpdateReferenceImageOrigin String
+    | UpdateReferenceImagePeriod Period
+    | UpdateReferenceImageSubperiod Subperiod
+    | UpdateReferenceImageUrl String
 
 
 type alias DragData =
@@ -546,39 +584,138 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentIndex } as 
         LoadedReferenceImage dataUrl ->
             loadedReferenceImage dataUrl model
 
+        UpdateReferenceImageOrigin origin ->
+            updateReferenceImageOrigin origin model
+
+        UpdateReferenceImagePeriod period ->
+            updateReferenceImagePeriod period model
+
+        UpdateReferenceImageSubperiod subperiod ->
+            updateReferenceImageSubperiod subperiod model
+
+        UpdateReferenceImageUrl url ->
+            updateReferenceImageUrl url model
+
+
+updateReferenceImageUrl : String -> Model -> ( Model, Cmd Msg )
+updateReferenceImageUrl url model =
+    updateReferenceImage
+        (Maybe.map
+            (\referenceImage ->
+                { referenceImage
+                    | url =
+                        url
+                }
+            )
+        )
+        model
+
+
+updateReferenceImageSubperiod : Subperiod -> Model -> ( Model, Cmd Msg )
+updateReferenceImageSubperiod subperiod model =
+    updateReferenceImage
+        (Maybe.map
+            (\referenceImage ->
+                { referenceImage
+                    | time =
+                        case referenceImage.time of
+                            Just time ->
+                                Just
+                                    { time
+                                        | subperiod =
+                                            subperiod
+                                    }
+
+                            Nothing ->
+                                Just
+                                    { subperiod =
+                                        subperiod
+                                    , period =
+                                        Shang
+                                    }
+                }
+            )
+        )
+        model
+
+
+updateReferenceImagePeriod : Period -> Model -> ( Model, Cmd Msg )
+updateReferenceImagePeriod period model =
+    updateReferenceImage
+        (Maybe.map
+            (\referenceImage ->
+                { referenceImage
+                    | time =
+                        case referenceImage.time of
+                            Just time ->
+                                Just
+                                    { time
+                                        | period =
+                                            period
+                                    }
+
+                            Nothing ->
+                                Just
+                                    { period =
+                                        period
+                                    , subperiod =
+                                        Early
+                                    }
+                }
+            )
+        )
+        model
+
+
+updateReferenceImageOrigin : String -> Model -> ( Model, Cmd Msg )
+updateReferenceImageOrigin origin model =
+    updateReferenceImage
+        (Maybe.map
+            (\referenceImage ->
+                { referenceImage
+                    | origin =
+                        origin
+                }
+            )
+        )
+        model
+
+
+updateReferenceImage : (Maybe ReferenceImage -> Maybe ReferenceImage) -> Model -> ( Model, Cmd Msg )
+updateReferenceImage func model =
+    updateExplaination
+        (\e ->
+            { e
+                | referenceImage =
+                    func e.referenceImage
+            }
+        )
+        model
+
 
 loadedReferenceImage : DataUrl -> Model -> ( Model, Cmd Msg )
 loadedReferenceImage dataUrl model =
-    ( { model
-        | charExplainations =
-            case model.selectedChar of
-                Just char ->
-                    Dict.update
-                        char
-                        (\explaination ->
-                            Maybe.map
-                                (\e ->
-                                    let
-                                        referenceImage =
-                                            e.referenceImage
-                                    in
-                                    { e
-                                        | referenceImage =
-                                            { referenceImage
-                                                | image =
-                                                    dataUrl
-                                            }
-                                    }
-                                )
-                                explaination
-                        )
-                        model.charExplainations
+    updateExplaination
+        (\e ->
+            { e
+                | referenceImage =
+                    case e.referenceImage of
+                        Just referenceImage ->
+                            Just
+                                { referenceImage
+                                    | image =
+                                        dataUrl
+                                }
 
-                Nothing ->
-                    model.charExplainations
-      }
-    , Cmd.none
-    )
+                        Nothing ->
+                            Just
+                                { emptyReferenceImage
+                                    | image =
+                                        dataUrl
+                                }
+            }
+        )
+        model
 
 
 selectedReferenceImage : File -> Model -> ( Model, Cmd Msg )
@@ -597,6 +734,18 @@ uploadReferenceImage model =
 
 updateExplainationNote : String -> Model -> ( Model, Cmd Msg )
 updateExplainationNote note model =
+    updateExplaination
+        (\e ->
+            { e
+                | note =
+                    note
+            }
+        )
+        model
+
+
+updateExplaination : (Explaination -> Explaination) -> Model -> ( Model, Cmd Msg )
+updateExplaination func model =
     ( { model
         | charExplainations =
             case model.selectedChar of
@@ -604,14 +753,7 @@ updateExplainationNote note model =
                     Dict.update
                         char
                         (\explaination ->
-                            Maybe.map
-                                (\e ->
-                                    { e
-                                        | note =
-                                            note
-                                    }
-                                )
-                                explaination
+                            Maybe.map func explaination
                         )
                         model.charExplainations
 
@@ -2719,17 +2861,22 @@ editorSidePanel ({ palette, spacing, fontSize } as model) =
 
 
 charExplaination : Model -> E.Element Msg
-charExplaination ({ fontSize, spacing, selectedChar, charExplainations } as model) =
+charExplaination ({ palette, fontSize, spacing, selectedChar, charExplainations } as model) =
     let
         explaination =
             Maybe.withDefault emptyExplaination <|
                 Dict.get (unboxChar selectedChar) charExplainations
+
         hasReferenceImage =
-            not <| String.isEmpty explaination.referenceImage.image
+            case explaination.referenceImage of
+                Just _ ->
+                    True
+
+                Nothing ->
+                    False
     in
     E.column
-        [ E.paddingEach { top = spacing.large, bottom = 0, left = 0, right = 0 }
-        , E.spacing spacing.medium
+        [ E.spacing spacing.medium
         , E.width <| E.px <| fontSize.medium * 15
         ]
         [ Input.multiline
@@ -2752,32 +2899,131 @@ charExplaination ({ fontSize, spacing, selectedChar, charExplainations } as mode
                 False
             }
         , E.row
-                [ E.spacing spacing.small
-                , E.width E.fill
-                ]
-                [ E.text "Reference image"
-                , iconButton
-                    { icon =
-                        if hasReferenceImage then
+            [ E.spacing spacing.small
+            , E.width E.fill
+            ]
+            [ E.text "Reference image"
+            , iconButton
+                { icon =
+                    case explaination.referenceImage of
+                        Just _ ->
                             FeatherIcons.refreshCw
-                        else
+
+                        Nothing ->
                             FeatherIcons.upload
-                    , size =
-                        fontSize.title
-                    , onPress =
-                        Just UploadReferenceImage
-                    }
+                , size =
+                    fontSize.thumb
+                , onPress =
+                    Just UploadReferenceImage
+                }
+            ]
+        , case explaination.referenceImage of
+            Just referenceImage ->
+                E.row
+                [ E.spacing spacing.medium ]
+                [ E.column
+                    [ E.spacing <| spacing.medium
+                    , E.width <| E.px <| fontSize.medium * 15
+                    ]
+                    [ E.image
+                        [ E.width E.fill ]
+                        { src =
+                            referenceImage.image
+                        , description =
+                            "Reference image"
+                        }
+                    , Input.text
+                        [ E.width E.fill
+                        , Font.alignLeft
+                        ]
+                        { onChange =
+                            UpdateReferenceImageOrigin
+                        , text =
+                            referenceImage.origin
+                        , placeholder =
+                            Just <| Input.placeholder [] <| E.text "Origin"
+                        , label =
+                            Input.labelHidden "Origin"
+                        }
+                    , Input.text
+                        [ E.width E.fill
+                        , Font.alignLeft
+                        , E.onRight <|
+                            if String.isEmpty referenceImage.url then
+                                E.none
+                            else
+                                E.newTabLink
+                                [ E.centerY
+                                , E.paddingXY spacing.small 0
+                                ]
+                                { url =
+                                    referenceImage.url
+                                , label =
+                                    iconButton
+                                        { icon =
+                                            FeatherIcons.externalLink
+                                        , size =
+                                            fontSize.thumb
+                                        , onPress =
+                                            Nothing
+                                        }
+                                }
+                        ]
+                        { onChange =
+                            UpdateReferenceImageUrl
+                        , text =
+                            referenceImage.url
+                        , placeholder =
+                            Just <| Input.placeholder [] <| E.text "URL"
+                        , label =
+                            Input.labelHidden "URL"
+                        }
+                    ]
+                , E.column
+                    [ E.spacing spacing.medium
+                    , E.alignTop
+                    ]
+                    [ Input.radio
+                        [ E.spacing spacing.small
+                        ]
+                        { onChange = UpdateReferenceImagePeriod
+                        , selected = Maybe.map .period referenceImage.time
+                        , label =
+                            Input.labelAbove [ E.alignLeft, E.paddingEach { top = 0, bottom = spacing.small, left = 0, right = 0 } ]
+                                (E.text "Period")
+                        , options =
+                            [ Input.optionWith Shang
+                                (radioOption palette.lightFg fontSize (E.text "Shang"))
+                            , Input.optionWith WesternZhou
+                                (radioOption palette.lightFg fontSize (E.text "Western Zhou"))
+                            , Input.optionWith SpringAndAutumn
+                                (radioOption palette.lightFg fontSize (E.text "Spring and Autumn"))
+                            , Input.optionWith WarringStates
+                                (radioOption palette.lightFg fontSize (E.text "The Warring States"))
+                            ]
+                        }
+                    , Input.radio
+                        [ E.spacing spacing.small
+                        ]
+                        { onChange = UpdateReferenceImageSubperiod
+                        , selected = Maybe.map .subperiod referenceImage.time
+                        , label =
+                            Input.labelAbove [ E.alignLeft, E.paddingEach { top = 0, bottom = spacing.small, left = 0, right = 0 } ]
+                                (E.text "Subperiod")
+                        , options =
+                            [ Input.optionWith Early
+                                (radioOption palette.lightFg fontSize (E.text "Early"))
+                            , Input.optionWith Middle
+                                (radioOption palette.lightFg fontSize (E.text "Middle"))
+                            , Input.optionWith Late
+                                (radioOption palette.lightFg fontSize (E.text "Late"))
+                            ]
+                        }
+                    ]
                 ]
-        , if hasReferenceImage then
-            E.image
-            [ E.width E.fill ]
-            { src =
-                explaination.referenceImage.image
-            , description =
-                "Reference image"
-            }
-        else
-            E.none
+
+            Nothing ->
+                E.none
         ]
 
 
