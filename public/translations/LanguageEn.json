@@ -16,5 +16,22 @@
     },
     "acceptOnlyOneCharacter": "Accept only 1 character",
     "cannotContainSelfReference": "Cannot contain self reference",
-    "characterNotFound": "Character \"{{char}}\" is not found"
+    "characterNotFound": "Character \"{{char}}\" is not found",
+    "explaination": "Explaination",
+    "referenceImage": "Reference image",
+    "period": "Period",
+    "periodName": {
+        "shang": "Shang",
+        "westernZhou": "Western Zhou",
+        "springAndAutumn": "Spring and Autumn",
+        "warringStates": "The Warring States"
+    },
+    "stage": "Stage",
+    "stageName": {
+        "early": "Early",
+        "middle": "Middle",
+        "late": "Late"
+    },
+    "origin": "Origin",
+    "url": "URL"
 }

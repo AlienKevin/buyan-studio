@@ -75,3 +75,33 @@ cannotContainSelfReference translations =
 characterNotFound : Translations -> String -> String
 characterNotFound translations char =
     tr translations Curly "characterNotFound" [ ( "char", char ) ]
+
+
+explaination : Translations -> String
+explaination translations =
+    t translations "explaination"
+
+
+referenceImage : Translations -> String
+referenceImage translations =
+    t translations "referenceImage"
+
+
+period : Translations -> String
+period translations =
+    t translations "period"
+
+
+stage : Translations -> String
+stage translations =
+    t translations "stage"
+
+
+origin : Translations -> String
+origin translations =
+    t translations "origin"
+
+
+url : Translations -> String
+url translations =
+    t translations "url"

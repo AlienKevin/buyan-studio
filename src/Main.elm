@@ -34,6 +34,8 @@ import Task
 import Time
 import Translations
 import Translations.CharType
+import Translations.PeriodName
+import Translations.StageName
 import TypedSvg as Svg
 import TypedSvg.Attributes as SvgAttributes
 import TypedSvg.Core exposing (Svg)
@@ -3049,7 +3051,7 @@ editorSidePanel ({ palette, spacing, fontSize } as model) =
 
 
 charExplaination : Model -> E.Element Msg
-charExplaination ({ palette, fontSize, spacing, selectedChar, charExplainations } as model) =
+charExplaination ({ palette, fontSize, spacing, selectedChar, charExplainations, trs } as model) =
     let
         explaination =
             Maybe.withDefault emptyExplaination <|
@@ -3082,7 +3084,7 @@ charExplaination ({ palette, fontSize, spacing, selectedChar, charExplainations 
                     [ E.alignLeft
                     , E.paddingEach { top = 0, bottom = spacing.small, left = 0, right = 0 }
                     ]
-                    (E.text "Explaination")
+                    (E.text <| Translations.explaination trs)
             , spellcheck =
                 False
             }
@@ -3090,7 +3092,7 @@ charExplaination ({ palette, fontSize, spacing, selectedChar, charExplainations 
             [ E.spacing spacing.small
             , E.width E.fill
             ]
-            [ E.text "Reference image"
+            [ E.text <| Translations.referenceImage trs
             , iconButton
                 { icon =
                     case explaination.referenceImage of
@@ -3118,7 +3120,7 @@ charExplaination ({ palette, fontSize, spacing, selectedChar, charExplainations 
                             { src =
                                 referenceImage.image
                             , description =
-                                "Reference image"
+                                Translations.referenceImage trs
                             }
                         , Input.text
                             [ E.width E.fill
@@ -3129,9 +3131,9 @@ charExplaination ({ palette, fontSize, spacing, selectedChar, charExplainations 
                             , text =
                                 referenceImage.origin
                             , placeholder =
-                                Just <| Input.placeholder [] <| E.text "Origin"
+                                Just <| Input.placeholder [] <| E.text <| Translations.origin trs
                             , label =
-                                Input.labelHidden "Origin"
+                                Input.labelHidden <| Translations.origin trs
                             }
                         , Input.text
                             [ E.width E.fill
@@ -3163,9 +3165,9 @@ charExplaination ({ palette, fontSize, spacing, selectedChar, charExplainations 
                             , text =
                                 referenceImage.url
                             , placeholder =
-                                Just <| Input.placeholder [] <| E.text "URL"
+                                Just <| Input.placeholder [] <| E.text <| Translations.url trs
                             , label =
-                                Input.labelHidden "URL"
+                                Input.labelHidden <| Translations.url trs
                             }
                         ]
                     , E.column
@@ -3179,16 +3181,16 @@ charExplaination ({ palette, fontSize, spacing, selectedChar, charExplainations 
                             , selected = Maybe.map .period referenceImage.time
                             , label =
                                 Input.labelAbove [ E.alignLeft, E.paddingEach { top = 0, bottom = spacing.small, left = 0, right = 0 } ]
-                                    (E.text "Period")
+                                    (E.text <| Translations.period trs)
                             , options =
                                 [ Input.optionWith Shang
-                                    (radioOption palette.lightFg fontSize (E.text "Shang"))
+                                    (radioOption palette.lightFg fontSize (E.text <| Translations.PeriodName.shang trs))
                                 , Input.optionWith WesternZhou
-                                    (radioOption palette.lightFg fontSize (E.text "Western Zhou"))
+                                    (radioOption palette.lightFg fontSize (E.text <| Translations.PeriodName.westernZhou trs))
                                 , Input.optionWith SpringAndAutumn
-                                    (radioOption palette.lightFg fontSize (E.text "Spring and Autumn"))
+                                    (radioOption palette.lightFg fontSize (E.text <| Translations.PeriodName.springAndAutumn trs))
                                 , Input.optionWith WarringStates
-                                    (radioOption palette.lightFg fontSize (E.text "The Warring States"))
+                                    (radioOption palette.lightFg fontSize (E.text <| Translations.PeriodName.warringStates trs))
                                 ]
                             }
                         , Input.radio
@@ -3198,14 +3200,14 @@ charExplaination ({ palette, fontSize, spacing, selectedChar, charExplainations 
                             , selected = Maybe.map .stage referenceImage.time
                             , label =
                                 Input.labelAbove [ E.alignLeft, E.paddingEach { top = 0, bottom = spacing.small, left = 0, right = 0 } ]
-                                    (E.text "Stage")
+                                    (E.text <| Translations.stage trs)
                             , options =
                                 [ Input.optionWith Early
-                                    (radioOption palette.lightFg fontSize (E.text "Early"))
+                                    (radioOption palette.lightFg fontSize (E.text <| Translations.StageName.early trs))
                                 , Input.optionWith Middle
-                                    (radioOption palette.lightFg fontSize (E.text "Middle"))
+                                    (radioOption palette.lightFg fontSize (E.text <| Translations.StageName.middle trs))
                                 , Input.optionWith Late
-                                    (radioOption palette.lightFg fontSize (E.text "Late"))
+                                    (radioOption palette.lightFg fontSize (E.text <| Translations.StageName.late trs))
                                 ]
                             }
                         ]
