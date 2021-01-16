@@ -1400,7 +1400,6 @@ gotModel savedModelJson model =
     case Decode.decodeValue decodeSavedModel savedModelJson of
         Ok { chars, charExplainations, strokeWidth, language } ->
             let
-                _ = Debug.log "charExplainations" charExplainations
                 newModel =
                     { model
                         | chars =
@@ -1416,10 +1415,10 @@ gotModel savedModelJson model =
             updateLanguage language newModel
 
         Err err ->
-            let
-                _ =
-                    Debug.log "err" err
-            in
+            -- let
+            --     _ =
+            --         Debug.log "err" err
+            -- in
             ( model, Cmd.none )
 
 

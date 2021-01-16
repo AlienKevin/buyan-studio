@@ -45,7 +45,9 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
         },
       });
 
-      app.ports.getModelPort.send(savedModelJson);
+      if (savedModelJson !== null) {
+        app.ports.getModelPort.send(savedModelJson);
+      }
 
       app.ports.addSimpleCharsPort.subscribe(function () {
         var options = {
@@ -153,30 +155,10 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
         if (error !== null) {
           console.error("Error getting saved simpleCharSvgs: ", error);
         }
-        if (savedSimpleCharSvgs == null || Object.keys(savedSimpleCharSvgs).length === 0) {
-          var defaultChars = "上下不儿几卜口犬車門".split("");
-          var simpleCharSvgs = {};
-          defaultChars.forEach(function (char) {
-            fetch(`default-simple-char-svgs/${char}.svg`)
-              .then(function (r) {
-                return r.text()
-              })
-              .then(function (svg) {
-                // console.log("Loaded default SimpleCharSvg " + char);
-                simpleCharSvgs[char] = svg;
-                if (Object.keys(simpleCharSvgs).length === defaultChars.length) {
-                  app.ports.gotNewSimpleCharsPort.send(simpleCharSvgs);
-                  localforage.setItem(simpleCharSvgsStorageKey, simpleCharSvgs, function (error) {
-                    if (error !== null) {
-                      console.error("Error saving simpleCharSvgs: ", error);
-                    }
-                  });
-                }
-              });
-          });
-        }
         // console.log("Getting saved simpleCharSvgs: ", savedSimpleCharSvgs);
-        app.ports.gotSavedSimpleCharsPort.send(savedSimpleCharSvgs);
+        if (savedSimpleCharSvgs !== null) {
+          app.ports.gotSavedSimpleCharsPort.send(savedSimpleCharSvgs);
+        }
       });
     });
 });
