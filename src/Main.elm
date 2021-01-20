@@ -82,6 +82,9 @@ port updateBackupLocationPort : Value -> Cmd msg
 port succeededInBackupPort : (() -> msg) -> Sub msg
 
 
+port uploadBackupPort : () -> Cmd msg
+
+
 ---- MODEL ----
 
 
@@ -465,6 +468,7 @@ type Msg
     | UpdateReferenceImageUrl String
     | UpdateBackupLocation
     | SucceededInBackup
+    | UploadBackup
 
 
 type alias DragData =
@@ -631,6 +635,16 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentIndex } as 
         
         SucceededInBackup ->
             succeededInBackup model
+
+        UploadBackup ->
+            uploadBackup model
+
+
+uploadBackup : Model -> (Model, Cmd Msg)
+uploadBackup model =
+    ( model
+    , uploadBackupPort ()
+    )
 
 
 succeededInBackup : Model -> (Model, Cmd Msg)
@@ -2768,6 +2782,18 @@ appPreferencesPopUp ({ palette, spacing, fontSize, isBackingUp } as model) =
                     fontSize.thumb
                 , onPress =
                     Just UpdateBackupLocation
+                }
+            ]
+        , E.row
+            [ E.spacing spacing.tiny ]
+            [ E.text "Upload backup"
+            , iconButton
+                { icon =
+                    FeatherIcons.upload
+                , size =
+                    fontSize.thumb
+                , onPress =
+                    Just UploadBackup
                 }
             ]
         ]

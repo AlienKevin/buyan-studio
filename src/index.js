@@ -250,6 +250,23 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
       }
 
       app.ports.updateBackupLocationPort.subscribe(function (model) {
+        getBackupFileHandle(
+          FilePickerType.Save,
+          function() {
+            backupAsLocalFile(model, function () {
+              app.ports.succeededInBackupPort.send(null);
+            });
+          }
+        )
+      });
+
+      var FilePickerType =
+        {
+          "Open": "Open",
+          "Save": "Save",
+        };
+
+      function getBackupFileHandle(filePickerType, callback) {
         var options = {
           types: [
             {
@@ -260,19 +277,46 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
             },
           ],
         };
-        window.showSaveFilePicker(options)
-          .then(function (handle) {
-            backupFileHandle = handle;
-            localforage.setItem(backupFileHandleStorageKey, handle, function (error) {
+        (filePickerType === "Open"
+        ? window.showOpenFilePicker
+        : window.showSaveFilePicker
+        )(options)
+          .then(function(handle) {
+            backupFileHandle = (filePickerType === "Open"
+            ? handle[0]
+            : handle
+            );
+            localforage.setItem(backupFileHandleStorageKey, backupFileHandle, function (error) {
               if (error !== null) {
                 console.error("Error saving backupFileHandle: ", error);
               }
-              console.log("Saved backupFileHandle", handle);
+              console.log("Saved backupFileHandle", backupFileHandle);
             });
-            backupAsLocalFile(model, function () {
-              app.ports.succeededInBackupPort.send(null);
-            });
-          })
+            return callback(backupFileHandle);
+          });
+      }
+
+      app.ports.uploadBackupPort.subscribe(function () {
+        getBackupFileHandle(
+          FilePickerType.Open,
+          async function() {
+            if (!(await verifyPermission(backupFileHandle))) {
+              return;
+            }
+            var file = await backupFileHandle.getFile();
+            var backupJson = JSON.parse(await file.text());
+            app.ports.succeededInBackupPort.send(null);
+            if (backupJson !== null && backupJson.model !== null && backupJson.simpleCharSvgs !== null) {
+              localforage.setItem(simpleCharSvgsStorageKey, backupJson.simpleCharSvgs, function (error) {
+                if (error !== null) {
+                  console.error("Error saving simpleCharSvgs: ", error);
+                }
+                app.ports.gotNewSimpleCharsPort.send(backupJson.simpleCharSvgs);
+                app.ports.getModelPort.send(backupJson.model);
+              });
+            }
+          }
+        )
       });
 
       localforage.getItem(simpleCharSvgsStorageKey, function (error, savedSimpleCharSvgs) {
