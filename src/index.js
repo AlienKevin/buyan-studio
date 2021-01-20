@@ -65,7 +65,7 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
 
       async function verifyPermission(fileHandle) {
         const options = {
-          model: 'readwrite'
+          mode: 'readwrite'
         };
         // Check if permission was already granted. If so, return true.
         if ((await fileHandle.queryPermission(options)) === 'granted') {
