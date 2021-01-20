@@ -85,6 +85,7 @@ port succeededInBackupPort : (() -> msg) -> Sub msg
 port uploadBackupPort : () -> Cmd msg
 
 
+
 ---- MODEL ----
 
 
@@ -410,7 +411,7 @@ init flags =
                         translations
                 }
 
-        Err err ->
+        Err _ ->
             ( model, Cmd.none )
 
 
@@ -487,7 +488,7 @@ dragConfig =
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentIndex } as model) =
+update msg model =
     case msg of
         AddChar myCharType ->
             addChar myCharType model
@@ -629,10 +630,10 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentIndex } as 
 
         UpdateReferenceImageUrl url ->
             updateReferenceImageUrl url model
-        
+
         UpdateBackupLocation ->
             updateBackupLocation model
-        
+
         SucceededInBackup ->
             succeededInBackup model
 
@@ -640,24 +641,24 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentIndex } as 
             uploadBackup model
 
 
-uploadBackup : Model -> (Model, Cmd Msg)
+uploadBackup : Model -> ( Model, Cmd Msg )
 uploadBackup model =
     ( model
     , uploadBackupPort ()
     )
 
 
-succeededInBackup : Model -> (Model, Cmd Msg)
+succeededInBackup : Model -> ( Model, Cmd Msg )
 succeededInBackup model =
-    ({ model
+    ( { model
         | isBackingUp =
             True
-    }
+      }
     , Cmd.none
     )
 
 
-updateBackupLocation : Model -> (Model, Cmd Msg)
+updateBackupLocation : Model -> ( Model, Cmd Msg )
 updateBackupLocation model =
     ( model
     , updateBackupLocationPort <| encodeModel model
@@ -681,7 +682,7 @@ loadedSimpleChar svgJson model =
                             model.simpleCharSvgs
             }
 
-        Err err ->
+        Err _ ->
             model
     , Cmd.none
     )
@@ -901,11 +902,6 @@ updatePendingComponentChar charInput model =
     )
 
 
-addComponentToSelectedChar : Model -> ( Model, Cmd Msg )
-addComponentToSelectedChar model =
-    Debug.todo "TODO"
-
-
 requestAddComponentToSelectedChar : Model -> ( Model, Cmd Msg )
 requestAddComponentToSelectedChar model =
     ( { model
@@ -936,8 +932,10 @@ updateMode mode ({ isBackingUp } as model) =
         BrowseMode ->
             if isBackingUp then
                 backupAsLocalFilePort <| encodeModel model
+
             else
                 Cmd.none
+
         _ ->
             Cmd.none
     )
@@ -1126,7 +1124,7 @@ deleteActiveComponent ({ activeComponentIndex } as model) =
 
 
 copyActiveComponent : Model -> ( Model, Cmd Msg )
-copyActiveComponent ({ activeComponentIndex, isSnapToGrid, boxUnits, borderUnits } as model) =
+copyActiveComponent ({ activeComponentIndex, isSnapToGrid, boxUnits } as model) =
     ( { model
         | chars =
             Maybe.map
@@ -1201,7 +1199,7 @@ clearChars myCharType model =
             ( { model
                 | chars =
                     Dict.filter
-                        (\char myChar ->
+                        (\_ myChar ->
                             case myChar of
                                 SimpleChar _ ->
                                     False
@@ -1220,7 +1218,7 @@ clearChars myCharType model =
             ( { model
                 | chars =
                     Dict.filter
-                        (\char myChar ->
+                        (\_ myChar ->
                             case myChar of
                                 CompoundChar _ _ ->
                                     False
@@ -1350,7 +1348,7 @@ saveModel model =
 
 
 encodeModel : Model -> Value
-encodeModel { chars, charExplainations, simpleCharSvgs, strokeWidth, language } =
+encodeModel { chars, charExplainations, strokeWidth, language } =
     Encode.object
         [ ( "chars", Encode.dict String.fromChar encodeMyChar chars )
         , ( "charExplainations", Encode.dict String.fromChar encodeExplaination charExplainations )
@@ -1517,7 +1515,7 @@ gotModel savedModelJson model =
             in
             updateLanguage language newModel
 
-        Err err ->
+        Err _ ->
             -- let
             --     _ =
             --         Debug.log "err" err
@@ -1745,7 +1743,7 @@ stopDragging model =
 
 
 startDragging : DragData -> Model -> ( Model, Cmd Msg )
-startDragging { index, scale } ({ isSnapToGrid, boxUnits, strokeWidth, unitSize } as model) =
+startDragging { index, scale } ({ isSnapToGrid, boxUnits } as model) =
     let
         unitPercent =
             100 / toFloat boxUnits
@@ -1775,7 +1773,7 @@ type OffsetType
 
 
 onDragBy : Vec2 -> Model -> ( Model, Cmd Msg )
-onDragBy delta ({ dragDelta, isSnapToGrid, activeComponentIndex, activeScale, boxUnits, unitSize, chars, isAspectRatioLocked, strokeWidth } as model) =
+onDragBy delta ({ dragDelta, isSnapToGrid, boxUnits, unitSize } as model) =
     let
         factor =
             100 / (toFloat boxUnits * unitSize)
@@ -1840,7 +1838,7 @@ roundToUnitSize unitSize n =
 
 
 updateOnDrag : Float -> Vec2 -> Model -> Model
-updateOnDrag factor delta ({ dragDelta, activeScale, boxUnits, unitSize, chars, isAspectRatioLocked } as model) =
+updateOnDrag factor delta ({ activeScale, boxUnits, isAspectRatioLocked } as model) =
     updateActiveComponent
         (\char ->
             let
@@ -2116,7 +2114,7 @@ calculateMyCharDimension myChar =
                     }
                 <|
                     List.map
-                        (\{ char, position, dimension } ->
+                        (\{ position, dimension } ->
                             let
                                 -- _ =
                                 --     Debug.log "char" char
@@ -2226,14 +2224,14 @@ gotSavedSimpleChars svgsJson model =
                 | simpleCharSvgs =
                     Dict.merge
                         (\key a -> Dict.insert key a)
-                        (\key a b -> Dict.insert key a)
+                        (\key a _ -> Dict.insert key a)
                         (\key b -> Dict.insert key b)
                         svgs
                         model.simpleCharSvgs
                         Dict.empty
             }
 
-        Err err ->
+        Err _ ->
             -- let
             --     _ =
             --         Debug.log "err" err
@@ -2294,14 +2292,14 @@ gotNewSimpleChars svgsJson model =
                 , simpleCharSvgs =
                     Dict.merge
                         (\key a -> Dict.insert key a)
-                        (\key a b -> Dict.insert key a)
+                        (\key a _ -> Dict.insert key a)
                         (\key b -> Dict.insert key b)
                         svgs
                         model.simpleCharSvgs
                         Dict.empty
             }
 
-        Err err ->
+        Err _ ->
             -- let
             --     _ =
             --         Debug.log "err" err
@@ -2563,7 +2561,7 @@ view ({ mode, spacing, fontSize, device } as model) =
 
 
 appHeader : Model -> E.Element Msg
-appHeader ({ palette, spacing, fontSize } as model) =
+appHeader { spacing, fontSize } =
     E.row
         [ E.alignRight
         , E.spacing spacing.medium
@@ -2760,30 +2758,30 @@ appPreferencesPopUp ({ palette, spacing, fontSize, isBackingUp } as model) =
             }
         , if isBackingUp then
             E.row
-            [ E.spacing spacing.tiny
-            , E.centerX
-            ]
-            [ E.text "Backuped" 
-            , E.html
-                (FeatherIcons.check
-                    |> FeatherIcons.withSize (toFloat fontSize.thumb)
-                    |> FeatherIcons.toHtml []
-                )
-            ]
+                [ E.spacing spacing.tiny
+                , E.centerX
+                ]
+                [ E.text "Backuped"
+                , E.html
+                    (FeatherIcons.check
+                        |> FeatherIcons.withSize (toFloat fontSize.thumb)
+                        |> FeatherIcons.toHtml []
+                    )
+                ]
 
-        else
+          else
             E.row
-            [ E.spacing spacing.tiny ]
-            [ E.text "Create backup"
-            , iconButton
-                { icon =
-                    FeatherIcons.plusCircle
-                , size =
-                    fontSize.thumb
-                , onPress =
-                    Just UpdateBackupLocation
-                }
-            ]
+                [ E.spacing spacing.tiny ]
+                [ E.text "Create backup"
+                , iconButton
+                    { icon =
+                        FeatherIcons.plusCircle
+                    , size =
+                        fontSize.thumb
+                    , onPress =
+                        Just UpdateBackupLocation
+                    }
+                ]
         , E.row
             [ E.spacing spacing.tiny ]
             [ E.text "Upload backup"
@@ -2859,7 +2857,7 @@ confirmClearCharsPopUp myCharType ({ trs } as model) =
 
 
 confirmDeletePopUpTemplate : Model -> String -> Msg -> E.Element Msg
-confirmDeletePopUpTemplate ({ trs, boxUnits, thumbnailUnitSize, palette, spacing, fontSize } as model) targetName onConfirm =
+confirmDeletePopUpTemplate ({ trs, palette, spacing, fontSize } as model) targetName onConfirm =
     popUpTemplate
         { borderColor =
             palette.danger
@@ -3002,7 +3000,7 @@ previewInParagraphPopUp ({ palette, spacing, fontSize } as model) =
 
 
 renderPreviewInParagraph : Int -> Model -> E.Element Msg
-renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize, boxUnits, borderUnits, strokeWidth, simpleCharSvgs, activeComponentIndex, isAspectRatioLocked, isSnapToGrid } as model) =
+renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize, boxUnits, strokeWidth } as model) =
     let
         lines =
             String.split "\n" paragraphForPreview
@@ -3053,7 +3051,7 @@ confirmDeleteSelectedCharPopUp ({ selectedChar } as model) =
 
 
 addCompoundCharPopUp : Model -> E.Element Msg
-addCompoundCharPopUp ({ trs, activeComponentIndex, newCompoundChar, inputError, palette, spacing, fontSize, boxUnits, thumbnailUnitSize } as model) =
+addCompoundCharPopUp ({ trs, newCompoundChar, inputError, palette, spacing, fontSize, boxUnits, thumbnailUnitSize } as model) =
     let
         inputLength =
             String.length newCompoundChar
@@ -3175,7 +3173,7 @@ titleText fontSize text =
 
 
 editorSidePanel : Model -> E.Element Msg
-editorSidePanel ({ palette, spacing, fontSize } as model) =
+editorSidePanel ({ spacing } as model) =
     E.column
         [ E.spacing spacing.medium
         , E.width E.fill
@@ -3190,19 +3188,11 @@ editorSidePanel ({ palette, spacing, fontSize } as model) =
 
 
 charExplaination : Model -> E.Element Msg
-charExplaination ({ palette, fontSize, spacing, selectedChar, charExplainations, trs } as model) =
+charExplaination { palette, fontSize, spacing, selectedChar, charExplainations, trs } =
     let
         explaination =
             Maybe.withDefault emptyExplaination <|
                 Dict.get (unboxChar selectedChar) charExplainations
-
-        hasReferenceImage =
-            case explaination.referenceImage of
-                Just _ ->
-                    True
-
-                Nothing ->
-                    False
     in
     E.column
         [ E.spacing spacing.medium
@@ -3499,7 +3489,7 @@ radioOption borderColor fontSize optionLabel status =
 
 
 editor : Model -> E.Element Msg
-editor ({ activeComponentIndex, selectedChar, chars, simpleCharSvgs, boxUnits, borderUnits, unitSize, strokeWidth, isAspectRatioLocked, isSnapToGrid, palette, spacing, fontSize } as model) =
+editor ({ selectedChar, chars, spacing, fontSize } as model) =
     E.column
         []
         [ E.row
@@ -3722,7 +3712,7 @@ charPanels ({ spacing, device } as model) =
 
 
 charPanel : MyCharType -> Model -> E.Element Msg
-charPanel myCharType ({ trs, boxUnits, thumbnailUnitSize, palette, spacing, fontSize } as model) =
+charPanel myCharType ({ trs, palette, spacing, fontSize } as model) =
     let
         cards =
             List.filterMap
@@ -3791,7 +3781,7 @@ stringFromMyCharType trs myCharType =
 
 
 charCard : Model -> MyChar -> E.Element Msg
-charCard ({ chars, activeComponentIndex, unitSize, thumbnailUnitSize, boxUnits, borderUnits, strokeWidth, simpleCharSvgs, selectedChar, isAspectRatioLocked, isSnapToGrid, palette, spacing, fontSize } as model) myChar =
+charCard ({ activeComponentIndex, unitSize, thumbnailUnitSize, boxUnits, strokeWidth, selectedChar, palette, spacing, fontSize } as model) myChar =
     let
         char =
             charFromMyChar myChar
@@ -3917,7 +3907,7 @@ isMyCharType myCharType myChar =
 
 
 renderChar : Model -> { isThumbnail : Bool } -> MyChar -> Svg Msg
-renderChar ({ unitSize, boxUnits, borderUnits, strokeWidth, chars, simpleCharSvgs, activeComponentIndex, isAspectRatioLocked, isSnapToGrid } as model) { isThumbnail } myChar =
+renderChar ({ unitSize, boxUnits, borderUnits, strokeWidth } as model) { isThumbnail } myChar =
     let
         boxSize =
             toFloat boxUnits * unitSize
@@ -4014,7 +4004,7 @@ renderCharHelper :
     -> Int
     -> MyChar
     -> Svg Msg
-renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIndex, isAspectRatioLocked, isSnapToGrid, palette, fontSize } as model) { charClassName, index, isThumbnail, tightDimension, parentMyCharType } level myChar =
+renderCharHelper ({ boxUnits, chars, simpleCharSvgs, activeComponentIndex, palette, fontSize } as model) { charClassName, index, isThumbnail, tightDimension, parentMyCharType } level myChar =
     let
         char =
             charFromMyChar myChar
@@ -4065,113 +4055,114 @@ renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIn
             <|
                 if Just levelwiseIndex == activeComponentIndex && not isThumbnail then
                     styledContents
-                        ++ [ activeComponentButtons parentMyCharType model ]
-                        ++ (if Vector2.getX dimension < unitPercent then
-                                [ Svg.line
-                                    [ SvgAttributes.x1 <| SvgTypes.px <| 0
-                                    , SvgAttributes.y1 <| SvgTypes.px <| 0
-                                    , SvgAttributes.x2 <| SvgTypes.px <| 0
-                                    , SvgAttributes.y2 <| SvgTypes.Percent 100
-                                    , SvgAttributes.strokeWidth <| SvgTypes.px 2
-                                    , SvgAttributes.stroke <| SvgTypes.Paint <| toColor palette.darkFg
-                                    ]
-                                    []
-                                , scaleHandle
-                                    palette
-                                    { index = levelwiseIndex
-                                    , scale = ScaleTop
-                                    }
-                                    0
-                                    0
-                                    fontSize.thumb
-                                    isDraggable
-                                , scaleHandle
-                                    palette
-                                    { index = levelwiseIndex
-                                    , scale = ScaleBottom
-                                    }
-                                    0
-                                    100
-                                    fontSize.thumb
-                                    isDraggable
-                                ]
+                        ++ (activeComponentButtons parentMyCharType model
+                                :: (if Vector2.getX dimension < unitPercent then
+                                        [ Svg.line
+                                            [ SvgAttributes.x1 <| SvgTypes.px <| 0
+                                            , SvgAttributes.y1 <| SvgTypes.px <| 0
+                                            , SvgAttributes.x2 <| SvgTypes.px <| 0
+                                            , SvgAttributes.y2 <| SvgTypes.Percent 100
+                                            , SvgAttributes.strokeWidth <| SvgTypes.px 2
+                                            , SvgAttributes.stroke <| SvgTypes.Paint <| toColor palette.darkFg
+                                            ]
+                                            []
+                                        , scaleHandle
+                                            palette
+                                            { index = levelwiseIndex
+                                            , scale = ScaleTop
+                                            }
+                                            0
+                                            0
+                                            fontSize.thumb
+                                            isDraggable
+                                        , scaleHandle
+                                            palette
+                                            { index = levelwiseIndex
+                                            , scale = ScaleBottom
+                                            }
+                                            0
+                                            100
+                                            fontSize.thumb
+                                            isDraggable
+                                        ]
 
-                            else if Vector2.getY dimension < unitPercent then
-                                [ Svg.line
-                                    [ SvgAttributes.x1 <| SvgTypes.px <| 0
-                                    , SvgAttributes.y1 <| SvgTypes.px <| 0
-                                    , SvgAttributes.x2 <| SvgTypes.Percent 100
-                                    , SvgAttributes.y2 <| SvgTypes.px <| 0
-                                    , SvgAttributes.strokeWidth <| SvgTypes.px 2
-                                    , SvgAttributes.stroke <| SvgTypes.Paint <| toColor palette.darkFg
-                                    ]
-                                    []
-                                , scaleHandle
-                                    palette
-                                    { index = levelwiseIndex
-                                    , scale = ScaleLeft
-                                    }
-                                    0
-                                    0
-                                    fontSize.thumb
-                                    isDraggable
-                                , scaleHandle
-                                    palette
-                                    { index = levelwiseIndex
-                                    , scale = ScaleRight
-                                    }
-                                    100
-                                    0
-                                    fontSize.thumb
-                                    isDraggable
-                                ]
+                                    else if Vector2.getY dimension < unitPercent then
+                                        [ Svg.line
+                                            [ SvgAttributes.x1 <| SvgTypes.px <| 0
+                                            , SvgAttributes.y1 <| SvgTypes.px <| 0
+                                            , SvgAttributes.x2 <| SvgTypes.Percent 100
+                                            , SvgAttributes.y2 <| SvgTypes.px <| 0
+                                            , SvgAttributes.strokeWidth <| SvgTypes.px 2
+                                            , SvgAttributes.stroke <| SvgTypes.Paint <| toColor palette.darkFg
+                                            ]
+                                            []
+                                        , scaleHandle
+                                            palette
+                                            { index = levelwiseIndex
+                                            , scale = ScaleLeft
+                                            }
+                                            0
+                                            0
+                                            fontSize.thumb
+                                            isDraggable
+                                        , scaleHandle
+                                            palette
+                                            { index = levelwiseIndex
+                                            , scale = ScaleRight
+                                            }
+                                            100
+                                            0
+                                            fontSize.thumb
+                                            isDraggable
+                                        ]
 
-                            else
-                                [ Svg.rect
-                                    [ SvgAttributes.width <| SvgTypes.Percent 100
-                                    , SvgAttributes.height <| SvgTypes.Percent 100
-                                    , SvgAttributes.fill <| SvgTypes.PaintNone
-                                    , SvgAttributes.strokeWidth <| SvgTypes.px 2
-                                    , SvgAttributes.stroke <| SvgTypes.Paint <| toColor palette.darkFg
-                                    ]
-                                    []
-                                , scaleHandle
-                                    palette
-                                    { index = levelwiseIndex
-                                    , scale = ScaleTopLeft
-                                    }
-                                    0
-                                    0
-                                    fontSize.thumb
-                                    isDraggable
-                                , scaleHandle
-                                    palette
-                                    { index = levelwiseIndex
-                                    , scale = ScaleTopRight
-                                    }
-                                    100
-                                    0
-                                    fontSize.thumb
-                                    isDraggable
-                                , scaleHandle
-                                    palette
-                                    { index = levelwiseIndex
-                                    , scale = ScaleBottomLeft
-                                    }
-                                    0
-                                    100
-                                    fontSize.thumb
-                                    isDraggable
-                                , scaleHandle
-                                    palette
-                                    { index = levelwiseIndex
-                                    , scale = ScaleBottomRight
-                                    }
-                                    100
-                                    100
-                                    fontSize.thumb
-                                    isDraggable
-                                ]
+                                    else
+                                        [ Svg.rect
+                                            [ SvgAttributes.width <| SvgTypes.Percent 100
+                                            , SvgAttributes.height <| SvgTypes.Percent 100
+                                            , SvgAttributes.fill <| SvgTypes.PaintNone
+                                            , SvgAttributes.strokeWidth <| SvgTypes.px 2
+                                            , SvgAttributes.stroke <| SvgTypes.Paint <| toColor palette.darkFg
+                                            ]
+                                            []
+                                        , scaleHandle
+                                            palette
+                                            { index = levelwiseIndex
+                                            , scale = ScaleTopLeft
+                                            }
+                                            0
+                                            0
+                                            fontSize.thumb
+                                            isDraggable
+                                        , scaleHandle
+                                            palette
+                                            { index = levelwiseIndex
+                                            , scale = ScaleTopRight
+                                            }
+                                            100
+                                            0
+                                            fontSize.thumb
+                                            isDraggable
+                                        , scaleHandle
+                                            palette
+                                            { index = levelwiseIndex
+                                            , scale = ScaleBottomLeft
+                                            }
+                                            0
+                                            100
+                                            fontSize.thumb
+                                            isDraggable
+                                        , scaleHandle
+                                            palette
+                                            { index = levelwiseIndex
+                                            , scale = ScaleBottomRight
+                                            }
+                                            100
+                                            100
+                                            fontSize.thumb
+                                            isDraggable
+                                        ]
+                                   )
                            )
 
                 else
@@ -4187,7 +4178,7 @@ renderCharHelper ({ unitSize, boxUnits, chars, simpleCharSvgs, activeComponentIn
                     -- impossible
                     TypedSvg.Core.text <| "Error rendering " ++ String.fromChar char
 
-        CompoundChar ({ dimension, position } as compoundChar) components ->
+        CompoundChar { dimension, position } components ->
             constraint CompoundCharType dimension position <|
                 List.indexedMap
                     (\componentIndex ->
@@ -4253,7 +4244,7 @@ aspectRatioLockButton { isSnapToGrid, isAspectRatioLocked, palette, spacing, fon
 
 
 copyActiveComponentButton : Model -> Svg Msg
-copyActiveComponentButton { palette, spacing, fontSize } =
+copyActiveComponentButton { palette, fontSize } =
     activeComponentButton fontSize (-0.5 * toFloat fontSize.title) FeatherIcons.copy palette.lightFg CopyActiveComponent
 
 
@@ -4390,17 +4381,12 @@ highlightBorder { color, width, spacing, glowWidth, style } =
     ]
 
 
-compoundCharsPanel : Model -> E.Element Msg
-compoundCharsPanel model =
-    E.column [] []
-
-
 
 ---- SUBSCRIPTIONS ----
 
 
 subscriptions : Model -> Sub Msg
-subscriptions ({ drag } as model) =
+subscriptions { drag } =
     Sub.batch
         [ Draggable.subscriptions DragMsg drag
         , getModelPort GotModel
