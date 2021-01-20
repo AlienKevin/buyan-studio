@@ -73,6 +73,14 @@ port deleteSimpleCharPort : String -> Cmd msg
 port clearSimpleCharsPort : () -> Cmd msg
 
 
+port backupAsLocalFilePort : Value -> Cmd msg
+
+
+port updateBackupLocationPort : Value -> Cmd msg
+
+
+port succeededInBackupPort : (() -> msg) -> Sub msg
+
 
 ---- MODEL ----
 
@@ -109,6 +117,7 @@ type alias Model =
         Spacing
     , fontSize :
         FontSize
+    , isBackingUp : Bool
     }
 
 
@@ -368,6 +377,8 @@ init flags =
                 , thumb =
                     30
                 }
+            , isBackingUp =
+                False
             }
     in
     case
@@ -452,6 +463,8 @@ type Msg
     | UpdateReferenceImagePeriod Period
     | UpdateReferenceImageStage Stage
     | UpdateReferenceImageUrl String
+    | UpdateBackupLocation
+    | SucceededInBackup
 
 
 type alias DragData =
@@ -612,6 +625,29 @@ update msg ({ boxUnits, borderUnits, unitSize, chars, activeComponentIndex } as 
 
         UpdateReferenceImageUrl url ->
             updateReferenceImageUrl url model
+        
+        UpdateBackupLocation ->
+            updateBackupLocation model
+        
+        SucceededInBackup ->
+            succeededInBackup model
+
+
+succeededInBackup : Model -> (Model, Cmd Msg)
+succeededInBackup model =
+    ({ model
+        | isBackingUp =
+            True
+    }
+    , Cmd.none
+    )
+
+
+updateBackupLocation : Model -> (Model, Cmd Msg)
+updateBackupLocation model =
+    ( model
+    , updateBackupLocationPort <| encodeModel model
+    )
 
 
 loadedSimpleChar : Value -> Model -> ( Model, Cmd Msg )
@@ -877,12 +913,19 @@ showAppPreferences model =
 
 
 updateMode : Mode -> Model -> ( Model, Cmd Msg )
-updateMode mode model =
+updateMode mode ({ isBackingUp } as model) =
     ( { model
         | mode =
             mode
       }
-    , Cmd.none
+    , case mode of
+        BrowseMode ->
+            if isBackingUp then
+                backupAsLocalFilePort <| encodeModel model
+            else
+                Cmd.none
+        _ ->
+            Cmd.none
     )
 
 
@@ -2675,7 +2718,7 @@ addComponentToSelectedCharPopUp ({ chars, selectedChar, trs, newComponentChar, i
 
 
 appPreferencesPopUp : Model -> E.Element Msg
-appPreferencesPopUp ({ palette, spacing, fontSize } as model) =
+appPreferencesPopUp ({ palette, spacing, fontSize, isBackingUp } as model) =
     popUpTemplate
         { borderColor =
             palette.lightFg
@@ -2701,6 +2744,32 @@ appPreferencesPopUp ({ palette, spacing, fontSize } as model) =
                     (radioOption palette.lightFg fontSize (E.text "中文（繁體）"))
                 ]
             }
+        , if isBackingUp then
+            E.row
+            [ E.spacing spacing.tiny
+            , E.centerX
+            ]
+            [ E.text "Backuped" 
+            , E.html
+                (FeatherIcons.check
+                    |> FeatherIcons.withSize (toFloat fontSize.thumb)
+                    |> FeatherIcons.toHtml []
+                )
+            ]
+
+        else
+            E.row
+            [ E.spacing spacing.tiny ]
+            [ E.text "Create backup"
+            , iconButton
+                { icon =
+                    FeatherIcons.plusCircle
+                , size =
+                    fontSize.thumb
+                , onPress =
+                    Just UpdateBackupLocation
+                }
+            ]
         ]
 
 
@@ -4314,6 +4383,7 @@ subscriptions ({ drag } as model) =
         , loadedSimpleCharPort LoadedSimpleChar
         , Time.every 1000 (\_ -> SaveModel ())
         , Browser.Events.onResize UpdateDevice
+        , succeededInBackupPort (\_ -> SucceededInBackup)
         ]
 
 

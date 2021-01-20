@@ -5,11 +5,13 @@ import localforage from 'localforage';
 import "regenerator-runtime/runtime.js";
 // The imported methods will use the File System
 // Access API or a fallback implementation.
-import { fileOpen } from 'browser-nativefs';
+import { fileOpen, fileSave } from 'browser-nativefs';
 
 var baseStorageKey = 'buyan-studio-';
 var modelStorageKey = baseStorageKey + 'model';
 var simpleCharSvgsStorageKey = baseStorageKey + 'simpleCharSvgs'
+var backupFileHandleStorageKey = baseStorageKey + 'backupFileHandle';
+var backupFileHandle;
 
 var browserLanguage = "LanguageEn";
 var tag = navigator.language;
@@ -47,6 +49,34 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
 
       if (savedModelJson !== null) {
         app.ports.getModelPort.send(savedModelJson);
+      }
+
+      localforage.getItem(backupFileHandleStorageKey, async function (error, handle) {
+        if (error !== null) {
+          console.error("Error getting backupFileHandle: ", error);
+          return;
+        }
+        if (handle === null) {
+          return;
+        }
+        backupFileHandle = handle;
+        app.ports.succeededInBackupPort.send(null);
+      });
+
+      async function verifyPermission(fileHandle) {
+        const options = {
+          model: 'readwrite'
+        };
+        // Check if permission was already granted. If so, return true.
+        if ((await fileHandle.queryPermission(options)) === 'granted') {
+          return true;
+        }
+        // Request permission. If the user grants permission, return true.
+        if ((await fileHandle.requestPermission(options)) === 'granted') {
+          return true;
+        }
+        // The user didn't grant permission, so return false.
+        return false;
       }
 
       app.ports.addSimpleCharsPort.subscribe(function () {
@@ -187,6 +217,62 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
             // console.log("Successfully saved model!");
           }
         });
+      });
+
+      app.ports.backupAsLocalFilePort.subscribe(backupAsLocalFile, function () { });
+
+      function backupAsLocalFile(model, callback) {
+        localforage.getItem(simpleCharSvgsStorageKey, async function (error, simpleCharSvgs) {
+          if (error !== null) {
+            console.error("Error getting saved simpleCharSvgs: ", error);
+            return;
+          }
+          if (simpleCharSvgs === null) {
+            return;
+          }
+          console.log("Backing up as local file...");
+          var json =
+          {
+            model: model
+            , simpleCharSvgs: simpleCharSvgs
+          };
+          var jsonString = JSON.stringify(json, null, 2);
+          var blob = new Blob(
+            [jsonString]
+            , { type: 'application/json' }
+          );
+          if (!(await verifyPermission(backupFileHandle))) {
+            return;
+          }
+          fileSave(blob, undefined, backupFileHandle)
+            .then(callback);
+        });
+      }
+
+      app.ports.updateBackupLocationPort.subscribe(function (model) {
+        var options = {
+          types: [
+            {
+              description: "Buyan Studio Backup File",
+              accept: {
+                "application/json": [".json"],
+              },
+            },
+          ],
+        };
+        window.showSaveFilePicker(options)
+          .then(function (handle) {
+            backupFileHandle = handle;
+            localforage.setItem(backupFileHandleStorageKey, handle, function (error) {
+              if (error !== null) {
+                console.error("Error saving backupFileHandle: ", error);
+              }
+              console.log("Saved backupFileHandle", handle);
+            });
+            backupAsLocalFile(model, function () {
+              app.ports.succeededInBackupPort.send(null);
+            });
+          })
       });
 
       localforage.getItem(simpleCharSvgsStorageKey, function (error, savedSimpleCharSvgs) {
