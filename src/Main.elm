@@ -2869,6 +2869,7 @@ renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize
     E.column
         [ E.centerX
         , E.centerY
+        , E.spacing (displayFontSize // 2)
         ]
     <|
         List.map
