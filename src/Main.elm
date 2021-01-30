@@ -2758,15 +2758,19 @@ appPreferencesPopUp ({ palette, spacing, fontSize, isBackingUp } as model) =
             }
         , if isBackingUp then
             E.row
-                [ E.spacing spacing.tiny
-                , E.centerX
+                [ E.centerX
                 ]
-                [ E.text "Backuped"
-                , E.html
-                    (FeatherIcons.check
-                        |> FeatherIcons.withSize (toFloat fontSize.thumb)
-                        |> FeatherIcons.toHtml []
-                    )
+                [ E.el
+                    [ E.paddingXY spacing.tiny 0 ]
+                    (E.text "Backuped")
+                , iconButton
+                    { icon =
+                        FeatherIcons.refreshCw
+                    , size =
+                        fontSize.thumb
+                    , onPress =
+                        Just UpdateBackupLocation
+                    }
                 ]
 
           else
@@ -2783,7 +2787,9 @@ appPreferencesPopUp ({ palette, spacing, fontSize, isBackingUp } as model) =
                     }
                 ]
         , E.row
-            [ E.spacing spacing.tiny ]
+            [ E.spacing spacing.tiny
+            , E.centerX
+            ]
             [ E.text "Upload backup"
             , iconButton
                 { icon =
