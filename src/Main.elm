@@ -312,11 +312,6 @@ maxBorderUnits =
     3.5
 
 
-minComponentSize : Float
-minComponentSize =
-    25
-
-
 init : Value -> ( Model, Cmd Msg )
 init flags =
     let
@@ -1750,7 +1745,8 @@ startDragging { index, scale } ({ isSnapToGrid, boxUnits } as model) =
     in
     ( updateActiveComponent
         (if isSnapToGrid then
-            updateMyCharRefPositionAndDimension unitPercent ScaleTopLeft (snapToGrid boxUnits) (snapToGrid boxUnits)
+            updateMyCharRefDimension (snapToGrid boxUnits)
+                << updateMyCharRefPosition (snapToGrid boxUnits)
 
          else
             identity
@@ -1838,7 +1834,7 @@ roundToUnitSize unitSize n =
 
 
 updateOnDrag : Float -> Vec2 -> Model -> Model
-updateOnDrag factor delta ({ activeScale, boxUnits, isAspectRatioLocked } as model) =
+updateOnDrag factor delta ({ activeScale, isAspectRatioLocked } as model) =
     updateActiveComponent
         (\char ->
             let
@@ -1847,9 +1843,6 @@ updateOnDrag factor delta ({ activeScale, boxUnits, isAspectRatioLocked } as mod
 
                 offsetPosition xDir yDir =
                     offsetDrag PositionOffset isAspectRatioLocked char.dimension factor xDir yDir delta
-
-                unitPercent =
-                    100 / toFloat boxUnits
             in
             (case activeScale of
                 NoScale ->
@@ -1857,60 +1850,36 @@ updateOnDrag factor delta ({ activeScale, boxUnits, isAspectRatioLocked } as mod
                         (Vector2.add <| Vector2.scale factor delta)
 
                 ScaleTopLeft ->
-                    updateMyCharRefPositionAndDimension
-                        unitPercent
-                        ScaleTopLeft
-                        (Vector2.add (offsetPosition 1 1))
-                        (Vector2.add (offsetDimension -1 -1))
-
+                    updateMyCharRefDimension (Vector2.add (offsetDimension -1 -1))
+                        << updateMyCharRefPosition (Vector2.add (offsetPosition 1 1))
+                
                 ScaleTopRight ->
-                    updateMyCharRefPositionAndDimension
-                        unitPercent
-                        ScaleTopRight
-                        (Vector2.add (offsetPosition 0 1))
-                        (Vector2.add (offsetDimension 1 -1))
-
+                    updateMyCharRefDimension (Vector2.add (offsetDimension 1 -1))
+                        << updateMyCharRefPosition (Vector2.add (offsetPosition 0 1))
+                
                 ScaleBottomLeft ->
-                    updateMyCharRefPositionAndDimension
-                        unitPercent
-                        ScaleBottomLeft
-                        (Vector2.add (offsetPosition 1 0))
-                        (Vector2.add (offsetDimension -1 1))
+                    updateMyCharRefDimension (Vector2.add (offsetDimension -1 1))
+                        << updateMyCharRefPosition (Vector2.add (offsetPosition 1 0))
 
                 ScaleBottomRight ->
-                    updateMyCharRefPositionAndDimension
-                        unitPercent
-                        ScaleBottomRight
-                        (Vector2.add (offsetPosition 0 0))
-                        (Vector2.add (offsetDimension 1 1))
-
+                    updateMyCharRefDimension (Vector2.add (offsetDimension 1 1))
+                        << updateMyCharRefPosition (Vector2.add (offsetPosition 0 0))
+                
                 ScaleLeft ->
-                    updateMyCharRefPositionAndDimension
-                        unitPercent
-                        ScaleTopLeft
-                        (Vector2.add (offsetPosition 1 0))
-                        (Vector2.add (offsetDimension -1 0))
-
+                    updateMyCharRefDimension (Vector2.add (offsetDimension -1 0))
+                        << updateMyCharRefPosition (Vector2.add (offsetPosition 1 1))
+                
                 ScaleRight ->
-                    updateMyCharRefPositionAndDimension
-                        unitPercent
-                        ScaleTopRight
-                        (Vector2.add (offsetPosition 0 0))
-                        (Vector2.add (offsetDimension 1 0))
-
+                    updateMyCharRefDimension (Vector2.add (offsetDimension 1 0))
+                        << updateMyCharRefPosition (Vector2.add (offsetPosition 0 0))
+                
                 ScaleTop ->
-                    updateMyCharRefPositionAndDimension
-                        unitPercent
-                        ScaleTopLeft
-                        (Vector2.add (offsetPosition 0 1))
-                        (Vector2.add (offsetDimension 0 -1))
-
+                    updateMyCharRefDimension (Vector2.add (offsetDimension 0 -1))
+                        << updateMyCharRefPosition (Vector2.add (offsetPosition 0 1))
+                
                 ScaleBottom ->
-                    updateMyCharRefPositionAndDimension
-                        unitPercent
-                        ScaleTopRight
-                        (Vector2.add (offsetPosition 0 0))
-                        (Vector2.add (offsetDimension 0 1))
+                    updateMyCharRefDimension (Vector2.add (offsetDimension 0 1))
+                        << updateMyCharRefPosition (Vector2.add (offsetPosition 0 0))
             )
                 char
         )
@@ -2018,7 +1987,10 @@ snapToGrid boxUnits position =
             100 / toFloat boxUnits
 
         roundToGrid pos =
-            (*) unitPercent <| toFloat <| round <| pos / unitPercent
+            if pos < unitPercent then
+                pos
+            else
+                (*) unitPercent <| toFloat <| round <| pos / unitPercent
     in
     Vector2.vec2
         (roundToGrid <| Vector2.getX position)
@@ -2339,156 +2311,39 @@ updateMyCharComponents func myChar =
             CompoundChar c (func components)
 
 
-updateMyCharRefPositionAndDimension : Float -> Scale -> (Vec2 -> Vec2) -> (Vec2 -> Vec2) -> MyCharRef -> MyCharRef
-updateMyCharRefPositionAndDimension unitPercent scale updatePos updateDim myCharRef =
-    let
-        oldDim =
-            myCharRef.dimension
-
-        oldPos =
-            myCharRef.position
-
-        updatedDim =
-            updateDim oldDim
-
-        updatedPos =
-            updatePos oldPos
-
-        minX =
-            if Vector2.getX oldDim < unitPercent then
-                Vector2.getX oldDim
-
-            else
-                minComponentSize
-
-        minY =
-            if Vector2.getY oldDim < unitPercent then
-                Vector2.getY oldDim
-
-            else
-                minComponentSize
-
-        scalePoint =
-            (case scale of
-                ScaleTopLeft ->
-                    identity
-
-                ScaleTopRight ->
-                    Vector2.add (Vector2.vec2 (Vector2.getX updatedDim) 0)
-
-                ScaleBottomLeft ->
-                    Vector2.add (Vector2.vec2 0 (Vector2.getY updatedDim))
-
-                ScaleBottomRight ->
-                    Vector2.add updatedDim
-
-                ScaleLeft ->
-                    \_ -> Vector2.setX (Vector2.getX updatedPos) myCharRef.position
-
-                ScaleRight ->
-                    Vector2.add (Vector2.vec2 (Vector2.getX updatedDim) 0)
-
-                ScaleTop ->
-                    \_ -> Vector2.setY (Vector2.getY updatedPos) myCharRef.position
-
-                ScaleBottom ->
-                    Vector2.add (Vector2.vec2 0 (Vector2.getY updatedDim))
-
-                NoScale ->
-                    identity
-            )
-                updatedPos
-
-        -- _ = Debug.log "positionClampResult" positionClampResult
-        -- _ = Debug.log "dimensionClampResult" dimensionClampResult
-        ( newPos, newDim ) =
-            mapTuple
-                (case ( clampVec2 0 100 0 100 scalePoint, clampVec2 minX 100 minY 100 updatedDim ) of
-                    ( ClampSafe _, ClampSafe dim ) ->
-                        ( \_ -> updatedPos, \_ -> dim )
-
-                    ( ClampSafeX _, ClampSafeX dimX ) ->
-                        ( Vector2.setX (Vector2.getX updatedPos), Vector2.setX dimX )
-
-                    ( ClampSafeY _, ClampSafeY dimY ) ->
-                        ( Vector2.setY (Vector2.getY updatedPos), Vector2.setY dimY )
-
-                    _ ->
-                        ( identity, identity )
-                )
-                ( myCharRef.position, myCharRef.dimension )
-    in
-    { myCharRef
-        | position =
-            newPos
-        , dimension =
-            newDim
-    }
-
-
-mapTuple : ( a -> x, b -> y ) -> ( a, b ) -> ( x, y )
-mapTuple ( mapA, mapB ) ( a, b ) =
-    ( mapA a, mapB b )
-
-
 updateMyCharRefPosition : (Vec2 -> Vec2) -> MyCharRef -> MyCharRef
 updateMyCharRefPosition func myCharRef =
     { myCharRef
         | position =
-            case
-                clampVec2 0
-                    (100 - Vector2.getX myCharRef.dimension)
-                    0
-                    (100 - Vector2.getY myCharRef.dimension)
-                    (func myCharRef.position)
-            of
-                ClampSafe newPos ->
-                    newPos
-
-                ClampSafeX posX ->
-                    Vector2.setX posX myCharRef.position
-
-                ClampSafeY posY ->
-                    Vector2.setY posY myCharRef.position
-
-                ClampUnsafe newPos ->
-                    newPos
+            func myCharRef.position
     }
 
 
-clampVec2 : Float -> Float -> Float -> Float -> Vec2 -> ClampResult
-clampVec2 minX maxX minY maxY vec =
-    let
-        x =
-            Vector2.getX vec
+updateMyCharDimension : (Vec2 -> Vec2) -> MyChar -> MyChar
+updateMyCharDimension func myChar =
+    case myChar of
+        SimpleChar c ->
+            SimpleChar
+                { c
+                    | dimension =
+                        func c.dimension
+                }
 
-        y =
-            Vector2.getY vec
-
-        isSafeX =
-            minX <= x && x <= maxX
-
-        isSafeY =
-            minY <= y && y <= maxY
-    in
-    if isSafeX && isSafeY then
-        ClampSafe vec
-
-    else if isSafeX then
-        ClampSafeX x
-
-    else if isSafeY then
-        ClampSafeY y
-
-    else
-        ClampUnsafe <| Vector2.vec2 (clamp minX maxX x) (clamp minY maxY y)
+        CompoundChar c components ->
+            CompoundChar
+                { c
+                    | dimension =
+                        func c.dimension
+                }
+                components
 
 
-type ClampResult
-    = ClampSafe Vec2
-    | ClampSafeX Float
-    | ClampSafeY Float
-    | ClampUnsafe Vec2
+updateMyCharRefDimension : (Vec2 -> Vec2) -> MyCharRef -> MyCharRef
+updateMyCharRefDimension func myCharRef =
+    { myCharRef
+        | dimension =
+            func myCharRef.dimension
+    }
 
 
 
