@@ -3024,7 +3024,7 @@ renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize
                                             | unitSize = toFloat displayFontSize / toFloat boxUnits
                                             , strokeWidth = strokeWidth * toFloat displayFontSize / (toFloat boxUnits * unitSize)
                                         }
-                                        { isThumbnail = True }
+                                        RenderModeDisplay
                                         myChar
 
                             Nothing ->
@@ -3539,7 +3539,7 @@ editor ({ selectedChar, chars, spacing, fontSize } as model) =
                         E.html <|
                             renderChar
                                 model
-                                { isThumbnail = False }
+                                RenderModeEditor
                                 (myCharFromChar chars char)
 
                     Nothing ->
@@ -3878,7 +3878,7 @@ charCard ({ activeComponentIndex, unitSize, thumbnailUnitSize, boxUnits, strokeW
                             )
                             selectedChar
                 }
-                { isThumbnail = True }
+                RenderModeThumbnail
                 myChar
         ]
 
@@ -3906,8 +3906,14 @@ isMyCharType myCharType myChar =
             False
 
 
-renderChar : Model -> { isThumbnail : Bool } -> MyChar -> Svg Msg
-renderChar ({ unitSize, boxUnits, borderUnits, strokeWidth } as model) { isThumbnail } myChar =
+type RenderMode
+    = RenderModeEditor
+    | RenderModeThumbnail
+    | RenderModeDisplay
+
+
+renderChar : Model -> RenderMode -> MyChar -> Svg Msg
+renderChar ({ unitSize, boxUnits, borderUnits, strokeWidth } as model) renderMode myChar =
     let
         boxSize =
             toFloat boxUnits * unitSize
@@ -3917,7 +3923,7 @@ renderChar ({ unitSize, boxUnits, borderUnits, strokeWidth } as model) { isThumb
 
         outerBoxSize =
             boxSize + 2 * minBorderSize
-
+        
         borderSize =
             borderUnits * unitSize
 
@@ -3929,20 +3935,33 @@ renderChar ({ unitSize, boxUnits, borderUnits, strokeWidth } as model) { isThumb
 
         offset =
             borderUnits * unitSize
-
+        
         charClassName =
             "char-with-size-" ++ (String.fromInt <| round strokeWidth)
+        
+        dimension =
+            (calculateMyCharDimension myChar).dimension
+
+        widthPercent =
+            (Vector2.getX dimension) / 100
     in
     Svg.svg
-        ([ SvgAttributes.width <| SvgTypes.px <| outerBoxSize
+        ([ SvgAttributes.width <| SvgTypes.px <|
+            case renderMode of
+                RenderModeDisplay ->
+                    (widthPercent + 0.2) * outerBoxSize
+
+                _ ->
+                    outerBoxSize
          , SvgAttributes.height <| SvgTypes.px <| outerBoxSize
          , Html.Attributes.style "pointer-events" "none"
          ]
-            ++ (if isThumbnail then
-                    [ SvgAttributes.id ("char-" ++ String.fromChar (charFromMyChar myChar)) ]
+            ++ (case renderMode of
+                    RenderModeThumbnail ->
+                        [ SvgAttributes.id ("char-" ++ String.fromChar (charFromMyChar myChar)) ]
 
-                else
-                    []
+                    _ ->
+                        []
                )
         )
         [ Svg.defs []
@@ -3968,19 +3987,33 @@ renderChar ({ unitSize, boxUnits, borderUnits, strokeWidth } as model) { isThumb
                 ]
             ]
         , Svg.svg
-            [ SvgAttributes.width <| SvgTypes.px scaledBoxSize
-            , SvgAttributes.height <| SvgTypes.px scaledBoxSize
-            , SvgAttributes.x <| SvgTypes.px offset
-            , SvgAttributes.y <| SvgTypes.px offset
-            , Html.Attributes.style "pointer-events" "none"
-            ]
+            (case renderMode of
+                RenderModeDisplay ->
+                    [ SvgAttributes.viewBox 0 0 0.82 1
+                    , SvgAttributes.preserveAspectRatio
+                        (SvgTypes.Align SvgTypes.ScaleMid SvgTypes.ScaleMid)
+                        SvgTypes.Meet
+                    , Html.Attributes.style "pointer-events" "none"
+                    ]
+                _ ->
+                    [ SvgAttributes.width <| SvgTypes.px scaledBoxSize
+                    , SvgAttributes.height <| SvgTypes.px scaledBoxSize
+                    , SvgAttributes.x <| SvgTypes.px offset
+                    , SvgAttributes.y <| SvgTypes.px offset
+                    ]
+            )
             [ renderCharHelper
                 { model
                     | unitSize = scaledUnitSize
                 }
                 { charClassName = charClassName
                 , index = -1
-                , isThumbnail = isThumbnail
+                , isStatic =
+                    case renderMode of
+                        RenderModeEditor ->
+                            False
+                        _ ->
+                            True
                 , tightDimension =
                     { position = Vector2.vec2 0 0, dimension = Vector2.vec2 100 100 }
                 , parentMyCharType =
@@ -3992,19 +4025,28 @@ renderChar ({ unitSize, boxUnits, borderUnits, strokeWidth } as model) { isThumb
         ]
 
 
+myCharRefFromMyChar : MyChar -> MyCharRef
+myCharRefFromMyChar myChar =
+    case myChar of
+        SimpleChar ref ->
+            ref
+        CompoundChar ref _ ->
+            ref
+
+
 renderCharHelper :
     Model
     ->
         { charClassName : String
         , index : Int
-        , isThumbnail : Bool
+        , isStatic : Bool
         , tightDimension : { position : Vec2, dimension : Vec2 }
         , parentMyCharType : MyCharType
         }
     -> Int
     -> MyChar
     -> Svg Msg
-renderCharHelper ({ boxUnits, chars, simpleCharSvgs, activeComponentIndex, palette, fontSize } as model) { charClassName, index, isThumbnail, tightDimension, parentMyCharType } level myChar =
+renderCharHelper ({ boxUnits, chars, simpleCharSvgs, activeComponentIndex, palette, fontSize } as model) { charClassName, index, isStatic, tightDimension, parentMyCharType } level myChar =
     let
         char =
             charFromMyChar myChar
@@ -4013,7 +4055,7 @@ renderCharHelper ({ boxUnits, chars, simpleCharSvgs, activeComponentIndex, palet
             index + (level - 1) * 10
 
         isDraggable =
-            not (isThumbnail || level > 1)
+            not (isStatic || level > 1)
 
         constraint charType dimension position contents =
             let
@@ -4053,7 +4095,7 @@ renderCharHelper ({ boxUnits, chars, simpleCharSvgs, activeComponentIndex, palet
                         }
                 )
             <|
-                if Just levelwiseIndex == activeComponentIndex && not isThumbnail then
+                if Just levelwiseIndex == activeComponentIndex && not isStatic then
                     styledContents
                         ++ (activeComponentButtons parentMyCharType model
                                 :: (if Vector2.getX dimension < unitPercent then
@@ -4187,7 +4229,7 @@ renderCharHelper ({ boxUnits, chars, simpleCharSvgs, activeComponentIndex, palet
                                 model
                                 { charClassName = charClassName
                                 , index = componentIndex
-                                , isThumbnail = isThumbnail
+                                , isStatic = isStatic
                                 , tightDimension =
                                     if level >= 1 then
                                         calculateMyCharDimension myChar
