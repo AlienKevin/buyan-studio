@@ -826,7 +826,7 @@ selectedReferenceImage file model =
 uploadReferenceImage : Model -> ( Model, Cmd Msg )
 uploadReferenceImage model =
     ( model
-    , File.Select.file [ "image/jpeg", "image/png" ] SelectedReferenceImage
+    , File.Select.file [ "image/jpeg", "image/png", "image/webp" ] SelectedReferenceImage
     )
 
 
