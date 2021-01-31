@@ -19,6 +19,12 @@
     "characterNotFound": "Character \"{{char}}\" is not found",
     "explaination": "Explaination",
     "referenceImage": "Reference image",
+    "script": "Script",
+    "scriptName": {
+        "oracle": "Oracle",
+        "bronze": "Bronze",
+        "seal": "Seal"
+    },
     "period": "Period",
     "periodName": {
         "shang": "Shang",

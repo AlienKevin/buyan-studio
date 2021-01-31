@@ -36,6 +36,7 @@ import Translations
 import Translations.CharType
 import Translations.PeriodName
 import Translations.StageName
+import Translations.ScriptName
 import TypedSvg as Svg
 import TypedSvg.Attributes as SvgAttributes
 import TypedSvg.Core exposing (Svg)
@@ -461,6 +462,7 @@ type Msg
     | UpdateReferenceImageOrigin String
     | UpdateReferenceImagePeriod Period
     | UpdateReferenceImageStage Stage
+    | UpdateReferenceImageScript Script
     | UpdateReferenceImageUrl String
     | UpdateBackupLocation
     | SucceededInBackup
@@ -622,6 +624,9 @@ update msg model =
 
         UpdateReferenceImageStage stage ->
             updateReferenceImageStage stage model
+        
+        UpdateReferenceImageScript script ->
+            updateReferenceImageScript script model
 
         UpdateReferenceImageUrl url ->
             updateReferenceImageUrl url model
@@ -698,6 +703,20 @@ updateReferenceImageUrl url model =
                 { referenceImage
                     | url =
                         url
+                }
+            )
+        )
+        model
+
+
+updateReferenceImageScript : Script -> Model -> ( Model, Cmd Msg )
+updateReferenceImageScript script model =
+    updateReferenceImage
+        (Maybe.map
+            (\referenceImage ->
+                { referenceImage
+                    | script =
+                        script
                 }
             )
         )
@@ -3151,14 +3170,15 @@ charExplaination { palette, fontSize, spacing, selectedChar, charExplainations, 
                         , Input.text
                             [ E.width E.fill
                             , Font.alignLeft
-                            , E.onRight <|
+                            , E.below <|
                                 if String.isEmpty referenceImage.url then
                                     E.none
 
                                 else
                                     E.newTabLink
                                         [ E.centerY
-                                        , E.paddingXY spacing.small 0
+                                        , E.alignRight
+                                        , E.paddingXY 0 spacing.small
                                         ]
                                         { url =
                                             referenceImage.url
@@ -3188,6 +3208,23 @@ charExplaination { palette, fontSize, spacing, selectedChar, charExplainations, 
                         , E.alignTop
                         ]
                         [ Input.radio
+                            [ E.spacing spacing.small
+                            ]
+                            { onChange = UpdateReferenceImageScript
+                            , selected = Just referenceImage.script
+                            , label =
+                                Input.labelAbove [ E.alignLeft, E.paddingEach { top = 0, bottom = spacing.small, left = 0, right = 0 } ]
+                                    (E.text <| Translations.script trs)
+                            , options =
+                                [ Input.optionWith Oracle
+                                    (radioOption palette.lightFg fontSize (E.text <| Translations.ScriptName.oracle trs))
+                                , Input.optionWith Bronze
+                                    (radioOption palette.lightFg fontSize (E.text <| Translations.ScriptName.bronze trs))
+                                , Input.optionWith Seal
+                                    (radioOption palette.lightFg fontSize (E.text <| Translations.ScriptName.seal trs))
+                                ]
+                            }
+                        , Input.radio
                             [ E.spacing spacing.small
                             ]
                             { onChange = UpdateReferenceImagePeriod

@@ -87,6 +87,11 @@ referenceImage translations =
     t translations "referenceImage"
 
 
+script : Translations -> String
+script translations =
+    t translations "script"
+
+
 period : Translations -> String
 period translations =
     t translations "period"
