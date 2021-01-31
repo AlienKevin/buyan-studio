@@ -3822,31 +3822,26 @@ renderChar ({ unitSize, boxUnits, borderUnits, strokeWidth } as model) renderMod
         dimension =
             (calculateMyCharDimension myChar).dimension
 
-        widthPercent =
-            Vector2.getX dimension / 100
+        width =
+            Vector2.getX dimension
+
+        margin =
+            15
+        
+        renderedMargin =
+            margin - (100 - width) * (0.5 - 1/100 * margin)
     in
     Svg.svg
-        ([ SvgAttributes.width <|
-            SvgTypes.px <|
-                case renderMode of
-                    RenderModeDisplay ->
-                        (widthPercent + 0.2) * outerBoxSize
-
-                    _ ->
-                        outerBoxSize
-         , SvgAttributes.height <|
-            SvgTypes.px <|
-                case renderMode of
-                    RenderModeDisplay ->
-                        (widthPercent + 0.2) * outerBoxSize * 0.9
-
-                    _ ->
-                        outerBoxSize
+        ([ SvgAttributes.width <| SvgTypes.px outerBoxSize
+         , SvgAttributes.height <| SvgTypes.px outerBoxSize
          , Html.Attributes.style "pointer-events" "none"
          ]
             ++ (case renderMode of
                     RenderModeThumbnail ->
                         [ SvgAttributes.id ("char-" ++ String.fromChar (charFromMyChar myChar)) ]
+                    
+                    RenderModeDisplay ->
+                        [ Html.Attributes.style "margin" <| "0 " ++ (String.fromFloat renderedMargin) ]
 
                     _ ->
                         []
@@ -3877,11 +3872,7 @@ renderChar ({ unitSize, boxUnits, borderUnits, strokeWidth } as model) renderMod
         , Svg.svg
             (case renderMode of
                 RenderModeDisplay ->
-                    [ SvgAttributes.viewBox 0 0 0.82 1
-                    , SvgAttributes.preserveAspectRatio
-                        (SvgTypes.Align SvgTypes.ScaleMid SvgTypes.ScaleMid)
-                        SvgTypes.Meet
-                    , Html.Attributes.style "pointer-events" "none"
+                    [ Html.Attributes.style "pointer-events" "none"
                     ]
 
                 _ ->
