@@ -137,7 +137,7 @@ type alias ReferenceImage =
     , time :
         Maybe
             { period : Period
-            , stage : Stage
+            , stage : Maybe Stage
             }
     , script : Script
     , url : String
@@ -713,16 +713,23 @@ updateReferenceImageStage stage model =
                     | time =
                         case referenceImage.time of
                             Just time ->
-                                Just
-                                    { time
-                                        | stage =
-                                            stage
-                                    }
+                                if time.stage == Just stage then
+                                    Just
+                                        { time
+                                            | stage =
+                                                Nothing
+                                        }
+                                else
+                                    Just
+                                        { time
+                                            | stage =
+                                                Just stage
+                                        }
 
                             Nothing ->
                                 Just
                                     { stage =
-                                        stage
+                                        Just stage
                                     , period =
                                         Shang
                                     }
@@ -752,7 +759,7 @@ updateReferenceImagePeriod period model =
                                     { period =
                                         period
                                     , stage =
-                                        Early
+                                        Nothing
                                     }
                 }
             )
@@ -1375,9 +1382,16 @@ encodeReferenceImage { image, origin, time, script, url } =
                     Just { period, stage } ->
                         [ ( "time"
                           , Encode.object
-                                [ ( "period", encodePeriod period )
-                                , ( "stage", encodeStage stage )
-                                ]
+                                ([ ( "period", encodePeriod period )
+                                 ]
+                                    ++ (case stage of
+                                            Just s ->
+                                                [ ( "stage", encodeStage s ) ]
+
+                                            Nothing ->
+                                                []
+                                       )
+                                )
                           )
                         ]
 
@@ -1556,7 +1570,7 @@ decodeReferenceImage =
                         }
                     )
                     (Decode.field "period" decodePeriod)
-                    (Decode.field "stage" decodeStage)
+                    (Decode.maybe <| Decode.field "stage" decodeStage)
         )
         (Decode.field "script" decodeScript)
         (Decode.field "url" Decode.string)
@@ -1852,11 +1866,11 @@ updateOnDrag factor delta ({ activeScale, isAspectRatioLocked } as model) =
                 ScaleTopLeft ->
                     updateMyCharRefDimension (Vector2.add (offsetDimension -1 -1))
                         << updateMyCharRefPosition (Vector2.add (offsetPosition 1 1))
-                
+
                 ScaleTopRight ->
                     updateMyCharRefDimension (Vector2.add (offsetDimension 1 -1))
                         << updateMyCharRefPosition (Vector2.add (offsetPosition 0 1))
-                
+
                 ScaleBottomLeft ->
                     updateMyCharRefDimension (Vector2.add (offsetDimension -1 1))
                         << updateMyCharRefPosition (Vector2.add (offsetPosition 1 0))
@@ -1864,19 +1878,19 @@ updateOnDrag factor delta ({ activeScale, isAspectRatioLocked } as model) =
                 ScaleBottomRight ->
                     updateMyCharRefDimension (Vector2.add (offsetDimension 1 1))
                         << updateMyCharRefPosition (Vector2.add (offsetPosition 0 0))
-                
+
                 ScaleLeft ->
                     updateMyCharRefDimension (Vector2.add (offsetDimension -1 0))
                         << updateMyCharRefPosition (Vector2.add (offsetPosition 1 1))
-                
+
                 ScaleRight ->
                     updateMyCharRefDimension (Vector2.add (offsetDimension 1 0))
                         << updateMyCharRefPosition (Vector2.add (offsetPosition 0 0))
-                
+
                 ScaleTop ->
                     updateMyCharRefDimension (Vector2.add (offsetDimension 0 -1))
                         << updateMyCharRefPosition (Vector2.add (offsetPosition 0 1))
-                
+
                 ScaleBottom ->
                     updateMyCharRefDimension (Vector2.add (offsetDimension 0 1))
                         << updateMyCharRefPosition (Vector2.add (offsetPosition 0 0))
@@ -1989,6 +2003,7 @@ snapToGrid boxUnits position =
         roundToGrid pos =
             if pos < unitPercent then
                 pos
+
             else
                 (*) unitPercent <| toFloat <| round <| pos / unitPercent
     in
@@ -3188,7 +3203,7 @@ charExplaination { palette, fontSize, spacing, selectedChar, charExplainations, 
                             [ E.spacing spacing.small
                             ]
                             { onChange = UpdateReferenceImageStage
-                            , selected = Maybe.map .stage referenceImage.time
+                            , selected = Maybe.andThen .stage referenceImage.time
                             , label =
                                 Input.labelAbove [ E.alignLeft, E.paddingEach { top = 0, bottom = spacing.small, left = 0, right = 0 } ]
                                     (E.text <| Translations.stage trs)
@@ -3785,7 +3800,7 @@ renderChar ({ unitSize, boxUnits, borderUnits, strokeWidth } as model) renderMod
 
         outerBoxSize =
             boxSize + 2 * minBorderSize
-        
+
         borderSize =
             borderUnits * unitSize
 
@@ -3797,31 +3812,33 @@ renderChar ({ unitSize, boxUnits, borderUnits, strokeWidth } as model) renderMod
 
         offset =
             borderUnits * unitSize
-        
+
         charClassName =
             "char-with-size-" ++ (String.fromInt <| round strokeWidth)
-        
+
         dimension =
             (calculateMyCharDimension myChar).dimension
 
         widthPercent =
-            (Vector2.getX dimension) / 100
+            Vector2.getX dimension / 100
     in
     Svg.svg
-        ([ SvgAttributes.width <| SvgTypes.px <|
-            case renderMode of
-                RenderModeDisplay ->
-                    (widthPercent + 0.2) * outerBoxSize
+        ([ SvgAttributes.width <|
+            SvgTypes.px <|
+                case renderMode of
+                    RenderModeDisplay ->
+                        (widthPercent + 0.2) * outerBoxSize
 
-                _ ->
-                    outerBoxSize
-         , SvgAttributes.height <| SvgTypes.px <|
-            case renderMode of
-                RenderModeDisplay ->
-                    (widthPercent + 0.2) * outerBoxSize * 0.9
+                    _ ->
+                        outerBoxSize
+         , SvgAttributes.height <|
+            SvgTypes.px <|
+                case renderMode of
+                    RenderModeDisplay ->
+                        (widthPercent + 0.2) * outerBoxSize * 0.9
 
-                _ ->
-                    outerBoxSize
+                    _ ->
+                        outerBoxSize
          , Html.Attributes.style "pointer-events" "none"
          ]
             ++ (case renderMode of
@@ -3863,6 +3880,7 @@ renderChar ({ unitSize, boxUnits, borderUnits, strokeWidth } as model) renderMod
                         SvgTypes.Meet
                     , Html.Attributes.style "pointer-events" "none"
                     ]
+
                 _ ->
                     [ SvgAttributes.width <| SvgTypes.px scaledBoxSize
                     , SvgAttributes.height <| SvgTypes.px scaledBoxSize
@@ -3880,6 +3898,7 @@ renderChar ({ unitSize, boxUnits, borderUnits, strokeWidth } as model) renderMod
                     case renderMode of
                         RenderModeEditor ->
                             False
+
                         _ ->
                             True
                 , tightDimension =
@@ -3898,6 +3917,7 @@ myCharRefFromMyChar myChar =
     case myChar of
         SimpleChar ref ->
             ref
+
         CompoundChar ref _ ->
             ref
 
