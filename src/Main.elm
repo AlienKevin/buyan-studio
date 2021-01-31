@@ -748,11 +748,14 @@ updateReferenceImagePeriod period model =
                     | time =
                         case referenceImage.time of
                             Just time ->
-                                Just
-                                    { time
-                                        | period =
-                                            period
-                                    }
+                                if time.period == period then
+                                    Nothing
+                                else
+                                    Just
+                                        { time
+                                            | period =
+                                                period
+                                        }
 
                             Nothing ->
                                 Just
