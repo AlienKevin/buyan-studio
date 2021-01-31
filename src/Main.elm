@@ -2887,7 +2887,6 @@ renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize
     E.column
         [ E.centerX
         , E.centerY
-        , E.spacing (displayFontSize // 2)
         ]
     <|
         List.map
@@ -2898,6 +2897,11 @@ renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize
                     (\char ->
                         case Dict.get char chars of
                             Just myChar ->
+                                E.el
+                                [ E.htmlAttribute <|
+                                    Html.Attributes.style "margin" <|
+                                        String.fromInt (displayFontSize // 4) ++ "px 0"
+                                ] <|
                                 E.html <|
                                     renderChar
                                         { model
