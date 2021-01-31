@@ -3815,7 +3815,13 @@ renderChar ({ unitSize, boxUnits, borderUnits, strokeWidth } as model) renderMod
 
                 _ ->
                     outerBoxSize
-         , SvgAttributes.height <| SvgTypes.px <| outerBoxSize
+         , SvgAttributes.height <| SvgTypes.px <|
+            case renderMode of
+                RenderModeDisplay ->
+                    (widthPercent + 0.2) * outerBoxSize * 0.9
+
+                _ ->
+                    outerBoxSize
          , Html.Attributes.style "pointer-events" "none"
          ]
             ++ (case renderMode of
