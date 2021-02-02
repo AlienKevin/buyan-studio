@@ -266,6 +266,11 @@ type alias Mirror =
     { x : Bool, y: Bool }
 
 
+type MirrorDirection
+    = MirrorDirectionX
+    | MirrorDirectionY
+
+
 emptyMirror : Mirror
 emptyMirror =
     { x = False, y = False }
@@ -450,7 +455,7 @@ type Msg
     | StopDragging
     | DragMsg (Draggable.Msg DragData)
     | SetActiveComponent (Maybe Int)
-    | VerticalMirrorActiveComponent
+    | MirrorActiveComponent MirrorDirection
     | CopyActiveComponent
     | DeleteActiveComponent
     | GotModel Value
@@ -565,9 +570,9 @@ update msg model =
         SetActiveComponent index ->
             setActiveComponent index model
         
-        VerticalMirrorActiveComponent ->
-            verticalMirrorActiveComponent model
-
+        MirrorActiveComponent mirrorDirection ->
+            mirrorActiveComponent mirrorDirection model
+        
         CopyActiveComponent ->
             copyActiveComponent model
 
@@ -1139,8 +1144,8 @@ updateLanguage language model =
     )
 
 
-verticalMirrorActiveComponent : Model -> ( Model, Cmd Msg )
-verticalMirrorActiveComponent ({ activeComponentIndex } as model) =
+mirrorActiveComponent : MirrorDirection -> Model -> ( Model, Cmd Msg )
+mirrorActiveComponent direction ({ activeComponentIndex } as model) =
     ( { model
         | chars =
             Maybe.map
@@ -1155,14 +1160,21 @@ verticalMirrorActiveComponent ({ activeComponentIndex } as model) =
                                         let
                                             oldMirror =
                                                 component.mirror
-                                            _ = Debug.log "mirror" oldMirror
                                         in
                                         { component
                                             | mirror =
-                                                { oldMirror
-                                                    | y =
-                                                        not oldMirror.y
-                                                }
+                                                case direction of
+                                                    MirrorDirectionX ->
+                                                        { oldMirror
+                                                            | x =
+                                                                not oldMirror.x
+                                                        }
+
+                                                    MirrorDirectionY ->
+                                                        { oldMirror
+                                                            | y =
+                                                                not oldMirror.y
+                                                        }
                                         }
                                     )
                                 )
@@ -4281,19 +4293,35 @@ activeComponentButtons charType ({ palette } as model) =
 
             CompoundCharType ->
                 [ aspectRatioLockButton model
-                , verticalMirrorButton model
+                , mirrorXButton model
+                , mirrorYButton model
                 , copyActiveComponentButton model
                 , deleteActiveComponentButton model
                 ]
 
 
-verticalMirrorButton : Model -> Svg Msg
-verticalMirrorButton { palette, spacing, fontSize } =
-    activeComponentButton fontSize (-1.5 * toFloat fontSize.title - toFloat spacing.small) verticalMirrorIcon palette.darkFg VerticalMirrorActiveComponent
+mirrorXButton : Model -> Svg Msg
+mirrorXButton { palette, fontSize } =
+    activeComponentButton
+        fontSize
+        (-0.5 * toFloat fontSize.title)
+        mirrorXIcon
+        palette.darkFg
+        (MirrorActiveComponent MirrorDirectionY)
 
 
-horizontalMirrorIcon : FeatherIcons.Icon
-horizontalMirrorIcon =
+mirrorYButton : Model -> Svg Msg
+mirrorYButton { palette, spacing, fontSize } =
+    activeComponentButton
+    fontSize
+    (-1.5 * toFloat fontSize.title - toFloat spacing.small)
+    mirrorYIcon
+    palette.darkFg
+    (MirrorActiveComponent MirrorDirectionX)
+
+
+mirrorXIcon : FeatherIcons.Icon
+mirrorXIcon =
     [ Svg.polygon
         [ SvgAttributes.points [ (50, 50), (450, 50), (250, 180) ] ] []
     , Svg.line
@@ -4313,8 +4341,8 @@ horizontalMirrorIcon =
     |> FeatherIcons.withViewBox "0 0 500 500"
 
 
-verticalMirrorIcon : FeatherIcons.Icon
-verticalMirrorIcon =
+mirrorYIcon : FeatherIcons.Icon
+mirrorYIcon =
     [ Svg.polygon
         [ SvgAttributes.points [ (50, 100), (50, 400), (180, 250) ] ] []
     , Svg.line
