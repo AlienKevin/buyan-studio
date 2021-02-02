@@ -258,7 +258,17 @@ type alias MyCharRef =
     { char : Char
     , dimension : Vec2
     , position : Vec2
+    , mirror: Mirror
     }
+
+
+type alias Mirror =
+    { x : Bool, y: Bool }
+
+
+emptyMirror : Mirror
+emptyMirror =
+    { x = False, y = False }
 
 
 emptyMyChar : MyChar
@@ -267,6 +277,7 @@ emptyMyChar =
         { char = '?'
         , dimension = Vector2.vec2 0 0
         , position = Vector2.vec2 0 0
+        , mirror = emptyMirror
         }
 
 
@@ -439,6 +450,7 @@ type Msg
     | StopDragging
     | DragMsg (Draggable.Msg DragData)
     | SetActiveComponent (Maybe Int)
+    | VerticalMirrorActiveComponent
     | CopyActiveComponent
     | DeleteActiveComponent
     | GotModel Value
@@ -552,6 +564,9 @@ update msg model =
 
         SetActiveComponent index ->
             setActiveComponent index model
+        
+        VerticalMirrorActiveComponent ->
+            verticalMirrorActiveComponent model
 
         CopyActiveComponent ->
             copyActiveComponent model
@@ -1124,6 +1139,43 @@ updateLanguage language model =
     )
 
 
+verticalMirrorActiveComponent : Model -> ( Model, Cmd Msg )
+verticalMirrorActiveComponent ({ activeComponentIndex } as model) =
+    ( { model
+        | chars =
+            Maybe.map
+                (\selectedChar ->
+                    Dict.update
+                        selectedChar
+                        (Maybe.map <|
+                            updateMyCharComponents
+                                (List.Extra.updateAt
+                                    (Maybe.withDefault -1 activeComponentIndex)
+                                    (\component ->
+                                        let
+                                            oldMirror =
+                                                component.mirror
+                                            _ = Debug.log "mirror" oldMirror
+                                        in
+                                        { component
+                                            | mirror =
+                                                { oldMirror
+                                                    | y =
+                                                        not oldMirror.y
+                                                }
+                                        }
+                                    )
+                                )
+                        )
+                        model.chars
+                )
+                model.selectedChar
+                |> Maybe.withDefault model.chars
+      }
+    , Cmd.none
+    )
+
+
 deleteActiveComponent : Model -> ( Model, Cmd Msg )
 deleteActiveComponent ({ activeComponentIndex } as model) =
     ( { model
@@ -1190,6 +1242,7 @@ copyActiveComponent ({ activeComponentIndex, isSnapToGrid, boxUnits } as model) 
                                                         { char = component.char
                                                         , dimension = component.dimension
                                                         , position = copiedPosition
+                                                        , mirror = component.mirror
                                                         }
                                                 in
                                                 CompoundChar c (components ++ [ copiedComponent ])
@@ -1511,11 +1564,23 @@ encodeMyChar myChar =
 
 
 encodeMyCharRef : MyCharRef -> Value
-encodeMyCharRef { char, dimension, position } =
-    Encode.object
+encodeMyCharRef { char, dimension, position, mirror } =
+    Encode.object <|
         [ ( "char", encodeChar char )
         , ( "dimension", encodeVec2 dimension )
         , ( "position", encodeVec2 position )
+        ]
+        ++ if mirror /= emptyMirror then
+            [ ( "mirror", encodeMirror mirror ) ]
+        else
+            []
+
+
+encodeMirror : Mirror -> Value
+encodeMirror mirror =
+    Encode.object
+        [ ( "x", Encode.bool mirror.x )
+        , ( "y", Encode.bool mirror.y )
         ]
 
 
@@ -1733,10 +1798,18 @@ decodeMyChar =
 
 decodeMyCharRef : Decoder MyCharRef
 decodeMyCharRef =
-    Decode.map3 MyCharRef
+    Decode.map4 MyCharRef
         (Decode.field "char" decodeChar)
         (Decode.field "dimension" decodeVec2)
         (Decode.field "position" decodeVec2)
+        (Decode.map (Maybe.withDefault emptyMirror) <| Decode.maybe <| Decode.field "mirror" decodeMirror)
+
+
+decodeMirror : Decoder Mirror
+decodeMirror =
+    Decode.map2 Mirror
+        (Decode.field "x" Decode.bool)
+        (Decode.field "y" Decode.bool)
 
 
 decodeVec2 : Decoder Vec2
@@ -2064,6 +2137,7 @@ addComponentToMyChar chars componentChar myChar =
                         { char = componentChar
                         , dimension = dimension
                         , position = position
+                        , mirror = emptyMirror
                         }
                 in
                 CompoundChar
@@ -2186,6 +2260,7 @@ addPendingCompoundChar model =
                 { char = newChar
                 , dimension = Vector2.vec2 100 100
                 , position = Vector2.vec2 0 0
+                , mirror = emptyMirror
                 }
                 []
     in
@@ -2293,6 +2368,7 @@ gotNewSimpleChars svgsJson model =
                                     { char = char
                                     , dimension = dimension
                                     , position = position
+                                    , mirror = emptyMirror
                                     }
                                 )
                         )
@@ -3938,6 +4014,7 @@ renderChar ({ unitSize, boxUnits, borderUnits, strokeWidth } as model) renderMod
                             True
                 , tightDimension =
                     { position = Vector2.vec2 0 0, dimension = Vector2.vec2 100 100 }
+                , mirror = emptyMirror
                 , parentMyCharType =
                     myCharTypeFromMyChar myChar
                 }
@@ -3964,12 +4041,13 @@ renderCharHelper :
         , index : Int
         , isStatic : Bool
         , tightDimension : { position : Vec2, dimension : Vec2 }
+        , mirror : Mirror
         , parentMyCharType : MyCharType
         }
     -> Int
     -> MyChar
     -> Svg Msg
-renderCharHelper ({ boxUnits, chars, simpleCharSvgs, activeComponentIndex, palette, fontSize } as model) { charClassName, index, isStatic, tightDimension, parentMyCharType } level myChar =
+renderCharHelper ({ boxUnits, chars, simpleCharSvgs, activeComponentIndex, palette, fontSize } as model) { charClassName, index, isStatic, tightDimension, parentMyCharType, mirror } level myChar =
     let
         char =
             charFromMyChar myChar
@@ -3994,8 +4072,25 @@ renderCharHelper ({ boxUnits, chars, simpleCharSvgs, activeComponentIndex, palet
                 styledContents =
                     case charType of
                         SimpleCharType ->
+                            let
+                                _ = Debug.log "render mirror" mirror
+                            in
                             [ Svg.g
-                                [ SvgAttributes.class [ charClassName ] ]
+                                ((SvgAttributes.class [ charClassName ])
+                                    :: if mirror /= emptyMirror then
+                                        let
+                                            _ = Debug.log "render mirror" mirror
+                                        in
+                                        [ SvgAttributes.transform
+                                            [ SvgTypes.Scale
+                                                (if mirror.x then -1 else 1)
+                                                (if mirror.y then -1 else 1)
+                                            ]
+                                        , Html.Attributes.style "transform-origin" "center"
+                                        ]
+                                    else
+                                        []
+                                )
                                 contents
                             ]
 
@@ -4146,7 +4241,7 @@ renderCharHelper ({ boxUnits, chars, simpleCharSvgs, activeComponentIndex, palet
         CompoundChar { dimension, position } components ->
             constraint CompoundCharType dimension position <|
                 List.indexedMap
-                    (\componentIndex ->
+                    (\componentIndex componentRef ->
                         (\component ->
                             renderCharHelper
                                 model
@@ -4159,12 +4254,13 @@ renderCharHelper ({ boxUnits, chars, simpleCharSvgs, activeComponentIndex, palet
 
                                     else
                                         { position = Vector2.vec2 0 0, dimension = Vector2.vec2 100 100 }
+                                , mirror = componentRef.mirror
                                 , parentMyCharType = parentMyCharType
                                 }
                                 (level + 1)
                                 component
                         )
-                            << myCharFromMyCharRef chars
+                            <| myCharFromMyCharRef chars componentRef
                     )
                     components
 
@@ -4185,19 +4281,67 @@ activeComponentButtons charType ({ palette } as model) =
 
             CompoundCharType ->
                 [ aspectRatioLockButton model
+                , verticalMirrorButton model
                 , copyActiveComponentButton model
                 , deleteActiveComponentButton model
                 ]
 
 
+verticalMirrorButton : Model -> Svg Msg
+verticalMirrorButton { palette, spacing, fontSize } =
+    activeComponentButton fontSize (-1.5 * toFloat fontSize.title - toFloat spacing.small) verticalMirrorIcon palette.darkFg VerticalMirrorActiveComponent
+
+
+horizontalMirrorIcon : FeatherIcons.Icon
+horizontalMirrorIcon =
+    [ Svg.polygon
+        [ SvgAttributes.points [ (50, 50), (450, 50), (250, 180) ] ] []
+    , Svg.line
+        [ SvgAttributes.x1 <| SvgTypes.px 50
+        , SvgAttributes.y1 <| SvgTypes.px 250
+        , SvgAttributes.x2 <| SvgTypes.px 450
+        , SvgAttributes.y2 <| SvgTypes.px 250
+        , SvgAttributes.strokeDasharray "60, 100"
+        ]
+        []
+    , Svg.polygon
+        [ SvgAttributes.points [ (50, 450), (450, 450), (250, 320) ] ] []
+    ]
+    |> FeatherIcons.customIcon
+    |> FeatherIcons.withStrokeWidth 40
+    |> FeatherIcons.withSize 26
+    |> FeatherIcons.withViewBox "0 0 500 500"
+
+
+verticalMirrorIcon : FeatherIcons.Icon
+verticalMirrorIcon =
+    [ Svg.polygon
+        [ SvgAttributes.points [ (50, 100), (50, 400), (180, 250) ] ] []
+    , Svg.line
+        [ SvgAttributes.x1 <| SvgTypes.px 250
+        , SvgAttributes.y1 <| SvgTypes.px 50
+        , SvgAttributes.x2 <| SvgTypes.px 250
+        , SvgAttributes.y2 <| SvgTypes.px 450
+        , SvgAttributes.strokeDasharray "60, 100"
+        ]
+        []
+    , Svg.polygon
+        [ SvgAttributes.points [ (450, 100), (450, 400), (320, 250) ] ] []
+    ]
+    |> FeatherIcons.customIcon
+    |> FeatherIcons.withStrokeWidth 40
+    |> FeatherIcons.withSize 26
+    |> FeatherIcons.withViewBox "0 0 500 500"
+
+
 aspectRatioLockButton : Model -> Svg Msg
-aspectRatioLockButton { isSnapToGrid, isAspectRatioLocked, palette, spacing, fontSize } =
+aspectRatioLockButton { isSnapToGrid, isAspectRatioLocked, palette, fontSize } =
     if isSnapToGrid then
         Svg.g [] []
 
     else
         activeComponentButton fontSize
-            (-1.5 * toFloat fontSize.title - toFloat spacing.small)
+            (-0.5 * toFloat fontSize.title)
             (if isAspectRatioLocked then
                 FeatherIcons.lock
 
@@ -4209,13 +4353,13 @@ aspectRatioLockButton { isSnapToGrid, isAspectRatioLocked, palette, spacing, fon
 
 
 copyActiveComponentButton : Model -> Svg Msg
-copyActiveComponentButton { palette, fontSize } =
-    activeComponentButton fontSize (-0.5 * toFloat fontSize.title) FeatherIcons.copy palette.lightFg CopyActiveComponent
+copyActiveComponentButton { palette, spacing, fontSize } =
+    activeComponentButton fontSize (0.5 * toFloat fontSize.title + toFloat spacing.small) FeatherIcons.copy palette.lightFg CopyActiveComponent
 
 
 deleteActiveComponentButton : Model -> Svg Msg
 deleteActiveComponentButton { palette, spacing, fontSize } =
-    activeComponentButton fontSize (0.5 * toFloat fontSize.title + toFloat spacing.small) FeatherIcons.trash2 palette.danger DeleteActiveComponent
+    activeComponentButton fontSize (1.5 * toFloat fontSize.title + 2 * toFloat spacing.small) FeatherIcons.trash2 palette.danger DeleteActiveComponent
 
 
 activeComponentButton : FontSize -> Float -> FeatherIcons.Icon -> E.Color -> Msg -> Svg Msg
