@@ -36,8 +36,8 @@ import Time
 import Translations
 import Translations.CharType
 import Translations.PeriodName
-import Translations.StageName
 import Translations.ScriptName
+import Translations.StageName
 import TypedSvg as Svg
 import TypedSvg.Attributes as SvgAttributes
 import TypedSvg.Core exposing (Svg)
@@ -263,12 +263,12 @@ type alias MyCharRef =
     { char : Grapheme
     , dimension : Vec2
     , position : Vec2
-    , mirror: Mirror
+    , mirror : Mirror
     }
 
 
 type alias Mirror =
-    { x : Bool, y: Bool }
+    { x : Bool, y : Bool }
 
 
 type MirrorDirection
@@ -574,10 +574,10 @@ update msg model =
 
         SetActiveComponent index ->
             setActiveComponent index model
-        
+
         MirrorActiveComponent mirrorDirection ->
             mirrorActiveComponent mirrorDirection model
-        
+
         CopyActiveComponent ->
             copyActiveComponent model
 
@@ -649,7 +649,7 @@ update msg model =
 
         UpdateReferenceImageStage stage ->
             updateReferenceImageStage stage model
-        
+
         UpdateReferenceImageScript script ->
             updateReferenceImageScript script model
 
@@ -763,6 +763,7 @@ updateReferenceImageStage stage model =
                                             | stage =
                                                 Nothing
                                         }
+
                                 else
                                     Just
                                         { time
@@ -794,6 +795,7 @@ updateReferenceImagePeriod period model =
                             Just time ->
                                 if time.period == period then
                                     Nothing
+
                                 else
                                     Just
                                         { time
@@ -1469,9 +1471,8 @@ encodeReferenceImage { image, origin, time, script, url } =
                     Just { period, stage } ->
                         [ ( "time"
                           , Encode.object
-                                ([ ( "period", encodePeriod period )
-                                 ]
-                                    ++ (case stage of
+                                (( "period", encodePeriod period )
+                                    :: (case stage of
                                             Just s ->
                                                 [ ( "stage", encodeStage s ) ]
 
@@ -1582,10 +1583,12 @@ encodeMyCharRef { char, dimension, position, mirror } =
         , ( "dimension", encodeVec2 dimension )
         , ( "position", encodeVec2 position )
         ]
-        ++ if mirror /= emptyMirror then
-            [ ( "mirror", encodeMirror mirror ) ]
-        else
-            []
+            ++ (if mirror /= emptyMirror then
+                    [ ( "mirror", encodeMirror mirror ) ]
+
+                else
+                    []
+               )
 
 
 encodeMirror : Mirror -> Value
@@ -1833,10 +1836,6 @@ stopDragging model =
 
 startDragging : DragData -> Model -> ( Model, Cmd Msg )
 startDragging { index, scale } ({ isSnapToGrid, boxUnits } as model) =
-    let
-        unitPercent =
-            100 / toFloat boxUnits
-    in
     ( updateActiveComponent
         (if isSnapToGrid then
             updateMyCharRefDimension (snapToGrid boxUnits)
@@ -2940,18 +2939,20 @@ renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize
                         case Dict.get char chars of
                             Just myChar ->
                                 E.el
-                                [ E.htmlAttribute <|
-                                    Html.Attributes.style "margin" <|
-                                        String.fromInt (displayFontSize // 4) ++ "px 0"
-                                ] <|
-                                E.html <|
-                                    renderChar
-                                        { model
-                                            | unitSize = toFloat displayFontSize / toFloat boxUnits
-                                            , strokeWidth = strokeWidth * toFloat displayFontSize / (toFloat boxUnits * unitSize)
-                                        }
-                                        RenderModeDisplay
-                                        myChar
+                                    [ E.htmlAttribute <|
+                                        Html.Attributes.style "margin" <|
+                                            String.fromInt (displayFontSize // 4)
+                                                ++ "px 0"
+                                    ]
+                                <|
+                                    E.html <|
+                                        renderChar
+                                            { model
+                                                | unitSize = toFloat displayFontSize / toFloat boxUnits
+                                                , strokeWidth = strokeWidth * toFloat displayFontSize / (toFloat boxUnits * unitSize)
+                                            }
+                                            RenderModeDisplay
+                                            myChar
 
                             Nothing ->
                                 E.text <| char
@@ -3450,8 +3451,7 @@ editor ({ selectedChar, chars, spacing, fontSize } as model) =
                         Just <| UpdateMode BrowseMode
                     }
             , E.el [ E.centerX, Font.size fontSize.title, Font.bold ]
-                (E.text <| unboxChar selectedChar
-                )
+                (E.text <| unboxChar selectedChar)
             , if isMyCharType SimpleCharType (myCharFromChar chars (unboxChar selectedChar)) then
                 E.el [ E.alignRight ] <|
                     iconButton
@@ -3766,8 +3766,7 @@ charCard ({ activeComponentIndex, unitSize, thumbnailUnitSize, boxUnits, strokeW
                 [ E.alignLeft
                 , E.htmlAttribute <| Html.Attributes.style "user-select" "none"
                 ]
-                (E.text <| char
-                )
+                (E.text <| char)
             , if selectedChar == Just char then
                 E.row
                     [ E.alignRight
@@ -3887,9 +3886,9 @@ renderChar ({ unitSize, boxUnits, borderUnits, strokeWidth } as model) renderMod
 
         margin =
             15
-        
+
         renderedMargin =
-            margin - (100 - width) * (0.5 - 1/100 * margin)
+            margin - (100 - width) * (0.5 - 1 / 100 * margin)
     in
     Svg.svg
         ([ SvgAttributes.width <| SvgTypes.px outerBoxSize
@@ -3898,10 +3897,10 @@ renderChar ({ unitSize, boxUnits, borderUnits, strokeWidth } as model) renderMod
          ]
             ++ (case renderMode of
                     RenderModeThumbnail ->
-                        [ SvgAttributes.id ("char-" ++ (charFromMyChar myChar)) ]
-                    
+                        [ SvgAttributes.id ("char-" ++ charFromMyChar myChar) ]
+
                     RenderModeDisplay ->
-                        [ Html.Attributes.style "margin" <| "0 " ++ (String.fromFloat renderedMargin) ]
+                        [ Html.Attributes.style "margin" <| "0 " ++ String.fromFloat renderedMargin ]
 
                     _ ->
                         []
@@ -4020,17 +4019,29 @@ renderCharHelper ({ boxUnits, chars, simpleCharSvgs, activeComponentIndex, palet
 
                             CompoundCharType ->
                                 []
-                        )
-                        ++ if mirror /= emptyMirror then
-                            [ SvgAttributes.transform
-                                [ SvgTypes.Scale
-                                    (if mirror.x then -1 else 1)
-                                    (if mirror.y then -1 else 1)
-                                ]
-                            , Html.Attributes.style "transform-origin" "center"
-                            ]
-                        else
-                            []
+                         )
+                            ++ (if mirror /= emptyMirror then
+                                    [ SvgAttributes.transform
+                                        [ SvgTypes.Scale
+                                            (if mirror.x then
+                                                -1
+
+                                             else
+                                                1
+                                            )
+                                            (if mirror.y then
+                                                -1
+
+                                             else
+                                                1
+                                            )
+                                        ]
+                                    , Html.Attributes.style "transform-origin" "center"
+                                    ]
+
+                                else
+                                    []
+                               )
                         )
                         contents
                     ]
@@ -4198,7 +4209,8 @@ renderCharHelper ({ boxUnits, chars, simpleCharSvgs, activeComponentIndex, palet
                                 (level + 1)
                                 component
                         )
-                            <| myCharFromMyCharRef chars componentRef
+                        <|
+                            myCharFromMyCharRef chars componentRef
                     )
                     components
 
@@ -4239,17 +4251,18 @@ mirrorXButton { palette, fontSize } =
 mirrorYButton : Model -> Svg Msg
 mirrorYButton { palette, spacing, fontSize } =
     activeComponentButton
-    fontSize
-    (-1.5 * toFloat fontSize.title - toFloat spacing.small)
-    mirrorYIcon
-    palette.darkFg
-    (MirrorActiveComponent MirrorDirectionX)
+        fontSize
+        (-1.5 * toFloat fontSize.title - toFloat spacing.small)
+        mirrorYIcon
+        palette.darkFg
+        (MirrorActiveComponent MirrorDirectionX)
 
 
 mirrorXIcon : FeatherIcons.Icon
 mirrorXIcon =
     [ Svg.polygon
-        [ SvgAttributes.points [ (50, 50), (450, 50), (250, 180) ] ] []
+        [ SvgAttributes.points [ ( 50, 50 ), ( 450, 50 ), ( 250, 180 ) ] ]
+        []
     , Svg.line
         [ SvgAttributes.x1 <| SvgTypes.px 50
         , SvgAttributes.y1 <| SvgTypes.px 250
@@ -4259,18 +4272,20 @@ mirrorXIcon =
         ]
         []
     , Svg.polygon
-        [ SvgAttributes.points [ (50, 450), (450, 450), (250, 320) ] ] []
+        [ SvgAttributes.points [ ( 50, 450 ), ( 450, 450 ), ( 250, 320 ) ] ]
+        []
     ]
-    |> FeatherIcons.customIcon
-    |> FeatherIcons.withStrokeWidth 40
-    |> FeatherIcons.withSize 26
-    |> FeatherIcons.withViewBox "0 0 500 500"
+        |> FeatherIcons.customIcon
+        |> FeatherIcons.withStrokeWidth 40
+        |> FeatherIcons.withSize 26
+        |> FeatherIcons.withViewBox "0 0 500 500"
 
 
 mirrorYIcon : FeatherIcons.Icon
 mirrorYIcon =
     [ Svg.polygon
-        [ SvgAttributes.points [ (50, 100), (50, 400), (180, 250) ] ] []
+        [ SvgAttributes.points [ ( 50, 100 ), ( 50, 400 ), ( 180, 250 ) ] ]
+        []
     , Svg.line
         [ SvgAttributes.x1 <| SvgTypes.px 250
         , SvgAttributes.y1 <| SvgTypes.px 50
@@ -4280,12 +4295,13 @@ mirrorYIcon =
         ]
         []
     , Svg.polygon
-        [ SvgAttributes.points [ (450, 100), (450, 400), (320, 250) ] ] []
+        [ SvgAttributes.points [ ( 450, 100 ), ( 450, 400 ), ( 320, 250 ) ] ]
+        []
     ]
-    |> FeatherIcons.customIcon
-    |> FeatherIcons.withStrokeWidth 40
-    |> FeatherIcons.withSize 26
-    |> FeatherIcons.withViewBox "0 0 500 500"
+        |> FeatherIcons.customIcon
+        |> FeatherIcons.withStrokeWidth 40
+        |> FeatherIcons.withSize 26
+        |> FeatherIcons.withViewBox "0 0 500 500"
 
 
 aspectRatioLockButton : Model -> Svg Msg
