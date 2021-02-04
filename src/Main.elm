@@ -4082,32 +4082,27 @@ renderCharHelper ({ boxUnits, chars, simpleCharSvgs, activeComponentIndex, palet
                     100 / Vector2.getY tightDimension.dimension
 
                 styledContents =
-                    case charType of
-                        SimpleCharType ->
-                            let
-                                _ = Debug.log "render mirror" mirror
-                            in
-                            [ Svg.g
-                                ((SvgAttributes.class [ charClassName ])
-                                    :: if mirror /= emptyMirror then
-                                        let
-                                            _ = Debug.log "render mirror" mirror
-                                        in
-                                        [ SvgAttributes.transform
-                                            [ SvgTypes.Scale
-                                                (if mirror.x then -1 else 1)
-                                                (if mirror.y then -1 else 1)
-                                            ]
-                                        , Html.Attributes.style "transform-origin" "center"
-                                        ]
-                                    else
-                                        []
-                                )
-                                contents
-                            ]
+                    [ Svg.g
+                        ((case charType of
+                            SimpleCharType ->
+                                [ SvgAttributes.class [ charClassName ] ]
 
-                        CompoundCharType ->
-                            contents
+                            CompoundCharType ->
+                                []
+                        )
+                        ++ if mirror /= emptyMirror then
+                            [ SvgAttributes.transform
+                                [ SvgTypes.Scale
+                                    (if mirror.x then -1 else 1)
+                                    (if mirror.y then -1 else 1)
+                                ]
+                            , Html.Attributes.style "transform-origin" "center"
+                            ]
+                        else
+                            []
+                        )
+                        contents
+                    ]
 
                 unitPercent =
                     100 / toFloat boxUnits
