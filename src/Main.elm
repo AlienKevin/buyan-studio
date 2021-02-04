@@ -1624,10 +1624,6 @@ gotModel savedModelJson model =
             updateLanguage language newModel
 
         Err _ ->
-            -- let
-            --     _ =
-            --         Debug.log "err" err
-            -- in
             ( model, Cmd.none )
 
 
@@ -1880,12 +1876,6 @@ onDragBy delta ({ dragDelta, isSnapToGrid, boxUnits, unitSize } as model) =
             oldDeltaY =
                 Vector2.getY dragDelta
 
-            -- _ =
-            --     Debug.log "newDragDelta" newDragDelta
-            -- _ =
-            --     Debug.log "deltaX" deltaX
-            -- _ =
-            --     Debug.log "deltaY" deltaY
             deltaX =
                 Vector2.getX delta
 
@@ -2059,10 +2049,6 @@ offsetDrag offsetType isAspectRatioLocked dimension factor xDir yDir delta =
                 )
 
         else
-            -- let
-            --     _ = Debug.log "deltaX" <| xDir * deltaX * factor
-            --     _ = Debug.log "deltaY" <| yDir * deltaY * factor
-            -- in
             Vector2.vec2 (xDir * deltaX) (yDir * deltaY)
 
 
@@ -2150,16 +2136,6 @@ calculateMyCharDimension myChar =
 
         CompoundChar _ components ->
             (\{ minX, minY, maxX, maxY } ->
-                -- let
-                --     _ =
-                --         Debug.log "minX" minX
-                --     _ =
-                --         Debug.log "maxX" maxX
-                --     _ =
-                --         Debug.log "minY" minY
-                --     _ =
-                --         Debug.log "maxY" maxY
-                -- in
                 { position =
                     Vector2.vec2 minX minY
                 , dimension =
@@ -2188,12 +2164,6 @@ calculateMyCharDimension myChar =
                     List.map
                         (\{ position, dimension } ->
                             let
-                                -- _ =
-                                --     Debug.log "char" char
-                                -- _ =
-                                --     Debug.log "topLeftPoint" topLeftPoint
-                                -- _ =
-                                --     Debug.log "bottomRightPoint" bottomRightPoint
                                 topLeftPoint =
                                     position
 
@@ -2305,10 +2275,6 @@ gotSavedSimpleChars svgsJson model =
             }
 
         Err _ ->
-            -- let
-            --     _ =
-            --         Debug.log "err" err
-            -- in
             model
     , Cmd.none
     )
@@ -2336,10 +2302,6 @@ gotNewSimpleChars svgsJson model =
                                                 height =
                                                     Vector2.getY d
 
-                                                -- _ =
-                                                --     Debug.log "width" width
-                                                -- _ =
-                                                --     Debug.log "height" height
                                                 f =
                                                     lerp 0 (max width height) 0 100
                                             in
@@ -2374,10 +2336,6 @@ gotNewSimpleChars svgsJson model =
             }
 
         Err _ ->
-            -- let
-            --     _ =
-            --         Debug.log "err" err
-            -- in
             model
     , Cmd.none
     )
@@ -2576,7 +2534,6 @@ addComponentToSelectedCharPopUp ({ chars, selectedChar, trs, newComponentChar, i
                     let
                         inputLength =
                             String.Graphemes.length newComponentChar
-                        _ = Debug.log "inputLength" inputLength
                     in
                     if inputLength /= 1 then
                         Just <| InvalidInputLength inputLength
@@ -2595,9 +2552,6 @@ addComponentToSelectedCharPopUp ({ chars, selectedChar, trs, newComponentChar, i
                         Nothing
 
                 Nothing ->
-                    let
-                        _ = Debug.log "newComponentChar" newComponentChar
-                    in
                     Just <| InvalidInputLength 0
 
         width =
