@@ -6,6 +6,7 @@
     "elm-version": "0.19.1",
     "dependencies": {
         "direct": {
+            "BrianHicks/elm-string-graphemes": "1.0.3",
             "ChristophP/elm-i18next": "4.2.0",
             "Garados007/elm-svg-parser": "1.0.0",
             "avh4/elm-color": "1.0.0",

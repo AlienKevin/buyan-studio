@@ -29,6 +29,7 @@ import Json.Encode as Encode exposing (Value)
 import List.Extra
 import Math.Vector2 as Vector2 exposing (Vec2)
 import String.Extra
+import String.Graphemes
 import SvgParser
 import Task
 import Time
@@ -92,9 +93,9 @@ port uploadBackupPort : () -> Cmd msg
 
 type alias Model =
     { mode : Mode
-    , chars : Dict Char MyChar
-    , charExplainations : Dict Char Explaination
-    , selectedChar : Maybe Char
+    , chars : Dict Grapheme MyChar
+    , charExplainations : Dict Grapheme Explaination
+    , selectedChar : Maybe Grapheme
     , simpleCharSvgs : SimpleCharSvgs
     , boxUnits : Int
     , borderUnits : Float
@@ -124,6 +125,10 @@ type alias Model =
         FontSize
     , isBackingUp : Bool
     }
+
+
+type alias Grapheme =
+    String
 
 
 type alias Explaination =
@@ -224,8 +229,8 @@ type alias FontSize =
 
 
 type alias SavedModel =
-    { chars : Dict Char MyChar
-    , charExplainations : Dict Char Explaination
+    { chars : Dict Grapheme MyChar
+    , charExplainations : Dict Grapheme Explaination
     , strokeWidth : Float
     , language : Language
     }
@@ -255,7 +260,7 @@ type MyChar
 
 
 type alias MyCharRef =
-    { char : Char
+    { char : Grapheme
     , dimension : Vec2
     , position : Vec2
     , mirror: Mirror
@@ -279,7 +284,7 @@ emptyMirror =
 emptyMyChar : MyChar
 emptyMyChar =
     SimpleChar
-        { char = '?'
+        { char = "?"
         , dimension = Vector2.vec2 0 0
         , position = Vector2.vec2 0 0
         , mirror = emptyMirror
@@ -292,7 +297,7 @@ type MyCharType
 
 
 type alias SimpleCharSvgs =
-    Dict Char SimpleCharSvg
+    Dict Grapheme SimpleCharSvg
 
 
 type alias SimpleCharSvg =
@@ -711,7 +716,7 @@ loadedSimpleChar svgJson model =
 uploadSimpleChar : Model -> ( Model, Cmd Msg )
 uploadSimpleChar model =
     ( model
-    , uploadSimpleCharPort (String.fromChar <| unboxChar model.selectedChar)
+    , uploadSimpleCharPort (unboxChar model.selectedChar)
     )
 
 
@@ -923,7 +928,7 @@ addPendingComponentChar model =
                     Dict.update
                         selectedChar
                         (Maybe.map <|
-                            addComponentToMyChar model.chars (charFromString model.newComponentChar)
+                            addComponentToMyChar model.chars model.newComponentChar
                         )
                         model.chars
                 )
@@ -1326,12 +1331,7 @@ clearChars myCharType model =
 downloadSelectedChar : Model -> ( Model, Cmd Msg )
 downloadSelectedChar model =
     ( model
-    , downloadCharPort <|
-        String.fromChar
-            -- impossible
-            (Maybe.withDefault '?'
-                model.selectedChar
-            )
+    , downloadCharPort <| unboxChar model.selectedChar
     )
 
 
@@ -1402,7 +1402,7 @@ deleteSelectedChar model =
       }
     , case model.selectedChar of
         Just char ->
-            deleteSimpleCharPort (String.fromChar char)
+            deleteSimpleCharPort char
 
         Nothing ->
             Cmd.none
@@ -1439,8 +1439,8 @@ saveModel model =
 encodeModel : Model -> Value
 encodeModel { chars, charExplainations, strokeWidth, language } =
     Encode.object
-        [ ( "chars", Encode.dict String.fromChar encodeMyChar chars )
-        , ( "charExplainations", Encode.dict String.fromChar encodeExplaination charExplainations )
+        [ ( "chars", Encode.dict identity encodeMyChar chars )
+        , ( "charExplainations", Encode.dict identity encodeExplaination charExplainations )
         , ( "strokeWidth", Encode.float strokeWidth )
         , ( "language", encodeLanguage language )
         ]
@@ -1508,9 +1508,9 @@ stringFromLanguage language =
             "LanguageZhHant"
 
 
-encodeChar : Char -> Value
+encodeChar : Grapheme -> Value
 encodeChar =
-    Encode.string << String.fromChar
+    Encode.string
 
 
 encodePeriod : Period -> Value
@@ -1634,16 +1634,8 @@ gotModel savedModelJson model =
 decodeSavedModel : Decoder SavedModel
 decodeSavedModel =
     Decode.map4 SavedModel
-        (Decode.field "chars"
-            (Decode.map (Dict.Extra.mapKeys charFromString) <|
-                Decode.dict decodeMyChar
-            )
-        )
-        (Decode.field "charExplainations"
-            (Decode.map (Dict.Extra.mapKeys charFromString) <|
-                Decode.dict decodeExplaination
-            )
-        )
+        (Decode.field "chars" <| Decode.dict decodeMyChar)
+        (Decode.field "charExplainations" <| Decode.dict decodeExplaination)
         (Decode.field "strokeWidth" Decode.float)
         (Decode.field "language" decodeLanguage)
 
@@ -1770,21 +1762,6 @@ decodeLanguage =
             )
 
 
-decodeChar : Decoder Char
-decodeChar =
-    Decode.map charFromString Decode.string
-
-
-charFromString : String -> Char
-charFromString string =
-    case String.uncons string of
-        Just ( firstChar, _ ) ->
-            firstChar
-
-        Nothing ->
-            '?'
-
-
 decodeMyChar : Decoder MyChar
 decodeMyChar =
     Decode.field "type" Decode.string
@@ -1811,7 +1788,7 @@ decodeMyChar =
 decodeMyCharRef : Decoder MyCharRef
 decodeMyCharRef =
     Decode.map4 MyCharRef
-        (Decode.field "char" decodeChar)
+        (Decode.field "char" Decode.string)
         (Decode.field "dimension" decodeVec2)
         (Decode.field "position" decodeVec2)
         (Decode.map (Maybe.withDefault emptyMirror) <| Decode.maybe <| Decode.field "mirror" decodeMirror)
@@ -2119,7 +2096,7 @@ snapToGrid boxUnits position =
         (roundToGrid <| Vector2.getY position)
 
 
-addComponentToMyChar : Dict Char MyChar -> Char -> MyChar -> MyChar
+addComponentToMyChar : Dict Grapheme MyChar -> Grapheme -> MyChar -> MyChar
 addComponentToMyChar chars componentChar myChar =
     case myChar of
         -- impossible
@@ -2265,7 +2242,7 @@ addPendingCompoundChar : Model -> ( Model, Cmd Msg )
 addPendingCompoundChar model =
     let
         newChar =
-            charFromString model.newCompoundChar
+            model.newCompoundChar
 
         newCompoundChar =
             CompoundChar
@@ -2475,7 +2452,7 @@ updateMyCharRefDimension func myCharRef =
 -- Requires: char to be in chars
 
 
-myCharTypeFromChar : Dict Char MyChar -> Char -> MyCharType
+myCharTypeFromChar : Dict Grapheme MyChar -> Grapheme -> MyCharType
 myCharTypeFromChar chars char =
     case Dict.get char chars of
         Just myChar ->
@@ -2594,11 +2571,12 @@ addComponentToSelectedCharPopUp : Model -> E.Element Msg
 addComponentToSelectedCharPopUp ({ chars, selectedChar, trs, newComponentChar, inputError, boxUnits, thumbnailUnitSize, palette, spacing, fontSize } as model) =
     let
         newInputError =
-            case String.uncons newComponentChar of
+            case String.Graphemes.uncons newComponentChar of
                 Just ( char, _ ) ->
                     let
                         inputLength =
-                            String.length newComponentChar
+                            String.Graphemes.length newComponentChar
+                        _ = Debug.log "inputLength" inputLength
                     in
                     if inputLength /= 1 then
                         Just <| InvalidInputLength inputLength
@@ -2617,6 +2595,9 @@ addComponentToSelectedCharPopUp ({ chars, selectedChar, trs, newComponentChar, i
                         Nothing
 
                 Nothing ->
+                    let
+                        _ = Debug.log "newComponentChar" newComponentChar
+                    in
                     Just <| InvalidInputLength 0
 
         width =
@@ -3019,16 +3000,16 @@ renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize
                                         myChar
 
                             Nothing ->
-                                E.text <| String.fromChar char
+                                E.text <| char
                     )
                 << (\charsInLine ->
                         if List.isEmpty charsInLine then
-                            [ ' ' ]
+                            [ " " ]
 
                         else
                             charsInLine
                    )
-                << String.toList
+                << String.Graphemes.toList
             )
             lines
 
@@ -3037,7 +3018,7 @@ confirmDeleteSelectedCharPopUp : Model -> E.Element Msg
 confirmDeleteSelectedCharPopUp ({ selectedChar } as model) =
     confirmDeletePopUpTemplate
         model
-        (String.fromChar (unboxChar selectedChar))
+        (unboxChar selectedChar)
         DeleteSelectedChar
 
 
@@ -3045,7 +3026,7 @@ addCompoundCharPopUp : Model -> E.Element Msg
 addCompoundCharPopUp ({ trs, newCompoundChar, inputError, palette, spacing, fontSize, boxUnits, thumbnailUnitSize } as model) =
     let
         inputLength =
-            String.length newCompoundChar
+            String.Graphemes.length newCompoundChar
 
         newInputError =
             if inputLength /= 1 then
@@ -3515,9 +3496,7 @@ editor ({ selectedChar, chars, spacing, fontSize } as model) =
                         Just <| UpdateMode BrowseMode
                     }
             , E.el [ E.centerX, Font.size fontSize.title, Font.bold ]
-                (E.text <|
-                    String.fromChar <|
-                        unboxChar selectedChar
+                (E.text <| unboxChar selectedChar
                 )
             , if isMyCharType SimpleCharType (myCharFromChar chars (unboxChar selectedChar)) then
                 E.el [ E.alignRight ] <|
@@ -3558,12 +3537,12 @@ editor ({ selectedChar, chars, spacing, fontSize } as model) =
         ]
 
 
-unboxChar : Maybe Char -> Char
+unboxChar : Maybe Grapheme -> Grapheme
 unboxChar =
-    Maybe.withDefault '?'
+    Maybe.withDefault "?"
 
 
-isCharPartOfMyChar : Dict Char MyChar -> Char -> MyChar -> Bool
+isCharPartOfMyChar : Dict Grapheme MyChar -> Grapheme -> MyChar -> Bool
 isCharPartOfMyChar chars char myChar =
     case myChar of
         SimpleChar ref ->
@@ -3632,7 +3611,7 @@ gridBackground { boxUnits, borderUnits, unitSize, palette, selectedChar, isRefer
                 , SvgAttributes.pointerEvents "none"
                 , Html.Attributes.style "user-select" "none"
                 ]
-                [ TypedSvg.Core.text <| String.fromChar <| unboxChar selectedChar
+                [ TypedSvg.Core.text <| unboxChar selectedChar
                 ]
 
           else
@@ -3833,9 +3812,7 @@ charCard ({ activeComponentIndex, unitSize, thumbnailUnitSize, boxUnits, strokeW
                 [ E.alignLeft
                 , E.htmlAttribute <| Html.Attributes.style "user-select" "none"
                 ]
-                (E.text <|
-                    String.fromChar <|
-                        char
+                (E.text <| char
                 )
             , if selectedChar == Just char then
                 E.row
@@ -3892,7 +3869,7 @@ charCard ({ activeComponentIndex, unitSize, thumbnailUnitSize, boxUnits, strokeW
         ]
 
 
-charFromMyChar : MyChar -> Char
+charFromMyChar : MyChar -> Grapheme
 charFromMyChar myChar =
     case myChar of
         SimpleChar { char } ->
@@ -3967,7 +3944,7 @@ renderChar ({ unitSize, boxUnits, borderUnits, strokeWidth } as model) renderMod
          ]
             ++ (case renderMode of
                     RenderModeThumbnail ->
-                        [ SvgAttributes.id ("char-" ++ String.fromChar (charFromMyChar myChar)) ]
+                        [ SvgAttributes.id ("char-" ++ (charFromMyChar myChar)) ]
                     
                     RenderModeDisplay ->
                         [ Html.Attributes.style "margin" <| "0 " ++ (String.fromFloat renderedMargin) ]
@@ -4243,7 +4220,7 @@ renderCharHelper ({ boxUnits, chars, simpleCharSvgs, activeComponentIndex, palet
 
                 Nothing ->
                     -- impossible
-                    TypedSvg.Core.text <| "Error rendering " ++ String.fromChar char
+                    TypedSvg.Core.text <| "Error rendering " ++ char
 
         CompoundChar { dimension, position } components ->
             constraint CompoundCharType dimension position <|
@@ -4439,14 +4416,14 @@ dragTrigger isDraggable data =
         []
 
 
-myCharFromChar : Dict Char MyChar -> Char -> MyChar
+myCharFromChar : Dict Grapheme MyChar -> Grapheme -> MyChar
 myCharFromChar chars char =
     -- impossible
     Maybe.withDefault emptyMyChar <|
         Dict.get char chars
 
 
-myCharFromMyCharRef : Dict Char MyChar -> MyCharRef -> MyChar
+myCharFromMyCharRef : Dict Grapheme MyChar -> MyCharRef -> MyChar
 myCharFromMyCharRef chars ref =
     let
         myChar =
@@ -4533,10 +4510,7 @@ subscriptions { drag } =
 
 decodeSimpleCharSvgs : Decode.Decoder SimpleCharSvgs
 decodeSimpleCharSvgs =
-    Decode.map
-        (Dict.Extra.mapKeys charFromString)
-    <|
-        Decode.dict decodeSimpleCharSvg
+    Decode.dict decodeSimpleCharSvg
 
 
 decodeSimpleCharSvg : Decode.Decoder SimpleCharSvg
