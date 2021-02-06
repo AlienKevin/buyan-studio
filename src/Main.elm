@@ -60,7 +60,7 @@ port uploadSimpleCharPort : String -> Cmd msg
 port loadedSimpleCharPort : (Encode.Value -> msg) -> Sub msg
 
 
-port downloadCharPort : String -> Cmd msg
+port downloadCharsPort : List String -> Cmd msg
 
 
 port saveModelPort : Value -> Cmd msg
@@ -472,6 +472,7 @@ type Msg
     | ToggleIsSnapToGrid
     | ToggleIsReferenceCharShown
     | DownloadSelectedChar
+    | DownloadCharsForPreview
     | UpdateLanguage Language
     | GotTranslations (Result Http.Error I18Next.Translations)
     | UpdateDevice Int Int
@@ -613,6 +614,9 @@ update msg model =
 
         DownloadSelectedChar ->
             downloadSelectedChar model
+        
+        DownloadCharsForPreview ->
+            downloadCharsForPreview model
 
         UpdateLanguage language ->
             updateLanguage language model
@@ -1333,7 +1337,14 @@ clearChars myCharType model =
 downloadSelectedChar : Model -> ( Model, Cmd Msg )
 downloadSelectedChar model =
     ( model
-    , downloadCharPort <| unboxChar model.selectedChar
+    , downloadCharsPort [ unboxChar model.selectedChar ]
+    )
+
+
+downloadCharsForPreview : Model -> ( Model, Cmd Msg )
+downloadCharsForPreview model =
+    ( model
+    , downloadCharsPort <| String.Graphemes.toList <| model.paragraphForPreview
     )
 
 
@@ -2907,7 +2918,22 @@ previewInParagraphPopUp ({ palette, spacing, fontSize } as model) =
                         }
                     )
                 ]
-            , E.el [ E.width <| E.fillPortion 2, E.height E.fill, E.paddingXY 0 spacing.small ] <| strokeWidthPreference model
+            , E.column
+                [ E.width <| E.fillPortion 2
+                , E.height E.fill
+                , E.paddingXY 0 spacing.small
+                , E.spacing spacing.small
+                ]
+                [ strokeWidthPreference model
+                , iconButton
+                    { icon =
+                        FeatherIcons.download
+                    , size =
+                        fontSize.large
+                    , onPress =
+                        Just <| DownloadCharsForPreview
+                    }
+                ]
             ]
         , E.el
             [ E.width E.fill

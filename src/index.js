@@ -189,8 +189,12 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
         });
       });
 
-      app.ports.downloadCharPort.subscribe(function (char) {
-        var svgData = document.getElementById("char-" + char).outerHTML;
+      function downloadChar(char) {
+        var svgElement = document.getElementById("char-" + char);
+        if (svgElement === null) {
+          return;
+        }
+        var svgData = svgElement.outerHTML;
         //add name spaces.
         if (!svgData.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) {
           svgData = svgData.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
@@ -206,6 +210,10 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
         document.body.appendChild(downloadLink);
         downloadLink.click();
         document.body.removeChild(downloadLink);
+      }
+
+      app.ports.downloadCharsPort.subscribe(function (chars) {
+        chars.forEach(downloadChar);
       });
 
       app.ports.saveModelPort.subscribe(function (model) {
