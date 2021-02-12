@@ -2949,16 +2949,20 @@ renderPreviewInParagraph : Int -> Model -> E.Element Msg
 renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize, boxUnits, strokeWidth } as model) =
     let
         lines =
-            String.split "\n" paragraphForPreview
+            String.Graphemes.lines paragraphForPreview
     in
-    E.column
+    E.row
         [ E.centerX
         , E.centerY
+        , E.htmlAttribute <| Html.Attributes.style "flex-direction" "row-reverse"
+        , E.height <| E.fill
         ]
     <|
         List.map
             (E.wrappedRow
                 [ E.width E.fill
+                , E.htmlAttribute <| Html.Attributes.style "flex-flow" "column wrap-reverse"
+                , E.height <| E.fill
                 ]
                 << List.map
                     (\char ->
