@@ -4,6 +4,11 @@
     "snapToGrid": "Snap to grid",
     "showReference": "Show reference",
     "previewInParagraph": "Preview in Paragraph",
+    "orientation": "Orientation",
+    "orientationType": {
+        "horizontal": "Horizontal",
+        "vertical": "Vertical"
+    },
     "language": "Language",
     "writeTextHereToPreview": "Write text here to preview",
     "doYouWantToDelete": "Do you want to delete ",

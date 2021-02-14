@@ -38,6 +38,7 @@ import Translations.CharType
 import Translations.PeriodName
 import Translations.ScriptName
 import Translations.StageName
+import Translations.OrientationType
 import TypedSvg as Svg
 import TypedSvg.Attributes as SvgAttributes
 import TypedSvg.Core exposing (Svg)
@@ -2865,7 +2866,7 @@ confirmDeletePopUpTemplate ({ trs, palette, spacing, fontSize } as model) target
 
 
 previewInParagraphPopUp : Model -> E.Element Msg
-previewInParagraphPopUp ({ palette, spacing, fontSize, previewOrientation } as model) =
+previewInParagraphPopUp ({ palette, spacing, fontSize, previewOrientation, trs } as model) =
     let
         previewFontSize =
             fontSize.title * 2
@@ -2953,12 +2954,12 @@ previewInParagraphPopUp ({ palette, spacing, fontSize, previewOrientation } as m
                     , selected = Just previewOrientation
                     , label =
                         Input.labelAbove [ E.alignLeft, E.paddingEach { top = 0, bottom = spacing.small, left = 0, right = 0 } ]
-                            (E.text "Orientation")
+                            (E.text <| Translations.orientation trs)
                     , options =
                         [ Input.optionWith Horizontal
-                            (radioOption palette.lightFg fontSize (E.text "Horizontal"))
+                            (radioOption palette.darkFg fontSize (E.text <| Translations.OrientationType.horizontal trs))
                         , Input.optionWith Vertical
-                            (radioOption palette.lightFg fontSize (E.text "Vertical"))
+                            (radioOption palette.darkFg fontSize (E.text <| Translations.OrientationType.vertical trs))
                         ]
                     }
                 , iconButton

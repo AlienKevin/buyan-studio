@@ -4,6 +4,11 @@
     "snapToGrid": "对齐网格",
     "showReference": "显示参考",
     "previewInParagraph": "在段落中预览",
+    "orientation": "排列方向",
+    "orientationType": {
+        "horizontal": "橫式",
+        "vertical": "纵式"
+    },
     "language": "语言",
     "writeTextHereToPreview": "在此处写文字进行预览",
     "doYouWantToDelete": "您确定要删除",

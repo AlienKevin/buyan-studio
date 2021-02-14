@@ -32,6 +32,11 @@ previewInParagraph translations =
     t translations "previewInParagraph"
 
 
+orientation : Translations -> String
+orientation translations =
+    t translations "orientation"
+
+
 language : Translations -> String
 language translations =
     t translations "language"
