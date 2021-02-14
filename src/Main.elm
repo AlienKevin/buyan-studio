@@ -114,7 +114,7 @@ type alias Model =
     , isAspectRatioLocked : Bool
     , isSnapToGrid : Bool
     , isReferenceCharShown : Bool
-    , paragraphForPreview : String
+    , previewParagraph : String
     , previewOrientation : TextOrientation
     , trs : I18Next.Translations
     , language : Language
@@ -366,7 +366,7 @@ init flags =
             , isAspectRatioLocked = False
             , isSnapToGrid = True
             , isReferenceCharShown = True
-            , paragraphForPreview = ""
+            , previewParagraph = ""
             , previewOrientation = Vertical
             , trs = I18Next.initialTranslations
             , language = LanguageEn
@@ -476,7 +476,7 @@ type Msg
     | UpdateStrokeWidth Float
     | ToggleIsAspectRatioLocked
     | PreviewInParagraph
-    | UpdateParagraphForPreview String
+    | UpdatePreviewParagraph String
     | UpdatePreviewOrientation TextOrientation
     | ToggleIsSnapToGrid
     | ToggleIsReferenceCharShown
@@ -612,8 +612,8 @@ update msg model =
         PreviewInParagraph ->
             previewInParagraph model
 
-        UpdateParagraphForPreview paragraph ->
-            updateParagraphForPreview paragraph model
+        UpdatePreviewParagraph paragraph ->
+            updatePreviewParagraph paragraph model
 
         UpdatePreviewOrientation newOrientation ->
             updatePreviewOrientation newOrientation model
@@ -1366,7 +1366,7 @@ downloadSelectedChar model =
 downloadCharsForPreview : Model -> ( Model, Cmd Msg )
 downloadCharsForPreview model =
     ( model
-    , downloadCharsPort <| String.Graphemes.toList <| model.paragraphForPreview
+    , downloadCharsPort <| String.Graphemes.toList <| model.previewParagraph
     )
 
 
@@ -1390,10 +1390,10 @@ toggleIsSnapToGrid model =
     )
 
 
-updateParagraphForPreview : String -> Model -> ( Model, Cmd Msg )
-updateParagraphForPreview paragraph model =
+updatePreviewParagraph : String -> Model -> ( Model, Cmd Msg )
+updatePreviewParagraph paragraph model =
     ( { model
-        | paragraphForPreview =
+        | previewParagraph =
             paragraph
       }
     , Cmd.none
@@ -2928,9 +2928,9 @@ previewInParagraphPopUp ({ palette, spacing, fontSize, previewOrientation, trs }
                         , E.height <| E.fill
                         ]
                         { onChange =
-                            UpdateParagraphForPreview
+                            UpdatePreviewParagraph
                         , text =
-                            model.paragraphForPreview
+                            model.previewParagraph
                         , placeholder =
                             Just <| Input.placeholder [ E.alignLeft ] (E.text <| Translations.writeTextHereToPreview model.trs)
                         , label =
@@ -2983,10 +2983,10 @@ previewInParagraphPopUp ({ palette, spacing, fontSize, previewOrientation, trs }
 
 
 renderPreviewInParagraph : Int -> Model -> E.Element Msg
-renderPreviewInParagraph displayFontSize ({ paragraphForPreview, previewOrientation, chars, unitSize, boxUnits, strokeWidth } as model) =
+renderPreviewInParagraph displayFontSize ({ previewParagraph, previewOrientation, chars, unitSize, boxUnits, strokeWidth } as model) =
     let
         lines =
-            String.Graphemes.lines paragraphForPreview
+            String.Graphemes.lines previewParagraph
     in
     ( case previewOrientation of
         Horizontal ->
