@@ -114,6 +114,7 @@ type alias Model =
     , isSnapToGrid : Bool
     , isReferenceCharShown : Bool
     , paragraphForPreview : String
+    , previewOrientation : TextOrientation
     , trs : I18Next.Translations
     , language : Language
     , device : E.Device
@@ -125,6 +126,11 @@ type alias Model =
         FontSize
     , isBackingUp : Bool
     }
+
+
+type TextOrientation
+    = Horizontal
+    | Vertical
 
 
 type alias Grapheme =
@@ -360,6 +366,7 @@ init flags =
             , isSnapToGrid = True
             , isReferenceCharShown = True
             , paragraphForPreview = ""
+            , previewOrientation = Vertical
             , trs = I18Next.initialTranslations
             , language = LanguageEn
             , device =
@@ -469,6 +476,7 @@ type Msg
     | ToggleIsAspectRatioLocked
     | PreviewInParagraph
     | UpdateParagraphForPreview String
+    | UpdatePreviewOrientation TextOrientation
     | ToggleIsSnapToGrid
     | ToggleIsReferenceCharShown
     | DownloadSelectedChar
@@ -606,6 +614,9 @@ update msg model =
         UpdateParagraphForPreview paragraph ->
             updateParagraphForPreview paragraph model
 
+        UpdatePreviewOrientation newOrientation ->
+            updatePreviewOrientation newOrientation model
+
         ToggleIsSnapToGrid ->
             toggleIsSnapToGrid model
 
@@ -668,6 +679,16 @@ update msg model =
 
         UploadBackup ->
             uploadBackup model
+
+
+updatePreviewOrientation : TextOrientation -> Model -> ( Model, Cmd Msg )
+updatePreviewOrientation newOrientation model =
+    ( { model
+        | previewOrientation =
+            newOrientation
+    }
+    , Cmd.none
+    )
 
 
 uploadBackup : Model -> ( Model, Cmd Msg )
@@ -2844,7 +2865,7 @@ confirmDeletePopUpTemplate ({ trs, palette, spacing, fontSize } as model) target
 
 
 previewInParagraphPopUp : Model -> E.Element Msg
-previewInParagraphPopUp ({ palette, spacing, fontSize } as model) =
+previewInParagraphPopUp ({ palette, spacing, fontSize, previewOrientation } as model) =
     let
         previewFontSize =
             fontSize.title * 2
@@ -2925,6 +2946,21 @@ previewInParagraphPopUp ({ palette, spacing, fontSize } as model) =
                 , E.spacing spacing.small
                 ]
                 [ strokeWidthPreference model
+                , Input.radio
+                    [ E.spacing spacing.small
+                    ]
+                    { onChange = UpdatePreviewOrientation
+                    , selected = Just previewOrientation
+                    , label =
+                        Input.labelAbove [ E.alignLeft, E.paddingEach { top = 0, bottom = spacing.small, left = 0, right = 0 } ]
+                            (E.text "Orientation")
+                    , options =
+                        [ Input.optionWith Horizontal
+                            (radioOption palette.lightFg fontSize (E.text "Horizontal"))
+                        , Input.optionWith Vertical
+                            (radioOption palette.lightFg fontSize (E.text "Vertical"))
+                        ]
+                    }
                 , iconButton
                     { icon =
                         FeatherIcons.download
@@ -2946,24 +2982,39 @@ previewInParagraphPopUp ({ palette, spacing, fontSize } as model) =
 
 
 renderPreviewInParagraph : Int -> Model -> E.Element Msg
-renderPreviewInParagraph displayFontSize ({ paragraphForPreview, chars, unitSize, boxUnits, strokeWidth } as model) =
+renderPreviewInParagraph displayFontSize ({ paragraphForPreview, previewOrientation, chars, unitSize, boxUnits, strokeWidth } as model) =
     let
         lines =
             String.Graphemes.lines paragraphForPreview
     in
-    E.row
-        [ E.centerX
-        , E.centerY
-        , E.htmlAttribute <| Html.Attributes.style "flex-direction" "row-reverse"
-        , E.height <| E.fill
-        ]
+    ( case previewOrientation of
+        Horizontal ->
+            E.column
+                [ E.centerX
+                , E.centerY
+                ]
+        
+        Vertical ->
+            E.row
+                [ E.centerX
+                , E.centerY
+                , E.htmlAttribute <| Html.Attributes.style "flex-direction" "row-reverse"
+                , E.height <| E.fill
+                ]
+    )
     <|
         List.map
             (E.wrappedRow
-                [ E.width E.fill
-                , E.htmlAttribute <| Html.Attributes.style "flex-flow" "column wrap-reverse"
-                , E.height <| E.fill
-                ]
+                ( case previewOrientation of
+                    Horizontal ->
+                        [ E.width E.fill ]
+                    
+                    Vertical ->
+                        [ E.width E.fill
+                        , E.htmlAttribute <| Html.Attributes.style "flex-flow" "column wrap-reverse"
+                        , E.height <| E.fill
+                        ]
+                )
                 << List.map
                     (\char ->
                         case Dict.get char chars of
