@@ -9,6 +9,7 @@
         "horizontal": "橫式",
         "vertical": "縱式"
     },
+    "fontSize": "字體大小",
     "language": "語言",
     "writeTextHereToPreview": "在此處寫文字進行預覽",
     "doYouWantToDelete": "您確定要刪除",

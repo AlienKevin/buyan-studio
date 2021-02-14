@@ -9,6 +9,7 @@
         "horizontal": "Horizontal",
         "vertical": "Vertical"
     },
+    "fontSize": "Font size",
     "language": "Language",
     "writeTextHereToPreview": "Write text here to preview",
     "doYouWantToDelete": "Do you want to delete ",

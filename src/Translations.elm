@@ -37,6 +37,11 @@ orientation translations =
     t translations "orientation"
 
 
+fontSize : Translations -> String
+fontSize translations =
+    t translations "fontSize"
+
+
 language : Translations -> String
 language translations =
     t translations "language"

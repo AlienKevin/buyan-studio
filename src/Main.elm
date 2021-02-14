@@ -116,6 +116,7 @@ type alias Model =
     , isReferenceCharShown : Bool
     , previewParagraph : String
     , previewOrientation : TextOrientation
+    , previewFontSize : Int
     , trs : I18Next.Translations
     , language : Language
     , device : E.Device
@@ -331,6 +332,16 @@ maxStrokeWidth =
     70
 
 
+minPreviewFontSize : Float
+minPreviewFontSize =
+    30
+
+
+maxPreviewFontSize : Float
+maxPreviewFontSize =
+    200
+
+
 minBorderUnits : Float
 minBorderUnits =
     2
@@ -344,6 +355,19 @@ maxBorderUnits =
 init : Value -> ( Model, Cmd Msg )
 init flags =
     let
+        fontSize =
+            { small =
+                16
+            , medium =
+                20
+            , large =
+                30
+            , title =
+                40
+            , thumb =
+                30
+            }
+        
         model =
             { mode = BrowseMode
             , chars = Dict.empty
@@ -368,6 +392,7 @@ init flags =
             , isReferenceCharShown = True
             , previewParagraph = ""
             , previewOrientation = Vertical
+            , previewFontSize = fontSize.title * 2
             , trs = I18Next.initialTranslations
             , language = LanguageEn
             , device =
@@ -395,17 +420,7 @@ init flags =
                 , large = 30
                 }
             , fontSize =
-                { small =
-                    16
-                , medium =
-                    20
-                , large =
-                    30
-                , title =
-                    40
-                , thumb =
-                    30
-                }
+                fontSize
             , isBackingUp =
                 False
             }
@@ -478,6 +493,7 @@ type Msg
     | PreviewInParagraph
     | UpdatePreviewParagraph String
     | UpdatePreviewOrientation TextOrientation
+    | UpdatePreviewFontSize Int
     | ToggleIsSnapToGrid
     | ToggleIsReferenceCharShown
     | DownloadSelectedChar
@@ -617,6 +633,9 @@ update msg model =
 
         UpdatePreviewOrientation newOrientation ->
             updatePreviewOrientation newOrientation model
+        
+        UpdatePreviewFontSize newSize ->
+            updatePreviewFontSize newSize model
 
         ToggleIsSnapToGrid ->
             toggleIsSnapToGrid model
@@ -681,6 +700,18 @@ update msg model =
         UploadBackup ->
             uploadBackup model
 
+
+updatePreviewFontSize : Int -> Model -> ( Model, Cmd Msg )
+updatePreviewFontSize newSize model =
+    let
+        _ = Debug.log "newSize" newSize
+    in
+    ( { model
+        | previewFontSize =
+            newSize
+    }
+    , Cmd.none
+    )
 
 updatePreviewOrientation : TextOrientation -> Model -> ( Model, Cmd Msg )
 updatePreviewOrientation newOrientation model =
@@ -2866,11 +2897,8 @@ confirmDeletePopUpTemplate ({ trs, palette, spacing, fontSize } as model) target
 
 
 previewInParagraphPopUp : Model -> E.Element Msg
-previewInParagraphPopUp ({ palette, spacing, fontSize, previewOrientation, trs } as model) =
+previewInParagraphPopUp ({ palette, spacing, fontSize, previewOrientation, previewFontSize, trs } as model) =
     let
-        previewFontSize =
-            fontSize.title * 2
-
         maxParagraphInputWidth =
             fontSize.medium * 30
 
@@ -2947,6 +2975,7 @@ previewInParagraphPopUp ({ palette, spacing, fontSize, previewOrientation, trs }
                 , E.spacing spacing.small
                 ]
                 [ strokeWidthPreference model
+                , previewFontSizePreference model
                 , Input.radio
                     [ E.spacing spacing.small
                     ]
@@ -3429,6 +3458,39 @@ strokeWidthPreference { palette, spacing, fontSize, strokeWidth, trs } =
         , max = maxStrokeWidth
         , step = Just 1
         , value = strokeWidth
+        , thumb = sliderThumb palette fontSize
+        }
+
+
+previewFontSizePreference : Model -> E.Element Msg
+previewFontSizePreference { palette, spacing, fontSize, previewFontSize, trs } =
+    Input.slider
+        [ E.height (E.px fontSize.small)
+        , E.width (E.px <| fontSize.small * 7)
+        , E.behindContent
+            (E.el
+                [ E.width E.fill
+                , E.height (E.px <| fontSize.small // 3)
+                , E.centerY
+                , Background.color palette.darkFg
+                , Border.rounded (fontSize.small // 3)
+                ]
+                E.none
+            )
+        ]
+        { onChange = UpdatePreviewFontSize << round
+        , label =
+            Input.labelLeft []
+                (E.row
+                    [ E.spacing spacing.small ]
+                    [ E.text <| Translations.fontSize trs
+                    , E.text <| String.fromInt previewFontSize
+                    ]
+                )
+        , min = minPreviewFontSize
+        , max = maxPreviewFontSize
+        , step = Just 1
+        , value = toFloat previewFontSize
         , thumb = sliderThumb palette fontSize
         }
 
