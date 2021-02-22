@@ -4383,10 +4383,10 @@ activeComponentButtons charType ({ palette } as model) =
 
 
 mirrorXButton : Model -> Svg Msg
-mirrorXButton { palette, fontSize } =
+mirrorXButton { palette, spacing, fontSize } =
     activeComponentButton
         fontSize
-        (-0.5 * toFloat fontSize.title)
+        (-1.5 * toFloat fontSize.title - toFloat spacing.small)
         mirrorXIcon
         palette.darkFg
         (MirrorActiveComponent MirrorDirectionY)
@@ -4396,7 +4396,7 @@ mirrorYButton : Model -> Svg Msg
 mirrorYButton { palette, spacing, fontSize } =
     activeComponentButton
         fontSize
-        (-1.5 * toFloat fontSize.title - toFloat spacing.small)
+        (-2.5 * toFloat fontSize.title - 2 * toFloat spacing.small)
         mirrorYIcon
         palette.darkFg
         (MirrorActiveComponent MirrorDirectionX)
