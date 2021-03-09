@@ -2441,11 +2441,19 @@ updatePendingCompoundChar charInput model =
 
 selectChar : Grapheme -> Model -> ( Model, Cmd Msg )
 selectChar char model =
+    let
+        selectedMyChar =
+            unboxMyChar <| Dict.get char model.chars
+    in
     ( { model
         | selectedChar =
             Just char
         , selectedCharHistory =
-            emptyHistory
+            { snapshots =
+                Array.fromList [ selectedMyChar ]
+            , currentIndex =
+                0
+            }
         , activeComponentIndex =
             Nothing
       }
