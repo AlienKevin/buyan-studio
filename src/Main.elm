@@ -206,6 +206,7 @@ type Mode
 type InputError
     = InvalidInputLength Int
     | CharacterNotFound
+    | CharacterAlreadyExists
     | ContainsSelfReference
 
 
@@ -466,6 +467,7 @@ type Msg
     | UploadSimpleChar
     | LoadedSimpleChar Value
     | SelectChar MyChar
+    | EditChar Grapheme
     | RequestAddComponentToSelectedChar
     | UpdatePendingComponentChar String
     | AddPendingComponentChar
@@ -552,6 +554,9 @@ update msg model =
 
         SelectChar myChar ->
             selectChar myChar model
+        
+        EditChar char ->
+            editChar char model
 
         RequestAddComponentToSelectedChar ->
             requestAddComponentToSelectedChar model
@@ -699,6 +704,20 @@ update msg model =
 
         UploadBackup ->
             uploadBackup model
+
+
+editChar : Grapheme -> Model -> (Model, Cmd Msg)
+editChar char model =
+    ({ model
+        | selectedChar =
+            Just char
+        , mode =
+            EditMode
+        , popUp =
+            NoPopUp
+    }
+    , Cmd.none
+    )
 
 
 updatePreviewFontSize : Int -> Model -> ( Model, Cmd Msg )
@@ -2670,6 +2689,9 @@ addComponentToSelectedCharPopUp ({ chars, selectedChar, trs, newComponentChar, i
 
                                     CharacterNotFound ->
                                         Translations.characterNotFound trs newComponentChar
+                                    
+                                    CharacterAlreadyExists ->
+                                        "Character already exists"
                             ]
 
                     Nothing ->
@@ -3089,7 +3111,7 @@ confirmDeleteSelectedCharPopUp ({ selectedChar } as model) =
 
 
 addCompoundCharPopUp : Model -> E.Element Msg
-addCompoundCharPopUp ({ trs, newCompoundChar, inputError, palette, spacing, fontSize, boxUnits, thumbnailUnitSize } as model) =
+addCompoundCharPopUp ({ trs, newCompoundChar, inputError, palette, spacing, fontSize, boxUnits, thumbnailUnitSize, chars } as model) =
     let
         inputLength =
             String.Graphemes.length newCompoundChar
@@ -3098,9 +3120,10 @@ addCompoundCharPopUp ({ trs, newCompoundChar, inputError, palette, spacing, font
             if inputLength /= 1 then
                 Just <| InvalidInputLength inputLength
 
+            else if Dict.member newCompoundChar chars then
+                Just <| CharacterAlreadyExists
             else
                 Nothing
-
         width =
             toFloat boxUnits * thumbnailUnitSize * 2.3
     in
@@ -3137,15 +3160,32 @@ addCompoundCharPopUp ({ trs, newCompoundChar, inputError, palette, spacing, font
             ([ E.centerX
              , E.below <|
                 case inputError of
-                    Just _ ->
-                        E.paragraph
+                    Just e ->
+                        E.column
+                        [ E.centerX
+                        , Font.size fontSize.small
+                        , E.width <| E.px <| round width
+                        , E.padding spacing.small
+                        , E.spacing spacing.small
+                        ]
+                        [ E.paragraph
                             [ E.centerX
-                            , Font.size fontSize.small
-                            , E.width <| E.px <| round width
-                            , E.padding spacing.small
                             ]
-                            [ E.text (Translations.acceptOnlyOneCharacter trs)
+                            [ E.text <|
+                                case e of
+                                    CharacterAlreadyExists ->
+                                        "Character already exists"
+                                    _ ->
+                                        Translations.acceptOnlyOneCharacter trs
                             ]
+                        , case e of
+                            CharacterAlreadyExists ->
+                                E.el [ E.centerX ] <|
+                                    textButton model ("Edit " ++ newCompoundChar)
+                                        (Just <| EditChar newCompoundChar)
+                            _ ->
+                                E.none
+                        ]
 
                     Nothing ->
                         E.none
