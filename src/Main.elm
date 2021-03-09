@@ -1,6 +1,6 @@
 port module Main exposing (..)
 
-import Array
+import Array exposing (Array)
 import Browser
 import Browser.Events
 import Color
@@ -44,6 +44,7 @@ import TypedSvg.Attributes as SvgAttributes
 import TypedSvg.Core exposing (Svg)
 import TypedSvg.Events
 import TypedSvg.Types as SvgTypes
+import Maybe
 
 
 port addSimpleCharsPort : () -> Cmd msg
@@ -97,6 +98,7 @@ type alias Model =
     , chars : Dict Grapheme MyChar
     , charExplainations : Dict Grapheme Explaination
     , selectedChar : Maybe Grapheme
+    , selectedCharHistory : History
     , simpleCharSvgs : SimpleCharSvgs
     , boxUnits : Int
     , borderUnits : Float
@@ -127,6 +129,19 @@ type alias Model =
     , fontSize :
         FontSize
     , isBackingUp : Bool
+    }
+
+
+type alias History =
+    { snapshots : Array MyChar
+    , currentIndex : Int
+    }
+
+
+emptyHistory : History
+emptyHistory =
+    { snapshots = Array.empty
+    , currentIndex = 0
     }
 
 
@@ -215,6 +230,7 @@ type alias Palette =
     , lightFg : E.Color
     , darkFg : E.Color
     , danger : E.Color
+    , disabled : E.Color
     , black : E.Color
     , white : E.Color
     }
@@ -374,6 +390,7 @@ init flags =
             , chars = Dict.empty
             , charExplainations = Dict.empty
             , selectedChar = Nothing
+            , selectedCharHistory = emptyHistory
             , simpleCharSvgs = Dict.empty
             , boxUnits = 36
             , borderUnits = 3
@@ -409,6 +426,8 @@ init flags =
                     toElmUiColor Color.lightPurple
                 , danger =
                     E.rgb255 210 99 71
+                , disabled =
+                    toElmUiColor Color.grey
                 , black =
                     toElmUiColor Color.black
                 , white =
@@ -467,6 +486,8 @@ type Msg
     | UploadSimpleChar
     | LoadedSimpleChar Value
     | SelectChar Grapheme
+    | UndoSelectedCharHistory
+    | RedoSelectedCharHistory
     | EditChar Grapheme
     | RequestAddComponentToSelectedChar
     | UpdatePendingComponentChar String
@@ -482,7 +503,7 @@ type Msg
     | ClosePopUp
     | OnDragBy Vec2
     | StartDragging DragData
-    | StopDragging
+    | EndDragging
     | DragMsg (Draggable.Msg DragData)
     | SetActiveComponent (Maybe Int)
     | MirrorActiveComponent MirrorDirection
@@ -530,6 +551,7 @@ dragConfig =
     Draggable.customConfig
         [ Draggable.Events.onDragBy (\( dx, dy ) -> Vector2.vec2 dx dy |> OnDragBy)
         , Draggable.Events.onDragStart StartDragging
+        , Draggable.Events.onDragEnd EndDragging
         , Draggable.Events.onClick (\{ index } -> SetActiveComponent (Just index))
         ]
 
@@ -554,6 +576,12 @@ update msg model =
 
         SelectChar char ->
             selectChar char model
+        
+        UndoSelectedCharHistory ->
+            undoSelectedCharHistory model
+        
+        RedoSelectedCharHistory ->
+            redoSelectedCharHistory model
         
         EditChar char ->
             editChar char model
@@ -600,8 +628,8 @@ update msg model =
         StartDragging target ->
             startDragging target model
 
-        StopDragging ->
-            stopDragging model
+        EndDragging ->
+            endDragging model
 
         SetActiveComponent index ->
             setActiveComponent index model
@@ -704,6 +732,65 @@ update msg model =
 
         UploadBackup ->
             uploadBackup model
+
+
+undoSelectedCharHistory : Model -> (Model, Cmd Msg)
+undoSelectedCharHistory model =
+    updateSelectedCharHistory
+        (\index ->
+            if index == 0 then
+                index
+            else
+                index - 1
+        )
+        model
+
+
+redoSelectedCharHistory : Model -> (Model, Cmd Msg)
+redoSelectedCharHistory model =
+    let
+        lastIndex =
+            Array.length model.selectedCharHistory.snapshots - 1
+    in
+    updateSelectedCharHistory
+        (\index ->
+            if index == lastIndex then
+                index
+            else
+                index + 1
+        )
+        model
+
+
+updateSelectedCharHistory : (Int -> Int) -> Model -> (Model, Cmd Msg)
+updateSelectedCharHistory updateCurrentIndex model =
+    let
+        history =
+            model.selectedCharHistory
+        
+        newCurrentIndex =
+            updateCurrentIndex history.currentIndex
+        
+        selectedChar =
+            unboxChar model.selectedChar
+        
+        currentSnapshot =
+            unboxMyChar <| Array.get newCurrentIndex history.snapshots
+    in
+    ( { model
+        | selectedCharHistory =
+            { history
+                | currentIndex =
+                    newCurrentIndex
+            }
+        , chars =
+            Dict.insert
+                selectedChar
+                currentSnapshot
+                model.chars
+    }
+    , Cmd.none
+    )
 
 
 editChar : Grapheme -> Model -> (Model, Cmd Msg)
@@ -1900,9 +1987,9 @@ setActiveComponent index model =
     )
 
 
-stopDragging : Model -> ( Model, Cmd Msg )
-stopDragging model =
-    ( { model
+endDragging : Model -> ( Model, Cmd Msg )
+endDragging model =
+    ( addSnapshot <| { model
         | activeComponentIndex =
             Nothing
         , dragDelta =
@@ -1910,6 +1997,34 @@ stopDragging model =
       }
     , Cmd.none
     )
+
+
+addSnapshot : Model -> Model
+addSnapshot model =
+    let
+        history =
+            model.selectedCharHistory
+        selectedMyChar =
+            unboxMyChar <| Dict.get (unboxChar model.selectedChar) model.chars
+        lastIndex =
+            Array.length history.snapshots - 1
+    in
+    { model
+        | selectedCharHistory =
+            if history.currentIndex >= lastIndex then
+                { history
+                    | snapshots =
+                        Array.push selectedMyChar history.snapshots
+                    , currentIndex =
+                        history.currentIndex + 1
+                }
+            else
+                { history
+                    | snapshots =
+                        Array.push selectedMyChar <|
+                            Array.slice 0 history.currentIndex history.snapshots
+                }
+    }
 
 
 startDragging : DragData -> Model -> ( Model, Cmd Msg )
@@ -2329,6 +2444,8 @@ selectChar char model =
     ( { model
         | selectedChar =
             Just char
+        , selectedCharHistory =
+            emptyHistory
         , activeComponentIndex =
             Nothing
       }
@@ -2686,7 +2803,7 @@ addComponentToSelectedCharPopUp ({ chars, selectedChar, trs, newComponentChar, i
                                         Translations.characterNotFound trs newComponentChar
                                     
                                     CharacterAlreadyExists ->
-                                        Translations.characterAlreadyExists trs
+                                        ""
                             ]
 
                     Nothing ->
@@ -3613,7 +3730,7 @@ radioOption borderColor fontSize optionLabel status =
 
 
 editor : Model -> E.Element Msg
-editor ({ selectedChar, chars, spacing, fontSize } as model) =
+editor ({ selectedChar, selectedCharHistory, chars, spacing, palette, fontSize } as model) =
     E.column
         []
         [ E.row
@@ -3631,8 +3748,50 @@ editor ({ selectedChar, chars, spacing, fontSize } as model) =
                     }
             , E.el [ E.centerX, Font.size fontSize.title, Font.bold ]
                 (E.text <| unboxChar selectedChar)
-            , if isMyCharType SimpleCharType (myCharFromChar chars (unboxChar selectedChar)) then
-                E.el [ E.alignRight ] <|
+            , E.el
+                [ E.alignRight
+                , E.spacing spacing.small
+                , E.onLeft <|
+                    if Array.isEmpty selectedCharHistory.snapshots then
+                        E.none
+                    else
+                        E.row
+                        [ E.spacing spacing.small
+                        , E.paddingXY spacing.small 0
+                        ]
+                        [ E.el
+                            [ Font.color <|
+                                if selectedCharHistory.currentIndex == 0 then
+                                    palette.disabled
+                                else
+                                    palette.black
+                            ] <|
+                            iconButton
+                            { icon =
+                                FeatherIcons.cornerUpLeft
+                            , size =
+                                fontSize.title
+                            , onPress =
+                                Just <| UndoSelectedCharHistory
+                            }
+                        , E.el
+                            [ Font.color <|
+                                if selectedCharHistory.currentIndex == Array.length selectedCharHistory.snapshots - 1 then
+                                    palette.disabled
+                                else
+                                    palette.black
+                            ] <|
+                            iconButton
+                            { icon =
+                                FeatherIcons.cornerUpRight
+                            , size =
+                                fontSize.title
+                            , onPress =
+                                Just <| RedoSelectedCharHistory
+                            }
+                        ]
+                ] <|
+                if isMyCharType SimpleCharType (myCharFromChar chars (unboxChar selectedChar)) then
                     iconButton
                         { icon =
                             FeatherIcons.refreshCw
@@ -3642,8 +3801,7 @@ editor ({ selectedChar, chars, spacing, fontSize } as model) =
                             Just <| UploadSimpleChar
                         }
 
-              else
-                E.el [ E.alignRight ] <|
+                else
                     iconButton
                         { icon =
                             FeatherIcons.plus
@@ -3673,6 +3831,11 @@ editor ({ selectedChar, chars, spacing, fontSize } as model) =
 unboxChar : Maybe Grapheme -> Grapheme
 unboxChar =
     Maybe.withDefault "?"
+
+
+unboxMyChar : Maybe MyChar -> MyChar
+unboxMyChar =
+    Maybe.withDefault emptyMyChar
 
 
 isCharPartOfMyChar : Dict Grapheme MyChar -> Grapheme -> MyChar -> Bool
