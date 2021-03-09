@@ -1081,7 +1081,7 @@ toggleIsReferenceCharShown model =
 
 addPendingComponentChar : Model -> ( Model, Cmd Msg )
 addPendingComponentChar model =
-    ( { model
+    ( addSnapshot <| { model
         | chars =
             Maybe.map
                 (\selectedChar ->
