@@ -87,6 +87,16 @@ characterNotFound translations char =
     tr translations Curly "characterNotFound" [ ( "char", char ) ]
 
 
+characterAlreadyExists : Translations -> String
+characterAlreadyExists translations =
+    t translations "characterAlreadyExists"
+
+
+editChar : Translations -> String -> String
+editChar translations char =
+    tr translations Curly "editChar" [ ( "char", char ) ]
+
+
 explaination : Translations -> String
 explaination translations =
     t translations "explaination"

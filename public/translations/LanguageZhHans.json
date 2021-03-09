@@ -23,6 +23,8 @@
     "acceptOnlyOneCharacter": "仅接受1个字符",
     "cannotContainSelfReference": "不能含有自我参照",
     "characterNotFound": "找不到字符“{{char}}”",
+    "characterAlreadyExists": "字符已经存在",
+    "editChar": "编辑“{{char}}”",
     "explaination": "解释",
     "referenceImage": "参考字型",
     "script": "字体",

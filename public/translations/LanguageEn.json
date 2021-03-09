@@ -23,6 +23,8 @@
     "acceptOnlyOneCharacter": "Accept only 1 character",
     "cannotContainSelfReference": "Cannot contain self reference",
     "characterNotFound": "Character \"{{char}}\" is not found",
+    "characterAlreadyExists": "Character already exists",
+    "editChar": "Edit \"{{char}}\"",
     "explaination": "Explaination",
     "referenceImage": "Reference image",
     "script": "Script",

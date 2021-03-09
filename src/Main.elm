@@ -2691,7 +2691,7 @@ addComponentToSelectedCharPopUp ({ chars, selectedChar, trs, newComponentChar, i
                                         Translations.characterNotFound trs newComponentChar
                                     
                                     CharacterAlreadyExists ->
-                                        "Character already exists"
+                                        Translations.characterAlreadyExists trs
                             ]
 
                     Nothing ->
@@ -3174,14 +3174,14 @@ addCompoundCharPopUp ({ trs, newCompoundChar, inputError, palette, spacing, font
                             [ E.text <|
                                 case e of
                                     CharacterAlreadyExists ->
-                                        "Character already exists"
+                                        Translations.characterAlreadyExists trs
                                     _ ->
                                         Translations.acceptOnlyOneCharacter trs
                             ]
                         , case e of
                             CharacterAlreadyExists ->
                                 E.el [ E.centerX ] <|
-                                    textButton model ("Edit " ++ newCompoundChar)
+                                    textButton model (Translations.editChar trs newCompoundChar)
                                         (Just <| EditChar newCompoundChar)
                             _ ->
                                 E.none
