@@ -1378,7 +1378,7 @@ deleteActiveComponent ({ activeComponentIndex } as model) =
 
 copyActiveComponent : Model -> ( Model, Cmd Msg )
 copyActiveComponent ({ activeComponentIndex, isSnapToGrid, boxUnits } as model) =
-    ( { model
+    ( addSnapshot <| { model
         | chars =
             Maybe.map
                 (\selectedChar ->
