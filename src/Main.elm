@@ -1355,7 +1355,7 @@ mirrorActiveComponent direction ({ activeComponentIndex } as model) =
 
 deleteActiveComponent : Model -> ( Model, Cmd Msg )
 deleteActiveComponent ({ activeComponentIndex } as model) =
-    ( { model
+    ( addSnapshot <| { model
         | chars =
             Maybe.map
                 (\selectedChar ->
