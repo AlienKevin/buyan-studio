@@ -466,7 +466,7 @@ type Msg
     | GotSavedSimpleChars Value
     | UploadSimpleChar
     | LoadedSimpleChar Value
-    | SelectChar MyChar
+    | SelectChar Grapheme
     | EditChar Grapheme
     | RequestAddComponentToSelectedChar
     | UpdatePendingComponentChar String
@@ -552,8 +552,8 @@ update msg model =
         LoadedSimpleChar svgJson ->
             loadedSimpleChar svgJson model
 
-        SelectChar myChar ->
-            selectChar myChar model
+        SelectChar char ->
+            selectChar char model
         
         EditChar char ->
             editChar char model
@@ -708,16 +708,11 @@ update msg model =
 
 editChar : Grapheme -> Model -> (Model, Cmd Msg)
 editChar char model =
-    ({ model
-        | selectedChar =
-            Just char
-        , mode =
-            EditMode
-        , popUp =
-            NoPopUp
-    }
-    , Cmd.none
-    )
+    selectChar char model
+    |> Tuple.first
+    |> updateMode EditMode
+    |> Tuple.first
+    |> closePopUp
 
 
 updatePreviewFontSize : Int -> Model -> ( Model, Cmd Msg )
@@ -2329,11 +2324,11 @@ updatePendingCompoundChar charInput model =
     )
 
 
-selectChar : MyChar -> Model -> ( Model, Cmd Msg )
-selectChar myChar model =
+selectChar : Grapheme -> Model -> ( Model, Cmd Msg )
+selectChar char model =
     ( { model
         | selectedChar =
-            Just <| charFromMyChar myChar
+            Just char
         , activeComponentIndex =
             Nothing
       }
@@ -3919,7 +3914,7 @@ charCard ({ activeComponentIndex, unitSize, thumbnailUnitSize, boxUnits, strokeW
         ([ E.width <| E.px <| round outerBoxSize
          , Background.color palette.lightBg
          , Border.rounded spacing.medium
-         , Events.onClick <| SelectChar myChar
+         , Events.onClick <| SelectChar char
          , E.pointer
          ]
             ++ (case selectedChar of
