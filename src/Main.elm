@@ -1311,7 +1311,7 @@ updateLanguage language model =
 
 mirrorActiveComponent : MirrorDirection -> Model -> ( Model, Cmd Msg )
 mirrorActiveComponent direction ({ activeComponentIndex } as model) =
-    ( { model
+    ( addSnapshot <| { model
         | chars =
             Maybe.map
                 (\selectedChar ->
