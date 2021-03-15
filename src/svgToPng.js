@@ -3,10 +3,9 @@
  * converts an svg string to base64 png using the domUrl
  * @param {string} svgText the svgtext
  * @param {number} [margin=0] the width of the border - the image size will be height+margin by width+margin
- * @param {string} [fill] optionally backgrund canvas fill
  * @return {Promise} a promise to the bas64 png image
  */
-var svgToPng = function (svgText, margin, fill) {
+var svgToPng = function (svgText, margin) {
     // convert an svg text to png using the browser
     return new Promise(function (resolve, reject) {
         try {
@@ -50,21 +49,6 @@ var svgToPng = function (svgText, margin, fill) {
             myImage.onload = function () {
                 // draw it to the canvas
                 ctx.drawImage(myImage, margin, margin);
-
-                // if it needs some styling, we need a new canvas
-                if (fill) {
-                    var styled = document.createElement("canvas");
-                    styled.width = canvas.width;
-                    styled.height = canvas.height;
-                    var styledCtx = styled.getContext("2d");
-                    styledCtx.save();
-                    styledCtx.fillStyle = fill;
-                    styledCtx.fillRect(0, 0, canvas.width, canvas.height);
-                    styledCtx.strokeRect(0, 0, canvas.width, canvas.height);
-                    styledCtx.restore();
-                    styledCtx.drawImage(canvas, 0, 0);
-                    canvas = styled;
-                }
                 // we don't need the original any more
                 domUrl.revokeObjectURL(url);
                 // now we can resolve the promise, passing the base64 url
