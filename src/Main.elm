@@ -1190,7 +1190,7 @@ updateDevice width height model =
                     2.6
 
                 E.BigDesktop ->
-                    4
+                    8
         , spacing =
             let
                 tiny =
