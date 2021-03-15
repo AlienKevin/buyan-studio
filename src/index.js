@@ -6,6 +6,7 @@ import "regenerator-runtime/runtime.js";
 // The imported methods will use the File System
 // Access API or a fallback implementation.
 import { fileOpen, fileSave } from 'browser-nativefs';
+import { svgToPng } from './svgToPng';
 
 var baseStorageKey = 'buyan-studio-';
 var modelStorageKey = baseStorageKey + 'model';
@@ -189,31 +190,28 @@ localforage.getItem(modelStorageKey, function (error, savedModelJson) {
         });
       });
 
-      function downloadChar(char) {
-        var svgElement = document.getElementById("char-" + char);
-        if (svgElement === null) {
-          return;
-        }
-        var svgData = svgElement.outerHTML;
-        //add name spaces.
-        if (!svgData.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) {
-          svgData = svgData.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
-        }
-        if (!svgData.match(/^<svg[^>]+"http\:\/\/www\.w3\.org\/1999\/xlink"/)) {
-          svgData = svgData.replace(/^<svg/, '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
-        }
-        var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
-        var svgUrl = URL.createObjectURL(svgBlob);
-        var downloadLink = document.createElement("a");
-        downloadLink.href = svgUrl;
-        downloadLink.download = char + ".svg";
-        document.body.appendChild(downloadLink);
-        downloadLink.click();
-        document.body.removeChild(downloadLink);
-      }
-
       app.ports.downloadCharsPort.subscribe(function (chars) {
-        chars.forEach(downloadChar);
+        chars.forEach(function(char) {
+          var svgElement = document.getElementById("char-" + char);
+          if (svgElement === null) {
+            return;
+          }
+          var svgData = new XMLSerializer().serializeToString(svgElement);
+          svgToPng(svgData)
+            .then(function(pngData) {
+              console.log(pngData);
+              var downloadLink = document.createElement("a");
+              downloadLink.href = pngData;
+              downloadLink.download = char + ".png";
+              document.body.appendChild(downloadLink);
+              downloadLink.click();
+              document.body.removeChild(downloadLink);
+            })
+            .catch(function(err) {
+              console.log("Error converting svg to png");
+              console.log(err);
+            });
+        });
       });
 
       app.ports.saveModelPort.subscribe(function (model) {
